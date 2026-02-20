@@ -42,12 +42,6 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
-import { 
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -111,6 +105,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { fetchWindyWeather } from '@/lib/windy-api';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
+const IMMOBILITY_THRESHOLD_METERS = 20;
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
@@ -131,7 +126,6 @@ export default function VesselTrackerPage() {
   const [isSharing, setIsSharing] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isFollowMode, setIsFollowMode] = useState(false);
   const [googleMap, setGoogleMap] = useState<google.maps.Map | null>(null);
   const [wakeLock, setWakeLock] = useState<any>(null);
 
@@ -140,10 +134,15 @@ export default function VesselTrackerPage() {
   const [anchorPos, setAnchorPos] = useState<{ lat: number, lng: number } | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   
-  // Refs pour éviter les boucles de rendu infini
+  // REFS POUR ÉVITER LES BOUCLES INFINIES
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
   const isSharingRef = useRef(false);
   const anchorPosRef = useRef<{ lat: number, lng: number } | null>(null);
+  const vesselNicknameRef = useRef('');
+  const sharingIdRef = useRef('');
+  const fleetIdRef = useRef('');
+  const isGhostModeRef = useRef(false);
+  const mooringRadiusRef = useRef(100);
 
   // IDENTIFICATION & IDS
   const [vesselNickname, setVesselNickname] = useState('');
@@ -177,8 +176,23 @@ export default function VesselTrackerPage() {
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isAnyAudioPlaying, setIsAnyAudioPlaying] = useState(false);
 
-  const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
-  const fleetId = useMemo(() => customFleetId.trim().toUpperCase(), [customFleetId]);
+  // Mise à jour des refs quand le state change pour les callbacks
+  useEffect(() => { vesselNicknameRef.current = vesselNickname; }, [vesselNickname]);
+  useEffect(() => { isGhostModeRef.current = isGhostMode; }, [isGhostMode]);
+  useEffect(() => { mooringRadiusRef.current = mooringRadius; }, [mooringRadius]);
+  useEffect(() => { isSharingRef.current = isSharing; }, [isSharing]);
+
+  const sharingId = useMemo(() => {
+    const id = (customSharingId.trim() || user?.uid || '').toUpperCase();
+    sharingIdRef.current = id;
+    return id;
+  }, [customSharingId, user?.uid]);
+
+  const fleetId = useMemo(() => {
+    const id = customFleetId.trim().toUpperCase();
+    fleetIdRef.current = id;
+    return id;
+  }, [customFleetId]);
   
   const shouldPanOnNextFix = useRef(false);
   const watchIdRef = useRef<number | null>(null);
@@ -192,7 +206,7 @@ export default function VesselTrackerPage() {
   const userProfileRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: profile } = useDoc<UserAccount>(userProfileRef);
 
-  const savedVesselIds = useMemo(() => profile?.savedVesselIds || [], [profile?.savedVesselIds]);
+  const memoizedSavedVesselIds = useMemo(() => profile?.savedVesselIds || [], [profile?.savedVesselIds]);
   
   // Real-time followed vessels
   const vesselsQuery = useMemoFirebase(() => {
@@ -200,25 +214,13 @@ export default function VesselTrackerPage() {
     if (mode === 'fleet' && fleetId) {
         return query(collection(firestore, 'vessels'), where('fleetId', '==', fleetId), where('isSharing', '==', true));
     }
-    const queryIds = [...savedVesselIds];
+    const queryIds = [...memoizedSavedVesselIds];
     if (isSharing && !queryIds.includes(sharingId)) queryIds.push(sharingId);
     if (queryIds.length === 0) return null;
     return query(collection(firestore, 'vessels'), where('id', 'in', queryIds.slice(0, 10)));
-  }, [firestore, savedVesselIds, mode, fleetId, isSharing, sharingId]);
+  }, [firestore, memoizedSavedVesselIds, mode, fleetId, isSharing, sharingId]);
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
-
-  const technicalLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !sharingId) return null;
-    return query(collection(firestore, 'vessels', sharingId, 'logs_technique'), orderBy('time', 'desc'));
-  }, [firestore, sharingId]);
-  const { data: dbTechnicalLogs } = useCollection<any>(technicalLogsQuery);
-
-  const tacticalLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !sharingId) return null;
-    return query(collection(firestore, 'vessels', sharingId, 'logs_tactique'), orderBy('time', 'desc'));
-  }, [firestore, sharingId]);
-  const { data: dbTacticalLogs } = useCollection<any>(tacticalLogsQuery);
 
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -234,13 +236,13 @@ export default function VesselTrackerPage() {
   }, [dbSounds]);
 
   // --- HANDLERS ---
-  const stopAllAudio = () => {
+  const stopAllAudio = useCallback(() => {
     if (activeAudioRef.current) {
         activeAudioRef.current.pause();
         activeAudioRef.current = null;
     }
     setIsAnyAudioPlaying(false);
-  };
+  }, []);
 
   const handleStopSharing = useCallback(async () => {
     if (!user || !firestore) return;
@@ -251,7 +253,7 @@ export default function VesselTrackerPage() {
     stopAllAudio();
     
     try {
-        await updateDoc(doc(firestore, 'vessels', sharingId), { 
+        await updateDoc(doc(firestore, 'vessels', sharingIdRef.current), { 
             isSharing: false, 
             lastActive: serverTimestamp(),
             statusChangedAt: serverTimestamp() 
@@ -267,7 +269,7 @@ export default function VesselTrackerPage() {
     anchorPosRef.current = null;
     lastSentStatusRef.current = null;
     toast({ title: "Partage arrêté" });
-  }, [user, firestore, sharingId, toast]);
+  }, [user, firestore, stopAllAudio, toast]);
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharingRef.current && data.isSharing !== false)) return;
@@ -286,14 +288,14 @@ export default function VesselTrackerPage() {
         }
 
         const updatePayload: any = { 
-            id: sharingId,
+            id: sharingIdRef.current,
             userId: user.uid, 
-            displayName: vesselNickname || user.displayName || 'Capitaine', 
+            displayName: vesselNicknameRef.current || user.displayName || 'Capitaine', 
             isSharing: data.isSharing !== undefined ? data.isSharing : isSharingRef.current, 
             lastActive: serverTimestamp(),
-            fleetId: fleetId || null,
-            isGhostMode: isGhostMode,
-            mooringRadius: mooringRadius,
+            fleetId: fleetIdRef.current || null,
+            isGhostMode: isGhostModeRef.current,
+            mooringRadius: mooringRadiusRef.current,
             ...batteryInfo,
             ...data 
         };
@@ -303,10 +305,10 @@ export default function VesselTrackerPage() {
             lastSentStatusRef.current = newStatus;
         }
 
-        setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
+        setDoc(doc(firestore, 'vessels', sharingIdRef.current), updatePayload, { merge: true }).catch(() => {});
     };
     update();
-  }, [user, firestore, sharingId, fleetId, isGhostMode, vesselNickname, mooringRadius]);
+  }, [user, firestore]);
 
   const playVesselSound = useCallback((soundId: string, shouldLoop: boolean = false) => {
     const sound = availableSounds.find(s => s.id === soundId || s.label === soundId);
@@ -319,7 +321,7 @@ export default function VesselTrackerPage() {
       activeAudioRef.current = audio;
       setIsAnyAudioPlaying(true);
     }
-  }, [availableSounds, vesselPrefs.vesselVolume]);
+  }, [availableSounds, vesselPrefs.vesselVolume, stopAllAudio]);
 
   const handleTacticalReport = async (type: string, photo?: string) => {
     if (!user || !firestore || !currentPos || !isSharing) {
@@ -411,7 +413,6 @@ export default function VesselTrackerPage() {
         shouldPanOnNextFix.current = true;
         if (!isSharing) {
             setIsSharing(true);
-            isSharingRef.current = true;
         }
     }
   };
@@ -436,6 +437,19 @@ export default function VesselTrackerPage() {
     } catch (e) {}
   };
 
+  const handleSaveSmsSettings = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            emergencyContact: emergencyContact,
+            vesselSmsMessage: vesselSmsMessage,
+            isEmergencyEnabled: isEmergencyEnabled,
+            isCustomMessageEnabled: isCustomMessageEnabled
+        });
+        toast({ title: "Paramètres SMS sauvegardés" });
+    } catch (e) {}
+  };
+
   // --- TRACKING CORE ---
   useEffect(() => {
     if (!isSharing || !navigator.geolocation) return;
@@ -443,7 +457,6 @@ export default function VesselTrackerPage() {
     setIsInitializing(true);
     setStartTime(new Date());
     lastUpdateTimeRef.current = Date.now();
-    isSharingRef.current = true;
 
     const startTrackingAfterDelay = setTimeout(() => {
         setIsInitializing(false);
@@ -492,7 +505,7 @@ export default function VesselTrackerPage() {
             if (nextStatus !== vesselStatusRef.current || eventLabel || timeDiff >= 60) {
                 const durationMinutes = startTime ? differenceInMinutes(new Date(), startTime) : 0;
                 const logEntry = {
-                    vesselName: vesselNickname || 'Mon Navire',
+                    vesselName: vesselNicknameRef.current || 'Mon Navire',
                     statusLabel: eventLabel || nextStatus.toUpperCase(),
                     time: new Date(),
                     pos: newPos,
@@ -504,17 +517,6 @@ export default function VesselTrackerPage() {
 
                 setTechnicalLogs(prev => [logEntry, ...prev].slice(0, 50));
                 
-                if (firestore && sharingId) {
-                    addDoc(collection(firestore, 'vessels', sharingId, 'logs_technique'), {
-                        ...logEntry,
-                        time: serverTimestamp(),
-                        vesselId: sharingId,
-                        fleetId: fleetId || null
-                    });
-                }
-
-                setVesselStatus(nextStatus);
-                vesselStatusRef.current = nextStatus;
                 updateVesselInFirestore({ 
                     location: { latitude, longitude }, 
                     status: nextStatus, 
@@ -524,6 +526,8 @@ export default function VesselTrackerPage() {
 
                 lastUpdatePosRef.current = newPos;
                 lastUpdateTimeRef.current = now;
+                vesselStatusRef.current = nextStatus;
+                setVesselStatus(nextStatus);
             }
         },
         () => toast({ variant: 'destructive', title: "GPS perdu" }),
@@ -534,7 +538,7 @@ export default function VesselTrackerPage() {
         clearTimeout(startTrackingAfterDelay);
         if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     };
-  }, [isSharing, playVesselSound, loopEnabled, toast, updateVesselInFirestore, vesselNickname, firestore, sharingId, fleetId, startTime]);
+  }, [isSharing, playVesselSound, loopEnabled, toast, updateVesselInFirestore, startTime]);
 
   const handleMooringToggle = () => {
     if (anchorPos) {
@@ -708,7 +712,7 @@ export default function VesselTrackerPage() {
                       <X className="size-6" /> ARRÊTER LE PARTAGE
                   </Button>
               ) : (
-                  <Button className="w-full h-16 text-sm font-black uppercase tracking-widest shadow-xl rounded-2xl gap-3" onClick={() => { setIsSharing(true); isSharingRef.current = true; }}>
+                  <Button className="w-full h-16 text-sm font-black uppercase tracking-widest shadow-xl rounded-2xl gap-3" onClick={() => setIsSharing(true)}>
                       <Navigation className="size-6" /> LANCER PARTAGE
                   </Button>
               )}
@@ -742,7 +746,7 @@ export default function VesselTrackerPage() {
                       <TabsContent value="technique" className="m-0">
                         <ScrollArea className="h-64">
                             <div className="divide-y">
-                                {(dbTechnicalLogs || technicalLogs).map((h: any, i: number) => (
+                                {technicalLogs.map((h: any, i: number) => (
                                     <div key={i} className="p-3 flex items-center justify-between text-[10px] hover:bg-muted/30 transition-colors">
                                         <div className="flex flex-col gap-0.5">
                                             <div className="flex items-center gap-2">
@@ -756,7 +760,7 @@ export default function VesselTrackerPage() {
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-2 opacity-40">
-                                                <span className="text-[8px] font-bold uppercase">{h.time ? format(h.time.toDate ? h.time.toDate() : new Date(h.time), 'HH:mm:ss') : '--:--'}</span>
+                                                <span className="text-[8px] font-bold uppercase">{format(h.time, 'HH:mm:ss')}</span>
                                                 <span className="text-[8px] font-bold uppercase">{h.duration}</span>
                                                 <span className="text-[8px] font-bold uppercase">Acc: {h.accuracy}m</span>
                                             </div>
@@ -770,25 +774,23 @@ export default function VesselTrackerPage() {
                       <TabsContent value="tactique" className="m-0">
                         <ScrollArea className="h-64">
                             <div className="divide-y">
-                                {dbTacticalLogs?.map((h: any, i: number) => (
+                                {followedVessels?.flatMap(v => v.huntingMarkers || []).sort((a,b) => new Date(b.time).getTime() - new Date(a.time).getTime()).map((h: any, i: number) => (
                                     <div key={i} className="p-3 flex items-center justify-between text-[10px] hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => googleMap?.panTo({ lat: h.lat, lng: h.lng })}>
                                         <div className="flex items-center gap-3">
                                             <div className="p-2 bg-primary/10 rounded-lg">
-                                                {h.type === 'OISEAUX' ? <Bird className="size-4 text-orange-600" /> : <Fish className="size-4 text-primary" />}
+                                                {h.label === 'OISEAUX' ? <Bird className="size-4 text-orange-600" /> : <Fish className="size-4 text-primary" />}
                                             </div>
                                             <div className="flex flex-col gap-0.5">
-                                                <span className="font-black text-slate-800 uppercase">{h.type}</span>
+                                                <span className="font-black text-slate-800 uppercase">{h.label}</span>
                                                 <div className="flex items-center gap-2 opacity-60">
-                                                    <span className="text-[8px] font-bold">{h.time ? format(new Date(h.time), 'HH:mm', { locale: fr }) : '--:--'}</span>
-                                                    {h.windSpeed !== null && <span className="flex items-center gap-1"><Wind className="size-2.5" /> {h.windSpeed} nds</span>}
-                                                    {h.temp !== null && <span className="flex items-center gap-1"><Thermometer className="size-2.5" /> {h.temp}°C</span>}
+                                                    <span className="text-[8px] font-bold">{!isNaN(new Date(h.time).getTime()) ? format(new Date(h.time), 'HH:mm', { locale: fr }) : '--:--'}</span>
                                                 </div>
                                             </div>
                                         </div>
                                         {h.photoUrl && <div className="size-8 rounded border overflow-hidden"><img src={h.photoUrl} className="w-full h-full object-cover" alt="" /></div>}
                                     </div>
                                 ))}
-                                {(!dbTacticalLogs || dbTacticalLogs.length === 0) && (
+                                {(!followedVessels?.some(v => v.huntingMarkers?.length)) && (
                                     <p className="text-center py-10 text-[9px] font-black uppercase opacity-20 tracking-widest italic">Aucun signalement tactique</p>
                                 )}
                             </div>
