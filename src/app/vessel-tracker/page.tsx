@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -182,6 +181,7 @@ export default function VesselTrackerPage() {
     const now = Date.now();
     if ((now - lastWeatherUpdateRef.current > 3 * 3600 * 1000) && pos) {
         try {
+            console.log("[Tracker] Tentative de mise à jour météo Windy...");
             const weather = await fetchWindyWeather(pos.lat, pos.lng);
             if (weather.success) {
                 updatePayload.windSpeed = weather.windSpeed;
@@ -292,12 +292,18 @@ export default function VesselTrackerPage() {
     toast({ title: label });
   };
 
+  const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
+    setMap(mapInstance);
+  }, []);
+
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
       return;
     }
+
+    console.log("[Tracker] Lancement de watchPosition pour l'émetteur:", sharingId);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
@@ -368,7 +374,7 @@ export default function VesselTrackerPage() {
         case 'landed': return { icon: Home, color: 'bg-green-600', label: 'HOME' };
         case 'emergency': return { icon: ShieldAlert, color: 'bg-red-600 animate-pulse', label: 'SOS' };
         case 'offline': return { icon: WifiOff, color: 'bg-red-600', label: 'OFF' };
-        default: return { icon: Navigation, color: 'bg-slate-600', label: '???' };
+        default: return { icon: Navigation, color: 'bg-blue-600', label: 'MOUV' };
     }
   };
 
@@ -497,8 +503,8 @@ export default function VesselTrackerPage() {
                     </AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-3">
                         <div className="grid grid-cols-2 gap-2">
-                            <Button variant="outline" size="sm" className="h-10 text-[8px] font-black uppercase" onClick={() => handleManualStatusToggle('moving', 'TEST: MOUVEMENT')}>SIMUL MOUV</Button>
-                            <Button variant="outline" size="sm" className="h-10 text-[8px] font-black uppercase" onClick={() => handleManualStatusToggle('stationary', 'TEST: MOUILLAGE')}>SIMUL MOUIL</Button>
+                            <Button variant="outline" size="sm" className="h-10 text-[8px] font-black uppercase" onClick={() => handleManualStatusToggle('moving', 'SIMUL MOUV')}>MOUV</Button>
+                            <Button variant="outline" size="sm" className="h-10 text-[8px] font-black uppercase" onClick={() => handleManualStatusToggle('stationary', 'SIMUL MOUIL')}>MOUIL</Button>
                         </div>
                         <Button variant="outline" size="sm" className="w-full h-10 text-[8px] font-black uppercase border-dashed" onClick={() => updateVesselInFirestore({})}>Forcer Sync Firestore</Button>
                     </AccordionContent>
@@ -535,7 +541,7 @@ export default function VesselTrackerPage() {
               mapContainerStyle={{ width: '100%', height: '100%' }}
               defaultCenter={INITIAL_CENTER} 
               defaultZoom={10} 
-              onLoad={(m) => setMap(m)} 
+              onLoad={onLoad} 
               options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
             >
                   {followedVessels?.filter(v => v.isSharing && v.location).map(vessel => {
@@ -564,7 +570,7 @@ export default function VesselTrackerPage() {
                                 </>
                               )}
 
-                              {/* NAVIRE MOBILE - NOUVEAU RENDU V3 (CONFORME PHOTO) */}
+                              {/* NAVIRE MOBILE */}
                               <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                   <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-50">
                                       {/* BADGE NOM | STATUT (HAUT) */}
@@ -589,7 +595,7 @@ export default function VesselTrackerPage() {
                                           {/* BULLE BATTERIE */}
                                           <div className={cn(
                                               "px-2.5 py-1 rounded-full text-[9px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
-                                              battery < 20 ? "text-red-600 border-red-200" : (battery < 60 ? "text-orange-600 border-orange-100" : "text-slate-700 border-slate-100")
+                                              battery < 20 ? "text-red-600 border-red-200" : (battery < 60 ? "text-orange-600 border-orange-100" : "text-green-600 border-green-100")
                                           )}>
                                               <BatteryStatusIcon level={battery} charging={isCharging} size={3.5} />
                                               <span>{battery}%</span>

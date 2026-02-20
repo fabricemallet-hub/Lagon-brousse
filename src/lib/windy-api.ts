@@ -10,15 +10,17 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
   // REFERER : Doit correspondre EXACTEMENT à l'identifiant saisi dans la console Windy
-  // L'utilisateur a saisi l'URL du projet Studio.
   const projectReferer = 'https://studio.firebase.google.com/project/studio-2943478321-f746e';
 
   try {
+    console.log(`[Windy] Appel API pour ${lat}, ${lon} avec Referer: ${projectReferer}`);
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'Referer': projectReferer
+        'Referer': projectReferer,
+        'Origin': 'https://studio.firebase.google.com'
       },
       body: JSON.stringify({
         lat,
@@ -30,14 +32,18 @@ export async function fetchWindyWeather(lat: number, lon: number) {
     });
 
     if (response.status === 429) {
+        console.warn("[Windy] Quota atteint");
         return { success: false, error: "Quota Windy atteint" };
     }
 
     if (!response.ok) {
-        throw new Error(`Windy API error: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error(`[Windy] Erreur API ${response.status}:`, errorText);
+        return { success: false, error: `Erreur Windy ${response.status}` };
     }
 
     const data = await response.json();
+    console.log("[Windy] Données reçues avec succès");
     
     // Windy retourne des séries temporelles. On prend le premier index (maintenant).
     return {
@@ -47,7 +53,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       success: true
     };
   } catch (error) {
-    console.error("Windy API Fetch failed:", error);
+    console.error("[Windy] Échec critique fetch:", error);
     return { success: false, error: "Erreur technique météo" };
   }
 }
