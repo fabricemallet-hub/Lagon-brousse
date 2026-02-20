@@ -89,7 +89,8 @@ import {
   Layers,
   Camera,
   ImageIcon,
-  Ghost
+  Ghost,
+  Users
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, WindDirection, HuntingMarker } from '@/lib/types';
@@ -144,7 +145,6 @@ export default function VesselTrackerPage() {
   const [activeOverlay, setActiveOverlay] = useState('wind');
   const [vesselValueAtPos, setVesselValueAtPos] = useState<string>('--');
 
-  const [syncCountdown, setSyncCountdown] = useState(60);
   const [currentPos, setCurrentPos] = useState<{ lat: number, lng: number } | null>(null);
   const [currentSpeed, setCurrentSpeed] = useState<number>(0);
   const [anchorPos, setAnchorPos] = useState<{ lat: number, lng: number } | null>(null);
@@ -350,13 +350,11 @@ export default function VesselTrackerPage() {
   const loadLeafletAssets = useCallback(() => {
     return new Promise<void>((resolve) => {
         if ((window as any).L) return resolve();
-        if (!document.getElementById('leaflet-css')) {
-            const link = document.createElement('link');
-            link.id = 'leaflet-css';
-            link.rel = 'stylesheet';
-            link.href = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.css';
-            document.head.appendChild(link);
-        }
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.css';
+        document.head.appendChild(link);
+        
         const script = document.createElement('script');
         script.src = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js';
         script.onload = () => resolve();
@@ -606,7 +604,7 @@ export default function VesselTrackerPage() {
                                             {marker.label === 'PRISE' && <Camera className="size-4 text-purple-600" />}
                                         </div>
                                         <Badge variant="outline" className="bg-slate-900/80 text-white text-[7px] border-none font-black h-3 px-1 mt-0.5 opacity-0 group-hover:opacity-100 whitespace-nowrap">
-                                            {marker.time ? format(new Date(marker.time), 'HH:mm') : '--:--'}
+                                            {!isNaN(new Date(marker.time).getTime()) ? format(new Date(marker.time), 'HH:mm') : '--:--'}
                                         </Badge>
                                     </div>
                                 </OverlayView>
