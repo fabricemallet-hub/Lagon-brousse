@@ -281,7 +281,7 @@ export default function VesselTrackerPage() {
                 </div>
                 <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
                     <p>1. Allez sur <strong>api.windy.com/keys</strong></p>
-                    <p>2. Modifiez la clé Map Forecast (1gGm...)</p>
+                    <p>2. Modifiez la clé Map Forecast (<strong>1gGm...</strong>)</p>
                     <p>3. Supprimez les espaces et utilisez des <strong>VIRGULES</strong>.</p>
                     <p className="font-black text-xs text-red-600">Exemple: domaine1.dev,domaine2.app,localhost</p>
                 </div>
