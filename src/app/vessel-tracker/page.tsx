@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -24,21 +25,16 @@ import {
   Activity,
   Thermometer,
   Gauge,
-  Layers,
-  Smartphone,
-  ShieldAlert,
   Database,
-  History,
-  MapPin,
   WifiOff,
   BatteryCharging,
   BatteryLow,
   BatteryMedium,
   BatteryFull,
-  AlertCircle,
-  Eye,
-  EyeOff,
-  MessageSquare
+  ShieldAlert,
+  History,
+  MapPin,
+  AlertCircle
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount } from '@/lib/types';
@@ -47,8 +43,9 @@ import { Badge } from '@/components/ui/badge';
 import { fetchWindyWeather } from '@/lib/windy-api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
+// CLÉ DE PRÉVISIONS CARTOGRAPHIQUES VÉRIFIÉE (MAP FORECAST)
 const WINDY_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
+const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
@@ -107,7 +104,6 @@ export default function VesselTrackerPage() {
   const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
   const [isWindyLoaded, setIsWindyLoaded] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [detectedHost, setDetectedHost] = useState('');
   
   const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
   const [isSharing, setIsSharing] = useState(false);
@@ -135,13 +131,6 @@ export default function VesselTrackerPage() {
   }, [user, firestore]);
   const { data: profile } = useDoc<UserAccount>(userProfileRef);
 
-  const labels = useMemo(() => ({
-    title: "Vessel Tracker",
-    status1: "Au Mouillage",
-    status2: "En Route",
-    emergency: "DÉTRESSE"
-  }), []);
-
   const savedVesselIds = profile?.savedVesselIds || [];
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || savedVesselIds.length === 0) return null;
@@ -155,9 +144,7 @@ export default function VesselTrackerPage() {
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
-    setDetectedHost(window.location.host);
-
-    // DÉLAI DE PROTECTION DU THREAD (Fix Violations)
+    // PROTECTION DU THREAD (Délai pour laisser React finir le rendu)
     setTimeout(() => {
         const options = {
           key: WINDY_KEY,
@@ -173,7 +160,7 @@ export default function VesselTrackerPage() {
         try {
             window.windyInit(options, (windyAPI: any) => {
               if (!windyAPI) {
-                  setAuthError("Échec de l'initialisation. Vérifiez l'origine autorisée.");
+                  setAuthError("Échec de l'initialisation Windy (401).");
                   return;
               }
 
@@ -185,7 +172,7 @@ export default function VesselTrackerPage() {
               store.set('overlay', 'wind');
               store.set('product', 'ecmwf');
 
-              // Forcer le redessin
+              // Forcer le redessin pour éviter l'écran gris
               setTimeout(() => {
                 map.invalidateSize();
                 window.dispatchEvent(new Event('resize'));
@@ -209,7 +196,7 @@ export default function VesselTrackerPage() {
               });
             });
         } catch (e: any) {
-            setAuthError(e.message || "Erreur d'authentification Windy.");
+            setAuthError(e.message || "Erreur critique Windy.");
         }
     }, 500);
   }, []);
@@ -310,9 +297,9 @@ export default function VesselTrackerPage() {
             <AlertDescription className="text-[10px] font-bold space-y-2">
                 <p>Veuillez autoriser l'hôte suivant sur <a href="https://api.windy.com/keys" target="_blank" className="underline">api.windy.com</a> :</p>
                 <div className="p-2 bg-white rounded border font-mono text-[9px] select-all uppercase">
-                    {detectedHost || 'Calcul...'}
+                    {typeof window !== 'undefined' ? window.location.host : 'Calcul...'}
                 </div>
-                <p className="text-red-800 italic">Sans cette étape, la carte Windy restera bloquée sur cet environnement.</p>
+                <p className="text-red-800 italic">Vérifiez que vous utilisez bien la clé de Prévisions Cartographiques.</p>
             </AlertDescription>
         </Alert>
       )}
