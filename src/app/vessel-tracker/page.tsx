@@ -69,15 +69,6 @@ import { locations } from '@/lib/locations';
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
-const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
-  if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
-  const props = { className: cn("size-4", className) };
-  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
-  if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
-  if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
-  return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
-};
-
 const getClosestCommune = (lat: number, lng: number) => {
     let closestName = 'Nouméa';
     let minDistance = Infinity;
@@ -125,7 +116,7 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
                         {tides.slice(0, 2).map((t, i) => (
                             <div key={i} className="bg-white/5 rounded p-1.5 text-center">
                                 <p className={cn("text-[7px] font-black uppercase", t.type === 'haute' ? 'text-primary' : 'text-orange-400')}>Mer {t.type}</p>
-                                <p className="text-[10px] font-black">{t.time} • {t.height.toFixed(2)}m</p>
+                                <p className="text-10px font-black">{t.time} • {t.height.toFixed(2)}m</p>
                             </div>
                         ))}
                     </div>
@@ -173,8 +164,10 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
+            // STEP 1: Load Leaflet 1.4.0 (Required by Windy)
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
+            // Wait for L to be globally available
             let retries = 0;
             while (!(window as any).L && retries < 50) { 
                 await new Promise(r => setTimeout(r, 100)); 
@@ -183,12 +176,13 @@ export default function VesselTrackerPage() {
             
             if (!(window as any).L) throw new Error("Leaflet non trouvé après attente.");
 
+            // STEP 2: Load Windy API (libBoot.js)
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const options = {
                 key: MAP_FORECAST_KEY,
                 lat: INITIAL_CENTER.lat,
-                lon: INITIAL_CENTER.lng,
+                lon: INITIAL_CENTER.lng, // Use 'lon' as per documentation
                 zoom: 10,
                 verbose: false,
                 externalAllowedOrigins: [window.location.host, window.location.hostname, window.location.origin],
@@ -196,6 +190,7 @@ export default function VesselTrackerPage() {
                 product: 'ecmwf',
             };
 
+            // STEP 3: Initialize Windy
             (window as any).windyInit(options, (windyAPI: any) => {
                 if (!windyAPI) { 
                     setAuthError(window.location.host); 
@@ -206,6 +201,7 @@ export default function VesselTrackerPage() {
                 store.set('overlay', 'wind');
                 store.set('product', 'ecmwf');
 
+                // Listener for picker
                 broadcast.on('pickerMoved', (latLon: any) => {
                     if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
                     pickerTimerRef.current = setTimeout(async () => {
@@ -233,10 +229,11 @@ export default function VesselTrackerPage() {
     };
 
     attemptInit();
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     const timer = setTimeout(initWindy, 1000);
+    // Safety check: if no map after 6s, show diag
     const diagTimer = setTimeout(() => {
         if (!mapRef.current) setAuthError(window.location.host);
     }, 6000);
