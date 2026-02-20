@@ -56,18 +56,14 @@ import {
   Activity,
   Thermometer,
   Gauge,
-  ArrowUp
+  ArrowUp,
+  Wind
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
-import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 
@@ -140,12 +136,11 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
 };
 
 export default function VesselTrackerPage() {
-  const { user } = useUserHook();
+  const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const [authError, setAuthError] = useState<string | null>(null);
-  const [isSharing, setIsSharing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentModel, setCurrentModel] = useState('ecmwf');
   const [currentOverlay, setCurrentOverlay] = useState('wind');
