@@ -5,7 +5,7 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
-    "source": ".",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -21,7 +21,11 @@
         "destination": "/sw.js"
       },
       {
-        "source": "!/@(manifest.json|sw.js|favicon.ico|icon-*)/**",
+        "source": "/icon-*.png",
+        "destination": "/icon-*.png"
+      },
+      {
+        "source": "**",
         "destination": "/index.html"
       }
     ]

@@ -48,19 +48,15 @@ import {
   Phone,
   Waves,
   Info,
-  Search,
   Copy,
-  Layers,
-  Database,
   Activity,
   Thermometer,
   Gauge,
   ArrowUp,
-  Wind,
-  ExternalLink
+  Wind
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, SoundLibraryEntry, UserAccount, Region } from '@/lib/types';
+import type { VesselStatus, SoundLibraryEntry, UserAccount } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -134,49 +130,43 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
 
 export default function VesselTrackerPage() {
   const firestore = useFirestore();
-  const { user } = useUserHook();
+  const { user } = useUser();
   const { toast } = useToast();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentModel, setCurrentModel] = useState('ecmwf');
   const [currentOverlay, setCurrentOverlay] = useState('wind');
+  const [authError, setAuthError] = useState<boolean>(false);
   
   const [mapClickResult, setMapClickResult] = useState<any>(null);
   const [pointTides, setPointTides] = useState<any[] | null>(null);
   const [isQueryingWindy, setIsQueryingWindy] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
   const [hasLaunched, setHasLaunched] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
   
   const mapRef = useRef<any>(null);
   const pickerTimerRef = useRef<any>(null);
 
-  /**
-   * RECENTER FUNCTION - DEFINED AT TOP TO AVOID REFERENCE ERRORS
+  /** 
+   * RECENTER - Defined with useCallback to avoid ReferenceError in early renders
    */
   const handleRecenter = useCallback(() => {
     if (mapRef.current) {
-        // Windy/Leaflet usually take [lat, lng] or {lat, lng}
         mapRef.current.panTo([INITIAL_CENTER.lat, INITIAL_CENTER.lng]);
         mapRef.current.setZoom(10);
     }
   }, []);
 
   useEffect(() => {
-    // FORCE REFERRER POLICY FOR CLOUD ENVIRONMENTS
     if (typeof window === 'undefined') return;
-    try {
-        const meta = document.createElement('meta');
-        meta.name = 'referrer';
-        meta.content = 'no-referrer-when-downgrade';
-        document.head.appendChild(meta);
-        (document as any).referrerPolicy = "no-referrer-when-downgrade";
-    } catch(e) {}
+    document.referrerPolicy = "no-referrer-when-downgrade";
+    const meta = document.createElement('meta');
+    meta.name = "referrer";
+    meta.content = "no-referrer-when-downgrade";
+    document.head.appendChild(meta);
   }, []);
 
   const initWindyMap = useCallback(() => {
-    if (typeof window === 'undefined' || isInitializing || hasLaunched) return;
-    setIsInitializing(true);
+    if (typeof window === 'undefined' || hasLaunched) return;
 
     const loadScript = (id: string, src: string): Promise<void> => {
         return new Promise((resolve, reject) => {
@@ -197,33 +187,27 @@ export default function VesselTrackerPage() {
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             let retries = 0;
             while (!(window as any).L && retries < 10) { await new Promise(r => setTimeout(r, 500)); retries++; }
-            if (!(window as any).L) throw new Error("Leaflet non détecté.");
-
-            (window as any).W = { apiKey: MAP_FORECAST_KEY.trim() };
+            
+            (window as any).W = { apiKey: MAP_FORECAST_KEY };
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const options = {
-                key: MAP_FORECAST_KEY.trim(),
+                key: MAP_FORECAST_KEY,
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
-                verbose: true,
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
 
-            if (!(window as any).windyInit) { setIsInitializing(false); return; }
+            if (!(window as any).windyInit) return;
 
             (window as any).windyInit(options, (windyAPI: any) => {
-                if (!windyAPI) { setAuthError('Échec Authentification'); setIsInitializing(false); return; }
+                if (!windyAPI) { setAuthError(true); return; }
                 const { map, store, broadcast, picker } = windyAPI;
                 mapRef.current = map;
                 setHasLaunched(true);
-                setAuthError(null);
-                setIsInitializing(false);
-
-                store.set('overlay', 'wind');
-                store.set('product', 'ecmwf');
+                setAuthError(false);
 
                 broadcast.on('pickerMoved', (latLon: any) => {
                     if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
@@ -244,29 +228,38 @@ export default function VesselTrackerPage() {
                 map.on('click', (e: any) => { picker.open({ lat: e.latlng.lat, lon: e.latlng.lng }); });
                 setTimeout(() => { if(map) map.invalidateSize(); }, 1000);
             });
-        } catch (e: any) {
+        } catch (e) {
             console.error("Windy Error:", e);
-            setAuthError(e.message);
-            setIsInitializing(false);
+            setAuthError(true);
         }
     };
 
     attemptInit();
-  }, [isInitializing, hasLaunched]);
+  }, [hasLaunched]);
 
   useEffect(() => {
     const timer = setTimeout(initWindyMap, 2000);
     return () => clearTimeout(timer);
   }, [initWindyMap]);
 
-  const copyHost = () => {
-    const host = window.location.hostname;
-    navigator.clipboard.writeText(host);
-    toast({ title: "Hôte copié !", description: host });
-  };
-
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
+      {authError && (
+          <Alert variant="destructive" className="border-2 shadow-lg animate-in slide-in-from-top-2">
+              <ShieldAlert className="size-5" />
+              <AlertTitle className="font-black uppercase text-xs">Authentification Windy échouée (401)</AlertTitle>
+              <AlertDescription className="space-y-3">
+                  <p className="text-[10px] font-medium leading-relaxed">
+                      L'hôte actuel n'est pas autorisé. Copiez l'hôte ci-dessous et ajoutez-le à votre clé sur Windy.com.
+                  </p>
+                  <div className="flex gap-2">
+                      <Input value={typeof window !== 'undefined' ? window.location.host : ''} readOnly className="h-9 bg-white text-[9px] font-mono border-2" />
+                      <Button size="sm" className="h-9 font-black uppercase text-[9px]" onClick={() => { navigator.clipboard.writeText(window.location.host); toast({ title: "Copié !" }); }}>Copier</Button>
+                  </div>
+              </AlertDescription>
+          </Alert>
+      )}
+
       <Card className="border-2 shadow-sm overflow-hidden">
         <CardContent className="p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -314,37 +307,10 @@ export default function VesselTrackerPage() {
 
       <div className={cn("overflow-hidden border-2 shadow-2xl flex flex-col transition-all relative bg-slate-100 rounded-[2rem]", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[550px]")}>
         <div id="windy" className="absolute inset-0 w-full h-full z-10">
-          {!hasLaunched && !authError && (
+          {!hasLaunched && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 gap-4 p-8 text-center">
                   <RefreshCw className="size-12 text-primary animate-spin" />
                   <p className="font-black uppercase text-[10px] tracking-widest text-slate-400">Chargement carte maritime...</p>
-              </div>
-          )}
-
-          {authError && (
-              <div className="absolute inset-0 z-[200] flex items-center justify-center bg-white/95 backdrop-blur-md p-6">
-                  <Alert variant="destructive" className="max-w-md shadow-2xl border-4 animate-in zoom-in-95">
-                      <ShieldAlert className="size-6" />
-                      <AlertTitle className="font-black uppercase text-sm mb-2">Erreur Authentification Windy (401)</AlertTitle>
-                      <AlertDescription className="space-y-4">
-                          <p className="text-xs font-medium leading-relaxed">
-                              Le serveur Windy rejette la connexion. Votre domaine n'est pas autorisé pour la clé <strong>1gGm...</strong>.
-                          </p>
-                          <div className="p-4 bg-red-50 rounded-2xl border-2 border-red-100 space-y-3">
-                              <p className="text-[10px] font-black uppercase text-red-800">Action : Copier l'hôte ci-dessous</p>
-                              <div className="flex gap-2">
-                                  <Input value={typeof window !== 'undefined' ? window.location.hostname : ''} readOnly className="h-10 bg-white font-mono text-[9px] border-2" />
-                                  <Button size="sm" onClick={copyHost} className="h-10 font-black uppercase text-[10px]"><Copy className="size-3 mr-1" /> Copier</Button>
-                              </div>
-                              <p className="text-[9px] italic text-slate-600">
-                                  Allez sur api.windy.com, sélectionnez votre clé et collez cette valeur exacte dans "Restrictions de domaine".
-                              </p>
-                          </div>
-                          <Button variant="outline" className="w-full h-12 font-black uppercase text-xs border-2 gap-2" onClick={() => window.location.reload()}>
-                              <RefreshCw className="size-4" /> Réessayer après mise à jour
-                          </Button>
-                      </AlertDescription>
-                  </Alert>
               </div>
           )}
 
