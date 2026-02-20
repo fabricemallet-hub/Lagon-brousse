@@ -83,7 +83,9 @@ import {
   Lock,
   Unlock,
   LayoutGrid,
-  Wind
+  Wind,
+  Plus,
+  Minus
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, WindDirection } from '@/lib/types';
@@ -217,10 +219,14 @@ export default function VesselTrackerPage() {
     const activeVessel = followedVessels?.find(v => v.id === sharingId);
     const pos = mode === 'sender' ? currentPos : (activeVessel?.location ? { lat: activeVessel.location.latitude, lng: activeVessel.location.longitude } : null);
     if (pos) {
-        map.panTo(pos);
-        map.setZoom(18); // Zoom maximal pour une vue rapprochée
+        // Commande atomique Leaflet pour forcer position ET zoom 18
+        map.setView([pos.lat, pos.lng], 18, { animate: true });
+        toast({ title: "Recentrage", description: "Zoom maximal (Niveau 18)" });
     }
-  }, [map, mode, currentPos, followedVessels, sharingId]);
+  }, [map, mode, currentPos, followedVessels, sharingId, toast]);
+
+  const handleZoomIn = () => map?.zoomIn();
+  const handleZoomOut = () => map?.zoomOut();
 
   const handleSaveVessel = async () => {
     if (!user || !firestore) return;
@@ -372,9 +378,8 @@ export default function VesselTrackerPage() {
             setCurrentSpeed(Math.max(0, Math.round((speed || 0) * 1.94384)));
 
             if (isFollowMode && map) {
+                // En mode suivi, on garde le zoom actuel mais on centre
                 map.panTo(newPos);
-                // On laisse l'utilisateur gérer son propre niveau de zoom s'il explore,
-                // mais pour le recentrage automatique on se rapproche.
             }
 
             if (!anchorPos) setAnchorPos(newPos);
@@ -554,6 +559,11 @@ export default function VesselTrackerPage() {
                     {isFollowMode ? <Lock className="size-5 text-blue-600" /> : <Unlock className="size-5 text-slate-400" />}
                 </Button>
                 <Button onClick={handleRecenter} className="h-10 bg-primary text-white border-2 border-white/20 px-3 gap-2 shadow-xl font-black uppercase text-[9px]">RECENTRER (Z+18) <LocateFixed className="size-4" /></Button>
+                
+                <div className="flex flex-col gap-1 mt-2">
+                    <Button size="icon" className="bg-slate-900/80 text-white border-2 border-white/10 h-10 w-10 shadow-xl" onClick={handleZoomIn}><Plus className="size-5" /></Button>
+                    <Button size="icon" className="bg-slate-900/80 text-white border-2 border-white/10 h-10 w-10 shadow-xl" onClick={handleZoomOut}><Minus className="size-5" /></Button>
+                </div>
             </div>
         </div>
 
@@ -687,7 +697,7 @@ export default function VesselTrackerPage() {
                         </div>
                         <div className="space-y-1.5"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">Contact d'urgence (Terre)</Label><Input placeholder="Ex: 77 12 34" value={emergencyContact} onChange={e => setEmergencyContact(e.target.value)} className="h-12 border-2 font-black" /></div>
                         <div className="space-y-1.5"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">Message personnalisé</Label><Textarea value={vesselSmsMessage} onChange={e => setVesselSmsMessage(e.target.value)} className="min-h-[80px] border-2" /></div>
-                        <div className="p-3 bg-muted/30 rounded-xl border-2 border-dashed text-[10px] italic font-medium leading-relaxed">Aperçu : {smsPreview}</div>
+                        <div className="p-3 bg-muted/30 rounded-xl border-2 border-dashed text-[10px] italic">Aperçu : {smsPreview}</div>
                         <Button onClick={handleSaveSmsSettings} className="w-full h-12 font-black uppercase text-[10px] gap-2"><Save className="size-4" /> Enregistrer réglages SMS</Button>
                     </div>
                 </AccordionContent>
