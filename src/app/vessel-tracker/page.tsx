@@ -145,23 +145,18 @@ export default function VesselTrackerPage() {
   const [isQueryingWindy, setIsQueryingWindy] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [hasLaunched, setHasLaunched] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   
   const mapRef = useRef<any>(null);
   const pickerTimerRef = useRef<any>(null);
 
-  // CONFIGURATION CRITIQUE : REFERRER POLICY
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
-    let meta = document.querySelector('meta[name="referrer"]') as HTMLMetaElement;
-    if (!meta) {
-        meta = document.createElement('meta');
-        meta.name = 'referrer';
-        document.head.appendChild(meta);
-    }
-    meta.content = 'no-referrer-when-downgrade';
-    
     try {
+        const meta = document.createElement('meta');
+        meta.name = 'referrer';
+        meta.content = 'no-referrer-when-downgrade';
+        document.head.appendChild(meta);
         (document as any).referrerPolicy = "no-referrer-when-downgrade";
     } catch(e) {}
   }, []);
@@ -177,8 +172,7 @@ export default function VesselTrackerPage() {
             script.id = id;
             script.src = src;
             script.async = true;
-            // CRITIQUE : Ajout du ReferrerPolicy sur le script pour débloquer l'auth Windy
-            (script as any).referrerPolicy = 'no-referrer-when-downgrade';
+            script.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
             script.onload = () => resolve();
             script.onerror = () => reject(new Error(`Failed to load ${src}`));
             document.head.appendChild(script);
@@ -188,17 +182,11 @@ export default function VesselTrackerPage() {
     const attemptInit = async () => {
         try {
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
-            
             let retries = 0;
-            while (!(window as any).L && retries < 10) { 
-                await new Promise(r => setTimeout(r, 500)); 
-                retries++; 
-            }
-            
+            while (!(window as any).L && retries < 10) { await new Promise(r => setTimeout(r, 500)); retries++; }
             if (!(window as any).L) throw new Error("Leaflet non détecté.");
 
             (window as any).W = { apiKey: MAP_FORECAST_KEY.trim() };
-
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const options = {
@@ -206,24 +194,19 @@ export default function VesselTrackerPage() {
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
-                verbose: false,
+                verbose: true,
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
 
-            if (!(window as any).windyInit) {
-                setIsInitializing(false);
-                return;
-            }
+            if (!(window as any).windyInit) { setIsInitializing(false); return; }
 
             (window as any).windyInit(options, (windyAPI: any) => {
-                if (!windyAPI) {
-                    setIsInitializing(false);
-                    return;
-                }
+                if (!windyAPI) { setAuthError('Échec Authentification'); setIsInitializing(false); return; }
                 const { map, store, broadcast, picker } = windyAPI;
                 mapRef.current = map;
                 setHasLaunched(true);
+                setAuthError(null);
                 setIsInitializing(false);
 
                 store.set('overlay', 'wind');
@@ -249,7 +232,8 @@ export default function VesselTrackerPage() {
                 setTimeout(() => { if(map) map.invalidateSize(); }, 1000);
             });
         } catch (e: any) {
-            console.error("Windy Critical Error:", e);
+            console.error("Windy Error:", e);
+            setAuthError(e.message);
             setIsInitializing(false);
         }
     };
@@ -269,6 +253,12 @@ export default function VesselTrackerPage() {
     }
   };
 
+  const copyHost = () => {
+    const host = window.location.hostname;
+    navigator.clipboard.writeText(host);
+    toast({ title: "Hôte copié !", description: host });
+  };
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       <Card className="border-2 shadow-sm overflow-hidden">
@@ -283,7 +273,7 @@ export default function VesselTrackerPage() {
                             setCurrentModel(e.target.value); 
                             if(mapRef.current) mapRef.current.fire('changeModel', e.target.value); 
                         }} 
-                        className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none"
+                        className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none outline-none"
                       >
                           <option value="ecmwf">ECMWF (9km)</option>
                           <option value="gfs">GFS (22km)</option>
@@ -301,7 +291,7 @@ export default function VesselTrackerPage() {
                             setCurrentOverlay(e.target.value); 
                             if(mapRef.current) mapRef.current.fire('changeOverlay', e.target.value); 
                         }} 
-                        className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none"
+                        className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none outline-none"
                       >
                           <option value="wind">Vent & Rafales</option>
                           <option value="waves">Mer & Vagues</option>
@@ -318,13 +308,42 @@ export default function VesselTrackerPage() {
 
       <div className={cn("overflow-hidden border-2 shadow-2xl flex flex-col transition-all relative bg-slate-100 rounded-[2rem]", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[550px]")}>
         <div id="windy" className="absolute inset-0 w-full h-full z-10">
-          {!hasLaunched && (
+          {!hasLaunched && !authError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 gap-4 p-8 text-center">
                   <RefreshCw className="size-12 text-primary animate-spin" />
-                  <p className="font-black uppercase text-[10px] tracking-widest text-slate-400">Chargement de la carte maritime...</p>
+                  <p className="font-black uppercase text-[10px] tracking-widest text-slate-400">Chargement carte maritime...</p>
               </div>
           )}
+
+          {authError && (
+              <div className="absolute inset-0 z-[200] flex items-center justify-center bg-white/95 backdrop-blur-md p-6">
+                  <Alert variant="destructive" className="max-w-md shadow-2xl border-4 animate-in zoom-in-95">
+                      <ShieldAlert className="size-6" />
+                      <AlertTitle className="font-black uppercase text-sm mb-2">Erreur Authentification Windy (401)</AlertTitle>
+                      <AlertDescription className="space-y-4">
+                          <p className="text-xs font-medium leading-relaxed">
+                              Le serveur Windy rejette la connexion. Votre domaine Cloud n'est pas autorisé pour la clé <strong>1gGm...</strong>.
+                          </p>
+                          <div className="p-4 bg-red-50 rounded-2xl border-2 border-red-100 space-y-3">
+                              <p className="text-[10px] font-black uppercase text-red-800">Action : Copier l'hôte ci-dessous</p>
+                              <div className="flex gap-2">
+                                  <Input value={typeof window !== 'undefined' ? window.location.hostname : ''} readOnly className="h-10 bg-white font-mono text-[9px] border-2" />
+                                  <Button size="sm" onClick={copyHost} className="h-10 font-black uppercase text-[10px]"><Copy className="size-3 mr-1" /> Copier</Button>
+                              </div>
+                              <p className="text-[9px] italic text-slate-600">
+                                  Allez sur api.windy.com, sélectionnez votre clé et collez cette valeur exacte dans "Restrictions de domaine".
+                              </p>
+                          </div>
+                          <Button variant="outline" className="w-full h-12 font-black uppercase text-xs border-2 gap-2" onClick={() => window.location.reload()}>
+                              <RefreshCw className="size-4" /> Réessayer après mise à jour
+                          </Button>
+                      </AlertDescription>
+                  </Alert>
+              </div>
+          )}
+
           <MeteoDataPanel data={mapClickResult} tides={pointTides} onClose={() => setMapClickResult(null)} isLoading={isQueryingWindy} />
+          
           <div className="absolute top-4 right-4 flex flex-col gap-3 z-20">
             <Button size="icon" className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-6 text-primary" /> : <Expand className="size-6 text-primary" />}</Button>
             <Button onClick={handleRecenter} className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-0"><LocateFixed className="size-6 text-primary" /></Button>
