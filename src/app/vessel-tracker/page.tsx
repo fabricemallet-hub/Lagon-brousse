@@ -52,13 +52,9 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getDataForDate } from '@/lib/data';
 
-// CLÉ "MAP FORECAST" (EXCLUSIVEMENT 1gGm...)
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
-/**
- * Panneau d'affichage des données météo marines extraites au point.
- */
 const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClose: () => void, isLoading: boolean, tides: Tide[] | null }) => {
     if (!data) return null;
     return (
@@ -141,6 +137,7 @@ export default function VesselTrackerPage() {
   const markersRef = useRef<Record<string, any>>({});
   const isMapInitializedRef = useRef<boolean>(false);
   const watchIdRef = useRef<number | null>(null);
+  const pickerTimerRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') setCurrentOrigin(window.location.host);
@@ -169,7 +166,7 @@ export default function VesselTrackerPage() {
 
     isMapInitializedRef.current = true;
 
-    // Délai de confort pour laisser React stabiliser le rendu avant Windy
+    // Délai prolongé pour Cloud Workstations
     setTimeout(() => {
         const options = {
           key: MAP_FORECAST_KEY,
@@ -177,7 +174,7 @@ export default function VesselTrackerPage() {
           lon: INITIAL_CENTER.lng,
           zoom: 10,
           verbose: true,
-          externalAllowedOrigins: [window.location.host, "web.app", "cloudworkstations.dev"],
+          externalAllowedOrigins: ["cloudworkstations.dev", "web.app"],
           overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
           product: 'ecmwf',
         };
@@ -194,41 +191,36 @@ export default function VesselTrackerPage() {
               mapRef.current = map;
               windyMapInstance.current = windyAPI;
 
-              // Configuration initiale des couches
               store.set('overlay', 'wind');
               store.set('product', 'ecmwf');
 
-              // Listener du sélecteur (Picker)
-              broadcast.on('pickerMoved', async (latLon: any) => {
-                const { lat, lon } = latLon;
-                setMapClickResult({ lat, lon });
-                setIsQueryingWindy(true);
-                setPointTides(null);
+              // Optimisation du Picker avec Debounce (Evite les violations de thread)
+              broadcast.on('pickerMoved', (latLon: any) => {
+                if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
+                
+                pickerTimerRef.current = setTimeout(async () => {
+                    const { lat, lon } = latLon;
+                    setMapClickResult({ lat, lon });
+                    setIsQueryingWindy(true);
+                    setPointTides(null);
 
-                try {
-                  // Appel à l'API Point Forecast via le serveur
-                  const weather = await fetchWindyWeather(lat, lon);
-                  setMapClickResult((prev: any) => ({ ...prev, ...weather }));
-
-                  // Marées locales
-                  const commune = getClosestCommune(lat, lon);
-                  const tideData = getDataForDate(commune, new Date());
-                  setPointTides(tideData.tides);
-                } catch (err) {
-                } finally {
-                  setIsQueryingWindy(false);
-                }
+                    try {
+                      const weather = await fetchWindyWeather(lat, lon);
+                      setMapClickResult((prev: any) => ({ ...prev, ...weather }));
+                      const commune = getClosestCommune(lat, lon);
+                      const tideData = getDataForDate(commune, new Date());
+                      setPointTides(tideData.tides);
+                    } catch (err) {} finally {
+                      setIsQueryingWindy(false);
+                    }
+                }, 300);
               });
 
               map.on('click', (e: any) => {
                 picker.open({ lat: e.latlng.lat, lon: e.latlng.lng });
               });
 
-              // Correction du rendu gris
-              setTimeout(() => { 
-                map.invalidateSize(); 
-                window.dispatchEvent(new Event('resize')); 
-              }, 1000);
+              setTimeout(() => { map.invalidateSize(); }, 1000);
             });
         } catch (e: any) {
             setAuthError(window.location.host);
@@ -241,7 +233,6 @@ export default function VesselTrackerPage() {
     if (isLeafletLoaded && isWindyLoaded) initWindy();
   }, [isLeafletLoaded, isWindyLoaded, initWindy]);
 
-  // Rendu de la flotte optimisé
   useEffect(() => {
     if (!mapRef.current || !followedVessels || !window.L) return;
     const L = window.L;
@@ -294,6 +285,11 @@ export default function VesselTrackerPage() {
     if (window.windyStore) window.windyStore.set('overlay', o);
   };
 
+  const copyHost = () => {
+    navigator.clipboard.writeText(currentOrigin);
+    toast({ title: "Hôte copié !" });
+  };
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       <Script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" strategy="afterInteractive" onLoad={() => setIsLeafletLoaded(true)} />
@@ -307,14 +303,14 @@ export default function VesselTrackerPage() {
             <AlertTitle className="font-black uppercase text-sm mb-2">ERREUR 401 : CONFIGURATION REQUISE</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cette URL exacte dans vos restrictions de domaine sur api.windy.com/keys (pour la clé 1gGm...) :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cet hôte dans vos restrictions Windy (Clé 1gGm...) :</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{currentOrigin}</code>
-                        <Button size="icon" variant="ghost" onClick={() => { navigator.clipboard.writeText(currentOrigin); toast({ title: "Copié !" }); }}><Copy className="size-4" /></Button>
+                        <Button size="icon" variant="ghost" onClick={copyHost}><Copy className="size-4" /></Button>
                     </div>
                 </div>
                 <div className="bg-white/50 p-3 rounded-lg text-[9px] font-bold text-red-900 italic">
-                    {"Assurez-vous que studio-2943478321-f746e.web.app est également présent."}
+                    {"Assurez-vous d'avoir également *.cloudworkstations.dev dans votre console Windy."}
                 </div>
             </AlertDescription>
         </Alert>
@@ -362,7 +358,7 @@ export default function VesselTrackerPage() {
           
           <div className="absolute top-4 right-4 flex flex-col gap-3 z-20">
             <Button size="icon" className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-6 text-primary" /> : <Expand className="size-6 text-primary" />}</Button>
-            <Button onClick={() => { if(currentPos && mapRef.current) mapRef.current.panTo([currentPos.lat, currentPos.lng]); }} className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-0"><LocateFixed className="size-6 text-primary" /></Button>
+            <Button onClick={handleRecenter} className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-0"><LocateFixed className="size-6 text-primary" /></Button>
           </div>
         </div>
       </div>
