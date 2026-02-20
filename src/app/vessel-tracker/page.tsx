@@ -198,6 +198,7 @@ export default function VesselTrackerPage() {
             console.log("--- INITIALISATION WINDY ---");
             console.log("Clé (Ligne 204):", cleanKey);
             console.log("Hôte (Referer):", window.location.host);
+            console.log("Document Referrer:", document.referrer);
 
             try {
                 (window as any).windyInit(options, (windyAPI: any) => {
@@ -313,7 +314,7 @@ export default function VesselTrackerPage() {
             <AlertTitle className="font-black uppercase text-sm mb-2">DIAGNOSTIC AUTHENTIFICATION (401)</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Hôte exact à copier :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Hôte exact détecté par le navigateur :</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{authError}</code>
                         <Button size="icon" variant="ghost" onClick={copyHost} className="h-10 w-10 hover:bg-red-200">
@@ -333,7 +334,8 @@ export default function VesselTrackerPage() {
                 <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2 leading-relaxed border border-red-200">
                     <p>1. Allez sur <strong>api.windy.com/keys</strong></p>
                     <p>2. Modifiez la clé Map Forecast (<strong>1gGm...</strong>)</p>
-                    <p>3. Ajoutez l'hôte complet copié ci-dessus à votre liste (virgule, sans espace).</p>
+                    <p>3. Supprimez tout joker `*` et collez l'hôte complet copié ci-dessus.</p>
+                    <p>4. Séparez les domaines par une <strong>virgule seule</strong>, sans espace.</p>
                 </div>
             </AlertDescription>
         </Alert>
