@@ -60,7 +60,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, SoundLibraryEntry, UserAccount } from '@/lib/types';
+import type { VesselStatus, SoundLibraryEntry, UserAccount, Region } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -150,17 +150,17 @@ export default function VesselTrackerPage() {
   const pickerTimerRef = useRef<any>(null);
 
   // CONFIGURATION CRITIQUE : REFERRER POLICY
-  // On force le passage de l'hôte complet à l'authentification Windy
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // 1. Balise Meta
-    const meta = document.querySelector('meta[name="referrer"]') || document.createElement('meta');
-    meta.setAttribute('name', 'referrer');
-    meta.setAttribute('content', 'no-referrer-when-downgrade');
-    if (!document.head.contains(meta)) document.head.appendChild(meta);
+    let meta = document.querySelector('meta[name="referrer"]') as HTMLMetaElement;
+    if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'referrer';
+        document.head.appendChild(meta);
+    }
+    meta.content = 'no-referrer-when-downgrade';
     
-    // 2. Propriété document (Navigateurs modernes)
     try {
         (document as any).referrerPolicy = "no-referrer-when-downgrade";
     } catch(e) {}
@@ -177,7 +177,8 @@ export default function VesselTrackerPage() {
             script.id = id;
             script.src = src;
             script.async = true;
-            script.referrerPolicy = 'no-referrer-when-downgrade';
+            // CRITIQUE : Ajout du ReferrerPolicy sur le script pour débloquer l'auth Windy
+            (script as any).referrerPolicy = 'no-referrer-when-downgrade';
             script.onload = () => resolve();
             script.onerror = () => reject(new Error(`Failed to load ${src}`));
             document.head.appendChild(script);
@@ -196,7 +197,6 @@ export default function VesselTrackerPage() {
             
             if (!(window as any).L) throw new Error("Leaflet non détecté.");
 
-            // Injection de la clé dans l'objet global AVANT libBoot
             (window as any).W = { apiKey: MAP_FORECAST_KEY.trim() };
 
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
@@ -210,6 +210,11 @@ export default function VesselTrackerPage() {
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
+
+            if (!(window as any).windyInit) {
+                setIsInitializing(false);
+                return;
+            }
 
             (window as any).windyInit(options, (windyAPI: any) => {
                 if (!windyAPI) {
@@ -315,17 +320,8 @@ export default function VesselTrackerPage() {
         <div id="windy" className="absolute inset-0 w-full h-full z-10">
           {!hasLaunched && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 gap-4 p-8 text-center">
-                  {isInitializing ? (
-                      <>
-                        <RefreshCw className="size-12 text-primary animate-spin" />
-                        <p className="font-black uppercase text-[10px] tracking-widest text-slate-400">Authentification Windy...</p>
-                      </>
-                  ) : (
-                      <>
-                        <RefreshCw className="size-12 text-primary animate-spin opacity-20" />
-                        <p className="font-black uppercase text-xs text-slate-600">Chargement de la carte maritime...</p>
-                      </>
-                  )}
+                  <RefreshCw className="size-12 text-primary animate-spin" />
+                  <p className="font-black uppercase text-[10px] tracking-widest text-slate-400">Chargement de la carte maritime...</p>
               </div>
           )}
           <MeteoDataPanel data={mapClickResult} tides={pointTides} onClose={() => setMapClickResult(null)} isLoading={isQueryingWindy} />
