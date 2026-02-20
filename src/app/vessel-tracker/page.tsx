@@ -156,20 +156,26 @@ export default function VesselTrackerPage() {
     setIsTesting(true);
     setTestResult(null);
     console.log("--- START WINDY API TRACE ---");
-    console.log("Target URL: https://api.windy.com/api/map-forecast/v2/auth");
+    console.log("Testing Point Forecast API (Connectivity Test)");
+    console.log("URL: https://api.windy.com/api/point-forecast/v2");
     console.log("Key used:", MAP_KEY);
-    console.log("Referrer Policy used: no-referrer-when-downgrade");
     
     try {
-        const payload = { key: MAP_KEY };
+        // Test via Point Forecast car Map Forecast Auth est géré par le script Leaflet
+        const payload = { 
+            lat: -21.3, 
+            lon: 165.5, 
+            model: "gfs", 
+            parameters: ["wind"], 
+            levels: ["surface"], 
+            key: MAP_KEY 
+        };
+        
         console.log("Request Payload:", payload);
 
-        const res = await fetch('https://api.windy.com/api/map-forecast/v2/auth', {
+        const res = await fetch('https://api.windy.com/api/point-forecast/v2', {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                // Note: Referer and Origin are protected headers, browser handles them
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
         
@@ -177,13 +183,11 @@ export default function VesselTrackerPage() {
         console.log("Response OK:", res.ok);
 
         if (res.status === 200) {
-            setTestResult({ status: 200, ok: true, msg: "Authentification RÉUSSIE ! La carte devrait s'afficher." });
-            toast({ title: "Test API OK ✅", description: "Communication Windy rétablie." });
+            setTestResult({ status: 200, ok: true, msg: "Authentification RÉUSSIE ! La clé et les domaines sont valides." });
+            toast({ title: "Test API OK ✅", description: "Communication Windy établie avec succès." });
         } else if (res.status === 401) {
-            setTestResult({ status: 401, ok: false, msg: "ÉCHEC 401 : Le domaine n'est toujours pas autorisé." });
-            toast({ variant: "destructive", title: "Test API Échoué 401 ❌", description: "Vérifiez vos restrictions Windy." });
-        } else if (res.status === 400) {
-            setTestResult({ status: 400, ok: false, msg: "ÉCHEC 400 : Requête mal formée. Windy attend peut-être un format différent." });
+            setTestResult({ status: 401, ok: false, msg: "ÉCHEC 401 : Le domaine n'est toujours pas autorisé par Windy." });
+            toast({ variant: "destructive", title: "Test API Échoué 401 ❌", description: "Vérifiez vos restrictions de domaines." });
         } else {
             setTestResult({ status: res.status, ok: false, msg: `Erreur inattendue : Statut ${res.status}` });
         }
