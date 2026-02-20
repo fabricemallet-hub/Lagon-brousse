@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
@@ -139,6 +140,11 @@ export default function VesselTrackerPage() {
   const [anchorPos, setAnchorPos] = useState<{ lat: number, lng: number } | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   
+  // Refs pour éviter les boucles de rendu infini
+  const vesselStatusRef = useRef<VesselStatus['status']>('moving');
+  const isSharingRef = useRef(false);
+  const anchorPosRef = useRef<{ lat: number, lng: number } | null>(null);
+
   // IDENTIFICATION & IDS
   const [vesselNickname, setVesselNickname] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
@@ -186,7 +192,7 @@ export default function VesselTrackerPage() {
   const userProfileRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: profile } = useDoc<UserAccount>(userProfileRef);
 
-  const savedVesselIds = profile?.savedVesselIds || [];
+  const savedVesselIds = useMemo(() => profile?.savedVesselIds || [], [profile?.savedVesselIds]);
   
   // Real-time followed vessels
   const vesselsQuery = useMemoFirebase(() => {
@@ -202,7 +208,6 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // Synchronisation des JOURNAUX via Firestore
   const technicalLogsQuery = useMemoFirebase(() => {
     if (!firestore || !sharingId) return null;
     return query(collection(firestore, 'vessels', sharingId, 'logs_technique'), orderBy('time', 'desc'));
@@ -240,6 +245,7 @@ export default function VesselTrackerPage() {
   const handleStopSharing = useCallback(async () => {
     if (!user || !firestore) return;
     setIsSharing(false);
+    isSharingRef.current = false;
     setIsInitializing(false);
     setStartTime(null);
     stopAllAudio();
@@ -258,14 +264,16 @@ export default function VesselTrackerPage() {
     }
     setCurrentPos(null);
     setAnchorPos(null);
+    anchorPosRef.current = null;
     lastSentStatusRef.current = null;
     toast({ title: "Partage arrêté" });
   }, [user, firestore, sharingId, toast]);
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
-    if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
+    if (!user || !firestore || (!isSharingRef.current && data.isSharing !== false)) return;
     
-    const newStatus = data.status || vesselStatus;
+    const currentStatus = vesselStatusRef.current;
+    const newStatus = data.status || currentStatus;
     const statusChanged = lastSentStatusRef.current !== newStatus;
 
     const update = async () => {
@@ -281,7 +289,7 @@ export default function VesselTrackerPage() {
             id: sharingId,
             userId: user.uid, 
             displayName: vesselNickname || user.displayName || 'Capitaine', 
-            isSharing: data.isSharing !== undefined ? data.isSharing : isSharing, 
+            isSharing: data.isSharing !== undefined ? data.isSharing : isSharingRef.current, 
             lastActive: serverTimestamp(),
             fleetId: fleetId || null,
             isGhostMode: isGhostMode,
@@ -298,7 +306,7 @@ export default function VesselTrackerPage() {
         setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
     };
     update();
-  }, [user, firestore, isSharing, sharingId, fleetId, isGhostMode, vesselNickname, vesselStatus, mooringRadius]);
+  }, [user, firestore, sharingId, fleetId, isGhostMode, vesselNickname, mooringRadius]);
 
   const playVesselSound = useCallback((soundId: string, shouldLoop: boolean = false) => {
     const sound = availableSounds.find(s => s.id === soundId || s.label === soundId);
@@ -386,8 +394,12 @@ export default function VesselTrackerPage() {
 
   const handleManualStatus = (st: VesselStatus['status'], label?: string) => {
     setVesselStatus(st);
+    vesselStatusRef.current = st;
     updateVesselInFirestore({ status: st, eventLabel: label || null });
-    if (st === 'moving') setAnchorPos(null);
+    if (st === 'moving') {
+        setAnchorPos(null);
+        anchorPosRef.current = null;
+    }
     toast({ title: label || (st === 'returning' ? 'Retour Maison' : st === 'landed' ? 'À terre' : 'Mode Auto') });
   };
 
@@ -397,7 +409,10 @@ export default function VesselTrackerPage() {
         googleMap.panTo(currentPos);
     } else {
         shouldPanOnNextFix.current = true;
-        if (!isSharing) setIsSharing(true);
+        if (!isSharing) {
+            setIsSharing(true);
+            isSharingRef.current = true;
+        }
     }
   };
 
@@ -421,26 +436,14 @@ export default function VesselTrackerPage() {
     } catch (e) {}
   };
 
-  const handleSaveSmsSettings = async () => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            emergencyContact,
-            vesselSmsMessage,
-            isEmergencyEnabled,
-            isCustomMessageEnabled
-        });
-        toast({ title: "Réglages SMS sauvegardés" });
-    } catch (e) {}
-  };
-
-  // --- TRACKING CORE & TECHNICAL LOGGING ---
+  // --- TRACKING CORE ---
   useEffect(() => {
     if (!isSharing || !navigator.geolocation) return;
     
     setIsInitializing(true);
     setStartTime(new Date());
     lastUpdateTimeRef.current = Date.now();
+    isSharingRef.current = true;
 
     const startTrackingAfterDelay = setTimeout(() => {
         setIsInitializing(false);
@@ -454,10 +457,7 @@ export default function VesselTrackerPage() {
             
             setCurrentPos(newPos);
             setCurrentSpeed(knotSpeed);
-            if (isFollowMode && googleMap) googleMap.panTo(newPos);
-
-            if (isInitializing) return;
-
+            
             const now = Date.now();
             const timeDiff = (now - lastUpdateTimeRef.current) / 1000;
             let distMoved = 0;
@@ -465,29 +465,31 @@ export default function VesselTrackerPage() {
                 distMoved = getDistance(newPos.lat, newPos.lng, lastUpdatePosRef.current.lat, lastUpdatePosRef.current.lng);
             }
 
-            let nextStatus: VesselStatus['status'] = vesselStatus;
+            let nextStatus: VesselStatus['status'] = vesselStatusRef.current;
             let eventLabel: string | null = null;
 
+            // Algorithme de détection de dérive intelligente
             if (knotSpeed > 2 || distMoved > 100) {
-                if (vesselStatus !== 'moving') {
+                if (vesselStatusRef.current !== 'moving') {
                     nextStatus = 'moving';
                     eventLabel = 'EN MOUVEMENT';
+                    anchorPosRef.current = null;
                     setAnchorPos(null);
                 }
             } else if (distMoved > 20 && distMoved <= 100 && timeDiff >= 60) {
-                if (vesselStatus !== 'drifting') {
+                if (vesselStatusRef.current !== 'drifting') {
                     nextStatus = 'drifting';
                     eventLabel = 'À LA DÉRIVE !';
                     playVesselSound('alerte', loopEnabled['batterie']);
                 }
             } else if (distMoved <= 20 && timeDiff >= 60) {
-                if (vesselStatus !== 'stationary') {
+                if (vesselStatusRef.current !== 'stationary') {
                     nextStatus = 'stationary';
                     eventLabel = 'AU MOUILLAGE';
                 }
             }
 
-            if (nextStatus !== vesselStatus || eventLabel || timeDiff >= 60) {
+            if (nextStatus !== vesselStatusRef.current || eventLabel || timeDiff >= 60) {
                 const durationMinutes = startTime ? differenceInMinutes(new Date(), startTime) : 0;
                 const logEntry = {
                     vesselName: vesselNickname || 'Mon Navire',
@@ -512,6 +514,7 @@ export default function VesselTrackerPage() {
                 }
 
                 setVesselStatus(nextStatus);
+                vesselStatusRef.current = nextStatus;
                 updateVesselInFirestore({ 
                     location: { latitude, longitude }, 
                     status: nextStatus, 
@@ -531,17 +534,21 @@ export default function VesselTrackerPage() {
         clearTimeout(startTrackingAfterDelay);
         if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     };
-  }, [isSharing, isInitializing, vesselStatus, startTime, playVesselSound, loopEnabled, toast, updateVesselInFirestore, vesselNickname, googleMap, isFollowMode, firestore, sharingId, fleetId]);
+  }, [isSharing, playVesselSound, loopEnabled, toast, updateVesselInFirestore, vesselNickname, firestore, sharingId, fleetId, startTime]);
 
   const handleMooringToggle = () => {
     if (anchorPos) {
         setAnchorPos(null);
+        anchorPosRef.current = null;
         setVesselStatus('moving');
+        vesselStatusRef.current = 'moving';
         updateVesselInFirestore({ status: 'moving', anchorLocation: null, eventLabel: 'ANCRE LEVÉE' });
         toast({ title: "Ancre levée" });
     } else if (currentPos) {
         setAnchorPos(currentPos);
+        anchorPosRef.current = currentPos;
         setVesselStatus('stationary');
+        vesselStatusRef.current = 'stationary';
         updateVesselInFirestore({ status: 'stationary', anchorLocation: { latitude: currentPos.lat, longitude: currentPos.lng }, eventLabel: 'AU MOUILLAGE' });
         toast({ title: "Mouillage actif", description: `Rayon : ${mooringRadius}m` });
     }
@@ -688,8 +695,12 @@ export default function VesselTrackerPage() {
               </Card>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Button variant={vesselStatus === 'returning' ? 'default' : 'outline'} className="h-14 font-black uppercase text-xs border-2 gap-2" onClick={() => handleManualStatus('returning')}><Navigation className="size-4 text-blue-500" /> RETOUR MAISON</Button>
-                  <Button variant={vesselStatus === 'landed' ? 'default' : 'outline'} className="h-14 font-black uppercase text-xs border-2 gap-2" onClick={() => handleManualStatus('landed')}><Home className="size-4 text-green-500" /> HOME (À TERRE)</Button>
+                  <Button variant={vesselStatus === 'returning' ? 'default' : 'outline'} className="h-14 font-black uppercase text-xs border-2 gap-2" onClick={() => handleManualStatus('returning')} disabled={vesselStatus === 'returning'}>
+                      <Navigation className="size-4 text-blue-500" /> RETOUR MAISON
+                  </Button>
+                  <Button variant={vesselStatus === 'landed' ? 'default' : 'outline'} className="h-14 font-black uppercase text-xs border-2 gap-2" onClick={() => handleManualStatus('landed')} disabled={vesselStatus === 'landed'}>
+                      <Home className="size-4 text-green-500" /> HOME (À TERRE)
+                  </Button>
               </div>
 
               {isSharing ? (
@@ -697,7 +708,7 @@ export default function VesselTrackerPage() {
                       <X className="size-6" /> ARRÊTER LE PARTAGE
                   </Button>
               ) : (
-                  <Button className="w-full h-16 text-sm font-black uppercase tracking-widest shadow-xl rounded-2xl gap-3" onClick={() => setIsSharing(true)}>
+                  <Button className="w-full h-16 text-sm font-black uppercase tracking-widest shadow-xl rounded-2xl gap-3" onClick={() => { setIsSharing(true); isSharingRef.current = true; }}>
                       <Navigation className="size-6" /> LANCER PARTAGE
                   </Button>
               )}
