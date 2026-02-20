@@ -1,29 +1,28 @@
-
 'use server';
 
+import { headers } from 'next/headers';
+
 /**
- * Service de récupération météo via Windy Point Forecast API.
- * Optimisé pour la Version 2 - Résolution Erreur 400
- * @param lat Latitude du point
- * @param lon Longitude du point
+ * Service de récupération météo via Windy Point Forecast API v2.
+ * @param lat Latitude du point (doit être un nombre)
+ * @param lon Longitude du point (doit être un nombre)
  */
 export async function fetchWindyWeather(lat: number, lon: number) {
   // CLÉ API WINDY VÉRIFIÉE
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
-  // DOMAINE DE PRODUCTION AUTORISÉ (Referer & Origin)
-  // Utilisation exacte de l'URL de production configurée dans la console Windy
-  const prodDomain = 'https://studio-2943478321-f746e.web.app/';
-
   try {
+    // Récupération dynamique du Referer pour supporter localhost et la prod
+    const headersList = await headers();
+    const currentReferer = headersList.get('referer') || 'https://studio.firebase.google.com/project/studio-2943478321-f746e';
+
     // FORMATAGE CRITIQUE : Windy exige des types Number (pas de String)
-    // On force la conversion en Number et on limite à 6 décimales
-    const cleanLat = Number(Number(lat).toFixed(6));
-    const cleanLon = Number(Number(lon).toFixed(6));
+    const cleanLat = Number(lat);
+    const cleanLon = Number(lon);
 
     if (isNaN(cleanLat) || isNaN(cleanLon)) {
-        throw new Error("Coordonnées GPS invalides");
+        throw new Error("Coordonnées GPS invalides (NaN)");
     }
 
     // Payload STRICT pour Windy V2
@@ -35,15 +34,15 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       levels: ['surface']
     };
 
-    console.log(`[Windy Diagnostic] Envoi vers ${url} avec Referer: ${prodDomain}`);
+    console.log(`[Windy Debug] Envoi vers ${url} avec Referer: ${currentReferer}`);
     
     const response = await fetch(url, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'x-windy-api-key': API_KEY,
-        'Referer': prodDomain,
-        'Origin': prodDomain
+        'Referer': currentReferer,
+        'Origin': new URL(currentReferer).origin
       },
       body: JSON.stringify(requestBody)
     });

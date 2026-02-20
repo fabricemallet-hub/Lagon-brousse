@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -97,7 +96,7 @@ export default function VesselTrackerPage() {
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status'] | 'offline'>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
-  // RÉFÉRENCES TECHNIQUES POUR LA PERFORMANCE (v4.1)
+  // RÉFÉRENCES TECHNIQUES POUR LA PERFORMANCE (v4.2 - Throttling 5s)
   const currentPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const anchorPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const statusRef = useRef<VesselStatus['status'] | 'offline'>('moving');
@@ -147,13 +146,13 @@ export default function VesselTrackerPage() {
   }, [userProfile, isSharing]);
 
   /**
-   * MISE À JOUR FIRESTORE AVEC THROTTLING (v4.1)
+   * MISE À JOUR FIRESTORE AVEC THROTTLING 5S (v4.2)
    */
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
     if (!user || !firestore || !sharingId) return;
     
     const now = Date.now();
-    // Throttling strict de 5s pour les écritures
+    // Throttling strict de 5s pour les écritures et re-rendus
     if (!force && (now - lastUpdateTimestampRef.current < 5000)) return;
     lastUpdateTimestampRef.current = now;
 
@@ -287,7 +286,7 @@ export default function VesselTrackerPage() {
   };
 
   /**
-   * CYCLE GPS STABILISÉ (v4.1)
+   * CYCLE GPS STABILISÉ AVEC CLEARWATCH (v4.2)
    */
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -305,11 +304,11 @@ export default function VesselTrackerPage() {
         const { latitude, longitude, accuracy } = position.coords;
         const newPos = { lat: latitude, lng: longitude };
         
-        if (accuracy > 500) return;
-
-        // THROTTLING TACTIQUE : Ne pas saturer le thread
+        // Throttling à la source pour éviter les violations de thread
         const now = Date.now();
         if (now - lastUpdateTimestampRef.current < 5000) return;
+
+        if (accuracy > 500) return;
 
         currentPosRef.current = newPos;
         setCurrentPos(newPos);
@@ -577,7 +576,7 @@ export default function VesselTrackerPage() {
               mapContainerStyle={{ width: '100%', height: '100%' }}
               defaultCenter={INITIAL_CENTER} 
               defaultZoom={10} 
-              onLoad={onLoad} 
+              onLoad={(m) => setMap(m)} 
               options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
             >
                   {followedVessels?.filter(v => v.isSharing && v.location).map(vessel => {
