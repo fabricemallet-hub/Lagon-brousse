@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -66,6 +67,15 @@ import { getDataForDate } from '@/lib/data';
 
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
+
+const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
+  if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
+  const props = { className: cn("size-4", className) };
+  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
+  if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
+  if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
+  return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
+};
 
 const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClose: () => void, isLoading: boolean, tides: any[] | null }) => {
     if (!data) return null;
@@ -152,11 +162,19 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
+            // Étape 1 : Charger Leaflet
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
+            
+            // Attendre que l'objet L soit réellement disponible
             let retries = 0;
-            while (!(window as any).L && retries < 30) { await new Promise(r => setTimeout(r, 100)); retries++; }
-            if (!(window as any).L) throw new Error("Leaflet L not found");
+            while (!(window as any).L && retries < 50) { 
+                await new Promise(r => setTimeout(r, 100)); 
+                retries++; 
+            }
+            
+            if (!(window as any).L) throw new Error("Leaflet non trouvé après attente.");
 
+            // Étape 2 : Charger Windy seulement après Leaflet
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const options = {
@@ -211,9 +229,10 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     const timer = setTimeout(initWindy, 1000);
+    // Panneau de secours si chargement bloqué
     const diagTimer = setTimeout(() => {
         if (!mapRef.current) setAuthError(window.location.host);
-    }, 5000);
+    }, 6000);
     return () => { clearTimeout(timer); clearTimeout(diagTimer); };
   }, [initWindy]);
 
@@ -227,7 +246,7 @@ export default function VesselTrackerPage() {
   const copyOrigin = () => {
     if (typeof window !== 'undefined') {
         navigator.clipboard.writeText(window.location.host);
-        toast({ title: "HÔTE COPIÉ !", description: "Utilisez des VIRGULES dans Windy." });
+        toast({ title: "HÔTE COPIÉ !", description: "Collez-le dans votre console Windy." });
     }
   };
 
@@ -238,10 +257,10 @@ export default function VesselTrackerPage() {
       {authError && (
         <Alert variant="destructive" className="bg-red-50 border-red-600 rounded-2xl border-2 shadow-xl animate-in slide-in-from-top-4">
             <ShieldAlert className="size-6" />
-            <AlertTitle className="font-black uppercase text-sm mb-2">ERREUR AUTHENTIFICATION WINDY (401)</AlertTitle>
+            <AlertTitle className="font-black uppercase text-sm mb-2">DIAGNOSTIC WINDY (401)</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cet hôte exact :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cette valeur exacte :</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{authError}</code>
                         <Button size="icon" variant="ghost" onClick={copyOrigin} className="h-10 w-10 hover:bg-red-200">
@@ -252,8 +271,8 @@ export default function VesselTrackerPage() {
                 <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
                     <p>1. Allez sur <strong>api.windy.com/keys</strong></p>
                     <p>2. Modifiez la clé Map Forecast (1gGm...)</p>
-                    <p>3. Séparez vos domaines par une <strong>VIRGULE</strong> (pas d'espace).</p>
-                    <p className="font-black text-xs text-red-600 animate-pulse">⚠️ ATTENTION : VIRGULE OBLIGATOIRE</p>
+                    <p>3. Dans "Restrictions de domaine", mettez des <strong>VIRGULES</strong>.</p>
+                    <p className="font-black text-xs text-red-600">⚠️ Pas d'espaces entre les domaines.</p>
                 </div>
             </AlertDescription>
         </Alert>
