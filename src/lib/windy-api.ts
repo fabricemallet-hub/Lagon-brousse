@@ -1,3 +1,4 @@
+
 'use server';
 
 import { headers } from 'next/headers';
@@ -14,11 +15,10 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   try {
     const headersList = await headers();
     const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app';
-    const currentReferer = headersList.get('referer') || `${PRODUCTION_URL}/`;
-
+    
     // FORMATAGE CRITIQUE : Windy exige des types Number purs avec précision fixe
-    const cleanLat = parseFloat(Number(lat).toFixed(6));
-    const cleanLon = parseFloat(Number(lon).toFixed(6));
+    const cleanLat = Number(Number(lat).toFixed(6));
+    const cleanLon = Number(Number(lon).toFixed(6));
 
     if (isNaN(cleanLat) || isNaN(cleanLon)) {
         throw new Error("Coordonnées GPS invalides");
@@ -28,10 +28,11 @@ export async function fetchWindyWeather(lat: number, lon: number) {
     // Note: Windy rejette les propriétés inconnues. On n'envoie que le nécessaire.
     const requestBody = {
       lat: cleanLat,
-      lon: cleanLon,
+      lon: cleanLon, // Windy utilise 'lon' et non 'lng'
       model: 'gfs',
       parameters: ['wind', 'windDir', 'waves'],
-      levels: ['surface']
+      levels: ['surface'],
+      key: API_KEY // Clé dans le JSON comme demandé pour V2
     };
 
     // LOG DE DIAGNOSTIC (Visible dans les logs serveurs Firebase)
@@ -41,7 +42,6 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'x-windy-api-key': API_KEY,
         'Referer': PRODUCTION_URL,
         'Origin': PRODUCTION_URL
       },

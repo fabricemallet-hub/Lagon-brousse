@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -103,9 +104,7 @@ export default function VesselTrackerPage() {
   const watchIdRef = useRef<number | null>(null);
   const lastUpdateTimestampRef = useRef<number>(0);
   const [isForcingWindy, setIsForcingWindy] = useState(false);
-  const immobilityStartTime = useRef<number | null>(null);
 
-  // Journal technique fusionné
   const [technicalLog, setTechnicalLog] = useState<{ label: string, startTime: Date, lastUpdate: Date, duration: number }[]>([]);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
@@ -162,7 +161,6 @@ export default function VesselTrackerPage() {
         } catch (e) {}
     }
 
-    const pos = currentPosRef.current;
     const updatePayload: any = { 
         id: sharingId,
         userId: user.uid, 
@@ -224,9 +222,9 @@ export default function VesselTrackerPage() {
                 wavesHeight: weather.wavesHeight,
                 lastWeatherUpdate: serverTimestamp()
             }, true);
-            toast({ title: `Windy ${weather.status}`, description: `Vent: ${weather.windSpeed}nd | Vagues: ${weather.wavesHeight}m` });
+            toast({ title: `Windy Succès`, description: `Vent: ${weather.windSpeed}nd | Vagues: ${weather.wavesHeight}m` });
         } else {
-            toast({ variant: "destructive", title: `Windy ${weather.status}`, description: "Vérifiez vos restrictions de domaine." });
+            toast({ variant: "destructive", title: `Windy Erreur`, description: `Code: ${weather.status}` });
         }
     } catch (e) {
         toast({ variant: "destructive", title: "Échec API", description: "Communication impossible." });
@@ -265,23 +263,6 @@ export default function VesselTrackerPage() {
     updateVesselRef.current(updates, true);
     addToLogRef.current(label);
     toast({ title: label });
-  };
-
-  const handleResetIdentity = async () => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            vesselNickname: "",
-            lastVesselId: "",
-            mooringRadius: 20
-        });
-        setVesselNickname("");
-        setCustomSharingId("");
-        setMooringRadius(20);
-        toast({ title: "Identité réinitialisée" });
-    } catch (e) {
-        toast({ variant: "destructive", title: "Erreur Reset" });
-    }
   };
 
   useEffect(() => {
@@ -500,7 +481,7 @@ export default function VesselTrackerPage() {
                             </div>
                             <Slider value={[mooringRadius]} min={10} max={200} step={10} onValueChange={v => setMooringRadius(v[0])} />
                         </div>
-                        <Button variant="ghost" className="w-full h-10 font-black uppercase text-[8px] text-destructive/40 hover:text-destructive hover:bg-red-50" onClick={handleResetIdentity}>
+                        <Button variant="ghost" className="w-full h-10 font-black uppercase text-[8px] text-destructive/40 hover:text-destructive hover:bg-red-50" onClick={() => { setVesselNickname(''); setCustomSharingId(''); setMooringRadius(20); toast({ title: "Identité reset" }); }}>
                             <RefreshCw className="size-3 mr-2" /> RÉINITIALISER MON IDENTITÉ
                         </Button>
                     </AccordionContent>
@@ -509,13 +490,9 @@ export default function VesselTrackerPage() {
                 <AccordionItem value="diag" className="border-none mt-2">
                     <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-slate-100 rounded-xl">
                         <Zap className="size-4 text-slate-600" />
-                        <span className="text-[10px] font-black uppercase">Pont de Test (Diagnostic)</span>
+                        <span className="text-[10px] font-black uppercase">Diagnostic Windy</span>
                     </AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-3">
-                        <div className="grid grid-cols-2 gap-2">
-                            <Button variant="outline" size="sm" className="h-10 text-[8px] font-black uppercase" onClick={() => handleManualStatusToggle('moving', 'TEST MOUV')}>MOUV</Button>
-                            <Button variant="outline" size="sm" className="h-10 text-[8px] font-black uppercase" onClick={() => handleManualStatusToggle('stationary', 'TEST MOUIL')}>MOUIL</Button>
-                        </div>
                         <Button 
                             variant="secondary" 
                             size="sm" 
