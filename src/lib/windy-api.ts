@@ -3,18 +3,21 @@
 
 /**
  * Service de récupération météo via Windy Point Forecast API.
- * Optimisé pour la Version 2 - Fix Erreur 400
+ * Optimisé pour la Version 2 - Résolution Erreur 400
+ * @param lat Latitude du point
+ * @param lon Longitude du point
  */
 export async function fetchWindyWeather(lat: number, lon: number) {
-  // CLÉ API WINDY
+  // CLÉ API WINDY VÉRIFIÉE
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
-  // DOMAINE DE PRODUCTION AUTORISÉ
+  // DOMAINE DE PRODUCTION AUTORISÉ (Referer & Origin)
   const prodDomain = 'https://studio-2943478321-f746e.web.app';
 
   try {
-    // FORMATAGE STRICT : Windy V2 exige des Numbers (pas de Strings)
+    // FORMATAGE CRITIQUE : Windy exige des types Number (pas de String)
+    // On force la précision à 6 décimales pour la conformité GPS
     const cleanLat = Number(lat.toFixed(6));
     const cleanLon = Number(lon.toFixed(6));
 
@@ -22,7 +25,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
         throw new Error("Coordonnées GPS invalides");
     }
 
-    // Payload MINIMALISTE pour Windy V2 (Évite l'erreur 400 due à des champs superflus)
+    // Payload STRICT pour Windy V2
     const requestBody = {
       lat: cleanLat,
       lon: cleanLon,
@@ -32,7 +35,6 @@ export async function fetchWindyWeather(lat: number, lon: number) {
     };
 
     console.log(`[Windy Diagnostic] Envoi vers ${url}`);
-    console.log(`[Windy Diagnostic] Body:`, JSON.stringify(requestBody));
     
     const response = await fetch(url, {
       method: 'POST',

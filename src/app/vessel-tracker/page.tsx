@@ -55,7 +55,6 @@ import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { Textarea } from '@/components/ui/textarea';
 import { format, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -98,7 +97,7 @@ export default function VesselTrackerPage() {
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status'] | 'offline'>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
-  // RÉFÉRENCES TECHNIQUES POUR LA PERFORMANCE (Stabilité & Throttling)
+  // RÉFÉRENCES TECHNIQUES POUR LA PERFORMANCE (Optimisation v4.0)
   const currentPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const anchorPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const statusRef = useRef<VesselStatus['status'] | 'offline'>('moving');
@@ -148,14 +147,14 @@ export default function VesselTrackerPage() {
   }, [userProfile, isSharing]);
 
   /**
-   * MISE À JOUR FIRESTORE AVEC THROTTLING (Optimisation Performance)
-   * On limite les écritures et les re-rendus à une fois toutes les 5 secondes.
+   * MISE À JOUR FIRESTORE AVEC THROTTLING (v4.0)
+   * On limite strictement les écritures Firestore à une fois toutes les 5 secondes.
    */
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
     if (!user || !firestore || !sharingId) return;
     
     const now = Date.now();
-    // Throttling : On ne met à jour que toutes les 5s, sauf si 'force' est vrai (ex: SOS ou Changement Statut)
+    // Throttling : Stoppe les violations de performance
     if (!force && (now - lastUpdateTimestampRef.current < 5000)) {
         return;
     }
@@ -218,11 +217,10 @@ export default function VesselTrackerPage() {
   const handleForceWindyUpdate = async () => {
     const pos = currentPosRef.current;
     if (!pos) {
-        toast({ variant: "destructive", title: "Diagnostic Windy", description: "GPS requis pour l'appel API." });
+        toast({ variant: "destructive", title: "Diagnostic GPS", description: "Position requise pour Windy." });
         return;
     }
     setIsForcingWindy(true);
-    
     try {
         const weather = await fetchWindyWeather(pos.lat, pos.lng);
         if (weather.success) {
@@ -233,12 +231,12 @@ export default function VesselTrackerPage() {
                 lastWeatherUpdate: serverTimestamp()
             }, true);
             lastWeatherUpdateRef.current = Date.now();
-            toast({ title: "Communication OK (200)", description: `Vent: ${weather.windSpeed}nd | Mer: ${weather.wavesHeight}m` });
+            toast({ title: "Météo mise à jour !", description: `Vent: ${weather.windSpeed}nd | Mer: ${weather.wavesHeight}m` });
         } else {
             toast({ variant: "destructive", title: `Erreur ${weather.status}`, description: weather.error });
         }
     } catch (e) {
-        toast({ variant: "destructive", title: "Échec critique", description: "Vérifiez Referer & restrictions." });
+        toast({ variant: "destructive", title: "Échec Windy", description: "Vérifiez les restrictions API." });
     } finally {
         setIsForcingWindy(false);
     }
@@ -286,8 +284,10 @@ export default function VesselTrackerPage() {
   const handleStopSharing = async () => {
     if (!user || !firestore) return;
     setIsSharing(false);
-    if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
-    watchIdRef.current = null;
+    if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+    }
     await updateDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp() });
     setCurrentPos(null); 
     setAnchorPos(null);
@@ -321,8 +321,8 @@ export default function VesselTrackerPage() {
   }, []);
 
   /**
-   * CYCLE GPS OPTIMISÉ (v3.9)
-   * On utilise une seule instance de watchPosition pour éviter les violations de thread.
+   * CYCLE GPS OPTIMISÉ (v4.0)
+   * Throttling et ClearWatch systématique.
    */
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -333,7 +333,6 @@ export default function VesselTrackerPage() {
       return;
     }
 
-    // Protection contre les relancements multiples
     if (watchIdRef.current !== null) return;
 
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -341,12 +340,13 @@ export default function VesselTrackerPage() {
         const { latitude, longitude, accuracy } = position.coords;
         const newPos = { lat: latitude, lng: longitude };
         
-        // Filtre de précision minimale (500m) pour éviter les sauts GPS
+        // Filtre de précision minimale pour éviter les sauts erratiques
         if (accuracy > 500) return;
 
         currentPosRef.current = newPos;
         setCurrentPos(newPos);
 
+        // LOGIQUE DE DÉTECTION DE DÉRIVE / MOUILLAGE
         const currentStatus = statusRef.current;
         if (currentStatus !== 'returning' && currentStatus !== 'landed' && currentStatus !== 'emergency') {
             if (!anchorPosRef.current) {
@@ -357,17 +357,14 @@ export default function VesselTrackerPage() {
             } else {
                 const distFromAnchor = getDistance(latitude, longitude, anchorPosRef.current.lat, anchorPosRef.current.lng);
                 
-                // Sortie de mouillage automatique (si > 100m)
-                if (distFromAnchor > 100) {
+                if (distFromAnchor > 100) { // SORTIE AUTO
                     statusRef.current = 'moving';
                     setVesselStatus('moving');
                     anchorPosRef.current = null;
                     setAnchorPos(null);
                     updateVesselInFirestore({ location: { latitude, longitude }, status: 'moving', eventLabel: null, accuracy: Math.round(accuracy) }, true);
-                    addToTechnicalLog("SORTIE DE MOUILLAGE");
-                } 
-                // Dérive détectée (si entre rayon et 100m)
-                else if (distFromAnchor > mooringRadius) {
+                    addToTechnicalLog("MOUVEMENT DÉTECTÉ");
+                } else if (distFromAnchor > mooringRadius) { // DÉRIVE
                     if (statusRef.current !== 'drifting') {
                         statusRef.current = 'drifting';
                         setVesselStatus('drifting');
@@ -376,9 +373,7 @@ export default function VesselTrackerPage() {
                     } else {
                         updateVesselInFirestore({ location: { latitude, longitude }, accuracy: Math.round(accuracy) });
                     }
-                } 
-                // Immobilité confirmée
-                else {
+                } else { // STATIONNAIRE
                     if (statusRef.current !== 'stationary') {
                         statusRef.current = 'stationary';
                         setVesselStatus('stationary');
@@ -393,10 +388,11 @@ export default function VesselTrackerPage() {
             updateVesselInFirestore({ location: { latitude, longitude }, accuracy: Math.round(accuracy) });
         }
       },
-      (err) => console.error("[GPS Error]", err),
+      (err) => console.error("[GPS Critical]", err),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
 
+    // NETTOYAGE CRITIQUE : Empêche les fuites de mémoire et thread bloqué
     return () => { 
         if (watchIdRef.current !== null) {
             navigator.geolocation.clearWatch(watchIdRef.current); 
@@ -432,7 +428,7 @@ export default function VesselTrackerPage() {
 
   const sendEmergencySms = (type: 'MAYDAY' | 'PAN PAN') => {
     const contact = userProfile?.emergencyContact;
-    if (!contact) { toast({ variant: "destructive", title: "Contact requis", description: "Réglez votre contact dans Profil." }); return; }
+    if (!contact) { toast({ variant: "destructive", title: "Contact manquant", description: "Réglez votre contact d'urgence dans Profil." }); return; }
     const pos = currentPos || INITIAL_CENTER;
     const body = `[LB-NC] ${type} : ${vesselNickname || sharingId}. Carte : https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
     window.location.href = `sms:${contact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
@@ -468,7 +464,7 @@ export default function VesselTrackerPage() {
                             <Badge variant="outline" className="bg-green-500/30 border-white/30 text-white font-black text-[10px] px-3 h-6">EN LIGNE</Badge>
                             <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest ml-2 text-white">
                                 {vesselStatus === 'moving' ? <Move className="size-3" /> : vesselStatus === 'stationary' ? <Anchor className="size-3" /> : <Home className="size-3" />}
-                                {vesselStatus === 'moving' ? 'EN MOUVEMENT' : vesselStatus === 'stationary' ? 'AU MOUILLAGE' : 'À TERRE'}
+                                {vesselStatus === 'moving' ? 'MOUVEMENT' : vesselStatus === 'stationary' ? 'MOUILLAGE' : 'À TERRE'}
                             </div>
                             <span className="text-[9px] font-black uppercase opacity-60 ml-auto text-white">{activeDuration}</span>
                         </div>
@@ -620,7 +616,7 @@ export default function VesselTrackerPage() {
                               <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                   <div style={{ transform: 'translate(-50%, -50%)' }} className="flex flex-col items-center pointer-events-none relative">
                                       
-                                      {/* TOP STACK: NAME & STATUS ONLY */}
+                                      {/* TOP STACK: NAME & STATUS */}
                                       <div className="absolute bottom-20 flex flex-col items-center">
                                           <div className="px-3 py-2 bg-white/95 backdrop-blur-md rounded-lg text-[11px] font-black shadow-2xl border-2 border-primary/20 text-slate-900 flex items-center gap-2">
                                               <span className="truncate max-w-[120px]">{vessel.displayName}</span>
@@ -628,7 +624,7 @@ export default function VesselTrackerPage() {
                                           </div>
                                       </div>
 
-                                      {/* CENTER ICON: TRANSPARENT WITH BLUE DOT OVERLAY */}
+                                      {/* CENTER ICON: VISEUR TACTIQUE (60% Opacity) */}
                                       <div className="relative size-32 flex items-center justify-center">
                                           <div className={cn("size-24 rounded-full border-8 border-white shadow-2xl transition-opacity flex items-center justify-center opacity-60", statusInfo.color)}>
                                               {React.createElement(statusInfo.icon, { className: "size-12 text-white drop-shadow-md" })}
@@ -642,7 +638,6 @@ export default function VesselTrackerPage() {
 
                                       {/* BOTTOM STACK: BATTERY, ALERTS, WINDY */}
                                       <div className="absolute top-14 flex flex-col items-center gap-1.5 mt-2">
-                                          {/* 1. Battery Badge */}
                                           <div className={cn(
                                               "px-3 py-1.5 rounded-full text-[10px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
                                               battery < 20 ? "text-red-600 border-red-200" : (battery < 60 ? "text-orange-600 border-orange-100" : "text-green-600 border-green-100")
@@ -651,11 +646,9 @@ export default function VesselTrackerPage() {
                                               <span>{battery}%</span>
                                           </div>
 
-                                          {/* 2. Dynamic Alerts (Stacked) */}
                                           {isCharging && <Badge className="bg-blue-600 text-white text-[9px] font-black shadow-lg border-2 border-white/30 px-3 py-1">⚡ EN CHARGE</Badge>}
                                           {battery < 20 && !isCharging && <Badge className="bg-red-600 text-white text-[9px] font-black shadow-lg animate-pulse border-2 border-white/30 px-3 py-1">⚠️ BATTERIE FAIBLE</Badge>}
 
-                                          {/* 3. Windy Meteo Badge */}
                                           {vessel.windSpeed !== undefined && (
                                               <div className="bg-slate-900/95 text-white px-4 py-2 rounded-2xl text-[10px] font-black shadow-2xl border-2 border-white/20 flex items-center gap-4 mt-1">
                                                   <div className="flex items-center gap-2"><Wind className="size-4 text-blue-400" /> {vessel.windSpeed} ND</div>
