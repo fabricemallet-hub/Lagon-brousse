@@ -28,7 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { 
   Accordion, 
   AccordionContent, 
@@ -129,6 +129,14 @@ export default function VesselTrackerPage() {
   const [anchorPos, setAnchorPos] = useState<{ lat: number, lng: number } | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   
+  // WINDY STATES
+  const [isWindyEnabled, setIsWindyEnabled] = useState(false);
+  const [windyLayer, setWindyLayer] = useState<'wind' | 'waves'>('wind');
+  const [windyOpacity, setWindyOpacity] = useState(0.5);
+  const [isWindyLoaded, setIsWindyLoaded] = useState(false);
+  const windyAPI = useRef<any>(null);
+  const windyStore = useRef<any>(null);
+
   // REFS POUR ÉVITER LES BOUCLES INFINIES
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
   const isSharingRef = useRef(false);
@@ -445,7 +453,7 @@ export default function VesselTrackerPage() {
     } catch (e) {}
   };
 
-  // --- TRACKING CORE (v26.5 Stabilisé - Fix Infinite Loop) ---
+  // --- TRACKING CORE ---
   useEffect(() => {
     if (!isSharing || !navigator.geolocation) return;
     
@@ -534,6 +542,79 @@ export default function VesselTrackerPage() {
     };
   }, [isSharing, playVesselSound, loopEnabled, toast, updateVesselInFirestore]);
 
+  // --- WINDY INTEGRATION ---
+  const initWindy = useCallback(() => {
+    if (typeof window === 'undefined' || !isWindyEnabled) return;
+
+    const bootSequentially = async () => {
+        const checkDependencies = () => typeof (window as any).L !== 'undefined' && typeof (window as any).windyInit !== 'undefined';
+        
+        let attempts = 0;
+        while (!checkDependencies() && attempts < 50) {
+            await new Promise(r => setTimeout(r, 200));
+            attempts++;
+        }
+
+        if (checkDependencies()) {
+            const options = {
+                key: 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU',
+                lat: currentPos?.lat || INITIAL_CENTER.lat,
+                lon: currentPos?.lng || INITIAL_CENTER.lng,
+                zoom: googleMap?.getZoom() || 12,
+                layer: windyLayer,
+            };
+
+            (window as any).windyInit(options, (windyApi: any) => {
+                const { map, store } = windyApi;
+                windyAPI.current = windyApi;
+                windyStore.current = store;
+                setIsWindyLoaded(true);
+                
+                // Sync from Google to Windy
+                googleMap?.addListener('idle', () => {
+                    if (isWindyEnabled) {
+                        const center = googleMap.getCenter();
+                        if (center) {
+                            map.setView([center.lat(), center.lng()], googleMap.getZoom());
+                        }
+                    }
+                });
+            });
+        }
+    };
+
+    bootSequentially();
+  }, [isWindyEnabled, currentPos, googleMap, windyLayer]);
+
+  useEffect(() => {
+    if (isWindyEnabled && !isWindyLoaded) {
+        const lScript = document.createElement('script');
+        lScript.src = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js';
+        lScript.async = true;
+        document.head.appendChild(lScript);
+
+        const wScript = document.createElement('script');
+        wScript.src = 'https://api.windy.com/assets/map-forecast/libBoot.js';
+        wScript.async = true;
+        document.head.appendChild(wScript);
+
+        lScript.onload = () => {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.css';
+            document.head.appendChild(link);
+        };
+
+        wScript.onload = () => initWindy();
+    }
+  }, [isWindyEnabled, isWindyLoaded, initWindy]);
+
+  useEffect(() => {
+    if (isWindyLoaded && windyStore.current) {
+        windyStore.current.set('overlay', windyLayer);
+    }
+  }, [windyLayer, isWindyLoaded]);
+
   const handleMooringToggle = () => {
     if (anchorPos) {
         setAnchorPos(null);
@@ -616,6 +697,8 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-950", isFullscreen ? "fixed inset-0 z-[150] h-screen w-screen rounded-none" : "h-[500px]")}>
+        <div id="windy" className={cn("absolute inset-0 z-10 transition-opacity", isWindyEnabled ? "opacity-100" : "opacity-0 pointer-events-none")} style={{ opacity: windyOpacity }} />
+        
         <GoogleMap
             mapContainerClassName="w-full h-full"
             defaultCenter={INITIAL_CENTER}
@@ -661,8 +744,29 @@ export default function VesselTrackerPage() {
         </GoogleMap>
         
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-[160]">
-            <Button size="icon" className="bg-white/90 border-2 h-10 w-10 shadow-xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5 text-primary" /> : <Expand className="size-5 text-primary" />}</Button>
+            <Button size="icon" className="bg-white/90 border-2 h-10 w-10 shadow-xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
             <Button onClick={handleRecenter} className="h-10 bg-primary text-white border-2 border-white/20 px-3 gap-2 shadow-xl font-black uppercase text-[9px]">RECENTRER <LocateFixed className="size-4" /></Button>
+            
+            <div className="flex flex-col gap-1 bg-white/90 backdrop-blur-md p-1 rounded-xl border-2 shadow-xl">
+                <Button 
+                    variant={isWindyEnabled ? "default" : "ghost"} 
+                    size="sm" 
+                    className="h-8 text-[8px] font-black uppercase px-2"
+                    onClick={() => setIsWindyEnabled(!isWindyEnabled)}
+                >
+                    WINDY {isWindyEnabled ? 'ON' : 'OFF'}
+                </Button>
+                {isWindyEnabled && (
+                    <div className="flex flex-col gap-1 p-1 animate-in slide-in-from-top-2">
+                        <Button variant={windyLayer === 'wind' ? 'secondary' : 'ghost'} size="sm" className="h-6 text-[7px] font-black" onClick={() => setWindyLayer('wind')}>VENT</Button>
+                        <Button variant={windyLayer === 'waves' ? 'secondary' : 'ghost'} size="sm" className="h-6 text-[7px] font-black" onClick={() => setWindyLayer('waves')}>VAGUES</Button>
+                        <div className="px-2 py-1 space-y-1">
+                            <span className="text-[6px] font-black uppercase opacity-40">Opacité</span>
+                            <Slider value={[windyOpacity * 100]} max={100} step={5} onValueChange={v => setWindyOpacity(v[0] / 100)} className="w-16 h-2" />
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
       </div>
 
