@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import Script from 'next/script';
 import { 
@@ -37,14 +38,13 @@ import {
   Clock,
   Layers,
   Ship,
-  Phone,
-  MessageSquare,
   Smartphone,
   ShieldAlert,
   Copy,
   Check,
-  TrendingUp,
-  Database
+  Database,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { cn, getDistance, translateWindDirection } from '@/lib/utils';
 import type { VesselStatus, UserAccount, WindDirection } from '@/lib/types';
@@ -140,7 +140,6 @@ export default function VesselTrackerPage() {
   const scriptBust = useMemo(() => Date.now(), []);
   const sharingId = useMemo(() => (user?.uid || '').toUpperCase(), [user]);
 
-  // FIX: Labels definition
   const labels = useMemo(() => ({
     status1: "Au Mouillage",
     status2: "En Dérive",
@@ -188,6 +187,9 @@ export default function VesselTrackerPage() {
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
+    // Diagnostic console rouge pour le 401
+    console.error(`%c[Windy Auth] ORIGINE À AUTORISER : ${window.location.host}`, "color: red; font-weight: bold; font-size: 14px;");
+
     setTimeout(() => {
         const options = {
           key: '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4',
@@ -214,11 +216,11 @@ export default function VesselTrackerPage() {
               store.set('overlay', 'wind');
               store.set('product', 'ecmwf');
 
+              // Performance : Différer le reflow
               setTimeout(() => {
-                document.querySelectorAll('.windy-error-msg, .error-boundary').forEach(el => el.remove());
                 map.invalidateSize();
                 window.dispatchEvent(new Event('resize'));
-              }, 500);
+              }, 1000);
 
               broadcast.on('pickerMoved', async (latLon: any) => {
                 const { lat, lon } = latLon;
@@ -231,7 +233,7 @@ export default function VesselTrackerPage() {
                   const weather = await fetchWindyWeather(lat, lon);
                   setMapClickResult((prev: any) => ({ ...prev, ...weather }));
                 } catch (err) {
-                  console.error("Point Forecast failed:", err);
+                  // Erreur silencieuse pour préserver les perfs
                 } finally {
                   setIsQueryingWindy(false);
                 }
@@ -242,10 +244,9 @@ export default function VesselTrackerPage() {
               });
             });
         } catch (e) {
-            console.error("Windy Init Crash:", e);
             setAuthError(true);
         }
-    }, 100);
+    }, 200);
   }, []);
 
   useEffect(() => {
@@ -256,41 +257,39 @@ export default function VesselTrackerPage() {
     if (!mapRef.current || !followedVessels || !window.L) return;
     const L = window.L;
 
-    requestAnimationFrame(() => {
-        followedVessels.forEach(v => {
-          if (!v.location || !v.isSharing) {
-            if (markersRef.current[v.id]) { markersRef.current[v.id].remove(); delete markersRef.current[v.id]; }
-            return;
-          }
+    followedVessels.forEach(v => {
+      if (!v.location || !v.isSharing) {
+        if (markersRef.current[v.id]) { markersRef.current[v.id].remove(); delete markersRef.current[v.id]; }
+        return;
+      }
 
-          const pos = [v.location.latitude, v.location.longitude];
-          const statusColor = v.status === 'stationary' ? '#f97316' : '#2563eb';
+      const pos = [v.location.latitude, v.location.longitude];
+      const statusColor = v.status === 'stationary' ? '#f97316' : '#2563eb';
 
-          if (!markersRef.current[v.id]) {
-            const icon = L.divIcon({
-              className: 'vessel-marker',
-              html: `<div class="relative flex flex-col items-center" style="transform: translate(-50%, -100%)">
-                      <div class="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap mb-1">
-                        ${v.displayName || v.id}
-                      </div>
-                      <div class="relative size-12 flex items-center justify-center">
-                        <div class="absolute inset-0 rounded-full border-2 border-white shadow-xl flex items-center justify-center" 
-                             style="background-color: ${statusColor}; opacity: 0.85">
-                          <svg class="size-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                              ${v.status === 'stationary' ? '<path d="M12 2v18M5 12h14M12 20c-3.3 0-6-2.7-6-6M12 20c3.3 0 6-2.7 6-6"></path>' : '<path d="M3 11l19-9-9 19-2-8-8-2z"></path>'}
-                          </svg>
-                        </div>
-                        <div class="absolute size-3 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(59,130,246,1)] z-[100] animate-pulse"></div>
-                      </div>
-                    </div>`,
-              iconSize: [0, 0],
-              iconAnchor: [0, 0]
-            });
-            markersRef.current[v.id] = L.marker(pos, { icon }).addTo(mapRef.current);
-          } else {
-            markersRef.current[v.id].setLatLng(pos);
-          }
+      if (!markersRef.current[v.id]) {
+        const icon = L.divIcon({
+          className: 'vessel-marker',
+          html: `<div class="relative flex flex-col items-center" style="transform: translate(-50%, -100%)">
+                  <div class="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap mb-1">
+                    ${v.displayName || v.id}
+                  </div>
+                  <div class="relative size-12 flex items-center justify-center">
+                    <div class="absolute inset-0 rounded-full border-2 border-white shadow-xl flex items-center justify-center" 
+                         style="background-color: ${statusColor}; opacity: 0.85">
+                      <svg class="size-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                          ${v.status === 'stationary' ? '<path d="M12 2v18M5 12h14M12 20c-3.3 0-6-2.7-6-6M12 20c3.3 0 6-2.7 6-6"></path>' : '<path d="M3 11l19-9-9 19-2-8-8-2z"></path>'}
+                      </svg>
+                    </div>
+                    <div class="absolute size-3 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(59,130,246,1)] z-[100] animate-pulse"></div>
+                  </div>
+                </div>`,
+          iconSize: [0, 0],
+          iconAnchor: [0, 0]
         });
+        markersRef.current[v.id] = L.marker(pos, { icon }).addTo(mapRef.current);
+      } else {
+        markersRef.current[v.id].setLatLng(pos);
+      }
     });
   }, [followedVessels]);
 
@@ -355,32 +354,29 @@ export default function VesselTrackerPage() {
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       <Script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" strategy="afterInteractive" onLoad={() => setIsLeafletLoaded(true)} />
-      <Script src={`https://api.windy.com/assets/map-forecast/libBoot.js?v=${scriptBust}`} strategy="afterInteractive" crossOrigin="anonymous" onLoad={() => setIsWindyLoaded(true)} />
+      <Script src={`https://api.windy.com/assets/map-forecast/libBoot.js?v=${scriptBust}`} strategy="lazyOnload" crossOrigin="anonymous" onLoad={() => setIsWindyLoaded(true)} />
 
       <meta name="referrer" content="no-referrer-when-downgrade" />
 
       {authError && (
-        <Card className="border-red-600 bg-red-50 border-2 animate-in slide-in-from-top-4 duration-500 shadow-2xl">
-            <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-xs font-black uppercase text-red-700 flex items-center gap-2">
-                    <ShieldAlert className="size-4" /> Autorisation Windy Requise (401)
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0 space-y-4">
-                <p className="text-[10px] font-bold leading-relaxed text-red-900">
-                    Veuillez ajouter l'origine suivante dans votre console <a href="https://api.windy.com/keys" target="_blank" className="underline font-black">api.windy.com/keys</a> :
-                </p>
-                <div className="bg-white border-2 border-red-200 p-3 rounded-xl flex items-center justify-between gap-3 shadow-inner">
-                    <code className="text-[9px] font-black break-all select-all text-slate-800">{currentHost}</code>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 hover:bg-red-100" onClick={() => { navigator.clipboard.writeText(currentHost); toast({ title: "Origine copiée !" }); }}>
-                        <Copy className="size-3.5 text-red-600" />
-                    </Button>
-                </div>
-                <Button className="w-full h-10 bg-red-600 hover:bg-red-700 font-black uppercase text-[10px] tracking-widest gap-2" onClick={() => window.location.reload()}>
-                    <RefreshCw className="size-3" /> Recharger après autorisation
+        <div className="p-4 bg-red-50 border-2 border-red-600 rounded-2xl animate-in slide-in-from-top-4 shadow-2xl">
+            <div className="flex items-center gap-2 mb-2">
+                <ShieldAlert className="size-5 text-red-700" />
+                <h3 className="text-sm font-black uppercase text-red-700">Autorisation Windy Requise (401)</h3>
+            </div>
+            <p className="text-[10px] font-bold leading-relaxed text-red-900 mb-4">
+                Veuillez ajouter cet hôte précis dans votre console <a href="https://api.windy.com/keys" target="_blank" className="underline font-black">api.windy.com/keys</a> :
+            </p>
+            <div className="bg-white border-2 border-red-200 p-3 rounded-xl flex items-center justify-between gap-3 shadow-inner mb-4">
+                <code className="text-[9px] font-black break-all select-all text-slate-800">{currentHost}</code>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 hover:bg-red-100" onClick={() => { navigator.clipboard.writeText(currentHost); toast({ title: "Origine copiée !" }); }}>
+                    <Copy className="size-3.5 text-red-600" />
                 </Button>
-            </CardContent>
-        </Card>
+            </div>
+            <Button className="w-full h-12 bg-red-600 hover:bg-red-700 font-black uppercase text-xs tracking-widest gap-2" onClick={() => window.location.reload()}>
+                <RefreshCw className="size-4" /> Recharger après autorisation
+            </Button>
+        </div>
       )}
 
       <Card className="border-2 shadow-sm overflow-hidden">
@@ -429,7 +425,7 @@ export default function VesselTrackerPage() {
         </CardContent>
       </Card>
 
-      <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all relative bg-slate-100", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[550px]")}>
+      <div className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all relative bg-slate-100 rounded-2xl", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[550px]")}>
         <div id="windy" className="absolute inset-0 w-full h-full z-10" style={{ minHeight: isFullscreen ? '100vh' : '550px', position: 'relative' }}>
           <MeteoDataPanel data={mapClickResult} onClose={() => setMapClickResult(null)} isLoading={isQueryingWindy} />
           
@@ -450,12 +446,12 @@ export default function VesselTrackerPage() {
               </div>
           </div>
         </div>
-      </Card>
+      </div>
 
       <div className="p-4 bg-primary/5 border-2 border-dashed rounded-xl flex gap-3 opacity-60">
           <Info className="size-5 text-primary shrink-0" />
           <p className="text-[10px] font-medium leading-relaxed">
-            <strong>Météo Marine Full Stack v9.1 :</strong> Diagnostic d'origine dynamique activé. Si la carte reste grise, vérifiez l'hôte affiché dans l'alerte d'authentification ci-dessus.
+            <strong>Diagnostic Origine :</strong> Si la carte ne s'affiche pas, vérifiez que l'hôte indiqué dans l'alerte d'authentification rouge en haut de page est bien autorisé dans votre console Windy.
           </p>
       </div>
     </div>
