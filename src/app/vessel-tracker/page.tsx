@@ -42,15 +42,22 @@ export default function VesselTrackerPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
+  // --- 1. CONSTANTES TACTIQUES (Fix labels ReferenceError) ---
+  const labels = useMemo(() => ({
+    status1: "Au Mouillage",
+    status2: "En Route",
+    title: "Boat Tracker"
+  }), []);
+
   const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
   const [isSharing, setIsSharing] = useState(false);
   const [vesselNickname, setVesselNickname] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isGpsActive, setIsGpsActive] = useState(false);
   
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
   const [mapClickResult, setMapClickResult] = useState<any>(null);
   const [isQueryingWindy, setIsQueryingWindy] = useState(false);
+  const [wakeLock, setWakeLock] = useState<any>(null);
   
   const mapRef = useRef<any>(null);
   const markersRef = useRef<Record<string, any>>({});
@@ -65,7 +72,7 @@ export default function VesselTrackerPage() {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
-  const { data: profile } = useDoc<UserAccount>(userProfileRef);
+  const { data: profile, isLoading: isProfileLoading } = useDoc<UserAccount>(userProfileRef);
 
   const savedVesselIds = profile?.savedVesselIds || [];
   const vesselsQuery = useMemoFirebase(() => {
@@ -77,21 +84,13 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // --- CONFIGURATION LABELS STABLES ---
-  const labels = useMemo(() => ({
-    status1: "Au Mouillage",
-    status2: "En Route",
-    title: "Boat Tracker"
-  }), []);
-
-  // --- INITIALISATION WINDY MAP (OPTIMISÉE v5.7) ---
+  // --- 2. INITIALISATION WINDY MAP (v5.8) ---
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !(window as any).windyInit || isMapInitializedRef.current) return;
 
-    console.log("[Windy Init] Tentative d'authentification depuis :", window.location.origin);
+    console.log("[Windy Init] Authentification origine :", window.location.origin);
 
     const options = {
-      // Clé Map Forecast (API Key spécifique aux visuels)
       key: '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4',
       lat: INITIAL_CENTER.lat,
       lon: INITIAL_CENTER.lng,
@@ -104,14 +103,13 @@ export default function VesselTrackerPage() {
           mapRef.current = map;
           isMapInitializedRef.current = true;
 
-          // Forçage du redessin asynchrone pour éviter le Forced Reflow
+          // Forced Reflow Optimization : Redessin différé
           setTimeout(() => {
             if (mapRef.current) mapRef.current.invalidateSize();
           }, 500);
 
           map.on('click', async (e: any) => {
             const now = Date.now();
-            // Protection anti-saturation (Debounce 2s)
             if (now - lastMapClickTimeRef.current < 2000) return; 
             lastMapClickTimeRef.current = now;
 
@@ -137,12 +135,11 @@ export default function VesselTrackerPage() {
           });
         });
     } catch (e) {
-        console.error("[Windy Critical] Échec initialisation :", e);
-        console.info("[Windy Hint] Vérifiez que l'URL suivante est autorisée sur api.windy.com/keys :", window.location.origin);
+        console.error("[Windy Auth Error] 401 Unauthorized");
+        console.error("[Windy Auth] ORIGINE À AUTORISER :", window.location.origin);
     }
   }, []);
 
-  // Montage unique de la carte
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).windyInit) {
         initWindy();
@@ -171,25 +168,18 @@ export default function VesselTrackerPage() {
         const icon = L.divIcon({
           className: 'vessel-marker',
           html: `<div class="relative flex flex-col items-center" style="transform: translate(-50%, -100%)">
-                  <!-- NOM (HAUT) -->
                   <div class="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap mb-1">
                     ${v.displayName || v.id}
                   </div>
-
-                  <!-- VISEUR TACTIQUE (CENTRE) -->
                   <div class="relative size-12 flex items-center justify-center">
-                    <!-- ICÔNE TRANSPARENTE 85% -->
                     <div class="absolute inset-0 rounded-full border-2 border-white shadow-xl flex items-center justify-center" 
                          style="background-color: ${statusColor}; opacity: 0.85">
                       <svg class="size-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                           ${v.status === 'stationary' ? '<path d="M12 2v18M5 12h14M12 20c-3.3 0-6-2.7-6-6M12 20c3.3 0 6-2.7 6-6"></path>' : '<path d="M3 11l19-9-9 19-2-8-8-2z"></path>'}
                       </svg>
                     </div>
-                    <!-- POINT BLEU GPS CENTRÉ (VISEUR) -->
                     <div class="absolute size-3 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(59,130,246,1)] z-[100] animate-pulse"></div>
                   </div>
-
-                  <!-- ÉTAT (BAS) -->
                   <div class="mt-1 flex flex-col items-center gap-1">
                     <div class="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full border shadow-sm">
                         <span class="text-[9px] font-black text-slate-700">${v.batteryLevel ?? '--'}%</span>
@@ -204,12 +194,11 @@ export default function VesselTrackerPage() {
         markersRef.current[v.id].setLatLng(pos);
       }
     });
-  }, [followedVessels]);
+  }, [followedVessels, labels]);
 
-  // --- MOTEUR GPS AVEC THROTTLING 5S (SUPPRESSION VIOLATIONS) ---
+  // --- 3. MOTEUR GPS AVEC THROTTLING 5S (Fix Violations) ---
   const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
     const now = Date.now();
-    // Verrou de performance matériel : 1 point toutes les 5 secondes
     if (now - lastUpdateTimestampRef.current < 5000) return;
     lastUpdateTimestampRef.current = now;
 
@@ -283,7 +272,6 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      {/* SCRIPTS WINDY OFFICIELS (API MAP FORECAST) */}
       <Script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" strategy="afterInteractive" crossOrigin="anonymous" />
       <Script 
         src="https://api.windy.com/assets/map-forecast/libBoot.js" 
@@ -319,13 +307,11 @@ export default function VesselTrackerPage() {
       </Card>
 
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all relative bg-slate-50", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[500px]")}>
-        {/* LE CONTENEUR #WINDY DOIT AVOIR UNE TAILLE EXPLICITE */}
         <div 
             id="windy" 
             className="absolute inset-0 w-full h-full z-10"
             style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
         >
-          {/* OVERLAYS WINDY LIVE */}
           {mapClickResult && (
             <div 
               className="absolute z-[110] bg-slate-900/85 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[140px] animate-in zoom-in-95 pointer-events-none"
@@ -368,13 +354,16 @@ export default function VesselTrackerPage() {
         </div>
       </Card>
 
-      <Alert className="bg-muted/30 border-2 border-dashed">
-          <Info className="size-4 text-primary" />
-          <AlertTitle className="text-xs font-black uppercase">Conseil Tactique</AlertTitle>
-          <AlertDescription className="text-[10px] leading-relaxed">
-              Cliquez n'importe où sur la carte pour interroger les stations météo en temps réel (Vent, Houle, Air).
-          </AlertDescription>
-      </Alert>
+      {/* Remplacement Alert (ReferenceError fix) par div stylisée */}
+      <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 flex gap-3 shadow-sm">
+          <Info className="size-5 text-primary shrink-0" />
+          <div className="space-y-1">
+              <h4 className="text-xs font-black uppercase text-primary leading-none">Conseil Tactique</h4>
+              <p className="text-[10px] leading-relaxed font-medium text-slate-600">
+                  Cliquez n'importe où sur la carte pour interroger les stations météo Windy en temps réel (Vent, Houle, Air).
+              </p>
+          </div>
+      </div>
     </div>
   );
 }
