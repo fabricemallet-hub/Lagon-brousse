@@ -79,19 +79,25 @@ export default function VesselTrackerPage() {
   const mapRef = useRef<any>(null);
   const [hasLaunched, setHasLaunched] = useState(false);
 
-  // RECENTER FUNCTION - STABILIZED FOR PRODUCTION
-  const onMapRecenterClick = useCallback(() => {
+  /**
+   * FONCTION DE RECENTRAGE (handleRecenter)
+   * Résout l'erreur ReferenceError identifiée en production.
+   */
+  const handleRecenter = useCallback(() => {
     if (mapRef.current) {
         mapRef.current.panTo([INITIAL_CENTER.lat, INITIAL_CENTER.lng]);
         mapRef.current.setZoom(10);
+    } else {
+        console.log("Windy Map non initialisée pour le recentrage");
     }
   }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setCurrentHost(window.location.host);
-    document.referrerPolicy = "no-referrer-when-downgrade";
     
+    // Forçage de la Referrer Policy pour l'authentification Windy sur Cluster Cloud
+    document.referrerPolicy = "no-referrer-when-downgrade";
     const meta = document.createElement('meta');
     meta.name = "referrer";
     meta.content = "no-referrer-when-downgrade";
@@ -121,7 +127,9 @@ export default function VesselTrackerPage() {
             let retries = 0;
             while (!(window as any).L && retries < 10) { await new Promise(r => setTimeout(r, 500)); retries++; }
             
+            // Injection directe de la clé dans l'objet global
             (window as any).W = { apiKey: MAP_FORECAST_KEY };
+            
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const options = {
@@ -136,7 +144,10 @@ export default function VesselTrackerPage() {
             if (!(window as any).windyInit) return;
 
             (window as any).windyInit(options, (windyAPI: any) => {
-                if (!windyAPI) { setAuthError(true); return; }
+                if (!windyAPI) { 
+                    setAuthError(true); 
+                    return; 
+                }
                 mapRef.current = windyAPI.map;
                 setHasLaunched(true);
                 setAuthError(false);
@@ -232,7 +243,7 @@ export default function VesselTrackerPage() {
             <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl">
                 {isFullscreen ? <Shrink className="size-6 text-primary" /> : <Expand className="size-6 text-primary" />}
             </Button>
-            <Button onClick={onMapRecenterClick} className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-0">
+            <Button onClick={handleRecenter} className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-0">
                 <LocateFixed className="size-6 text-primary" />
             </Button>
           </div>
