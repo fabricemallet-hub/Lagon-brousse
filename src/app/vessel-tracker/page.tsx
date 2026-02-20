@@ -85,15 +85,18 @@ import {
   Unlock,
   Eye,
   EyeOff,
-  Layers
+  Layers,
+  Camera,
+  ImageIcon
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, UserAccount, SoundLibraryEntry, WindDirection } from '@/lib/types';
+import type { VesselStatus, UserAccount, SoundLibraryEntry, WindDirection, HuntingMarker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const WINDY_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
@@ -153,10 +156,14 @@ export default function VesselTrackerPage() {
   const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
 
   const [technicalLogs, setTechnicalLogs] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: {lat: number, lng: number}, batteryLevel?: number, isCharging?: boolean }[]>([]);
-
+  
+  const [isCapturingPhoto, setIsCapturingPhoto] = useState(false);
+  const [selectedMarkerPhoto, setSelectedMarkerPhoto] = useState<string | null>(null);
+  
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
   const shouldPanOnNextFix = useRef(false);
   const watchIdRef = useRef<number | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const userDocRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: profile } = useDoc<UserAccount>(userDocRef);
@@ -225,6 +232,58 @@ export default function VesselTrackerPage() {
         ...data
     }, { merge: true }).catch(e => console.warn("Firestore Update Warn", e));
   }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
+
+  const handleTacticalReport = async (type: string, photo?: string) => {
+    if (!user || !firestore || !currentPos || !isSharing) {
+        toast({ variant: "destructive", title: "Action impossible", description: "Vérifiez que le partage GPS est actif." });
+        return;
+    }
+
+    const marker: HuntingMarker = {
+        id: Math.random().toString(36).substring(7),
+        lat: currentPos.lat,
+        lng: currentPos.lng,
+        time: new Date().toISOString(),
+        label: type,
+        photoUrl: photo || undefined
+    };
+
+    try {
+        const vesselRef = doc(firestore, 'vessels', sharingId);
+        await updateDoc(vesselRef, {
+            huntingMarkers: arrayUnion(marker)
+        });
+        toast({ title: "Signalement enregistré !", description: `${type} épinglé sur la carte.` });
+    } catch (e) {
+        console.error(e);
+        toast({ variant: "destructive", title: "Erreur signalement" });
+    }
+  };
+
+  const handleClearTactical = async () => {
+    if (!user || !firestore || !isSharing) return;
+    try {
+        await updateDoc(doc(firestore, 'vessels', sharingId), {
+            huntingMarkers: []
+        });
+        toast({ title: "Carte nettoyée" });
+    } catch (e) {}
+  };
+
+  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setIsCapturingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        const base64 = event.target?.result as string;
+        await handleTacticalReport('PRISE', base64);
+        setIsCapturingPhoto(false);
+        if (photoInputRef.current) photoInputRef.current.value = '';
+    };
+    reader.readAsDataURL(file);
+  };
 
   const loadLeafletAssets = useCallback(() => {
     return new Promise<void>((resolve) => {
@@ -359,11 +418,6 @@ export default function VesselTrackerPage() {
     } catch (e) { toast({ variant: 'destructive', title: "Erreur" }); }
   };
 
-  const handleRemoveSavedVessel = async (id: string) => {
-    if (!user || !firestore) return;
-    try { await updateDoc(doc(firestore, 'users', user.uid), { savedVesselIds: arrayRemove(id) }); } catch (e) {}
-  };
-
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
     if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
@@ -413,15 +467,40 @@ export default function VesselTrackerPage() {
                             <div className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg animate-pulse" style={{ transform: 'translate(-50%, -50%)' }} />
                         </OverlayView>
                     )}
-                    {followedVessels?.filter(v => v.isSharing).map(v => v.location && (
-                        <OverlayView key={v.id} position={{ lat: v.location.latitude, lng: v.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                            <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                                <div className="px-2 py-1 bg-slate-900/90 text-white rounded text-[9px] font-black shadow-lg border border-white/20 whitespace-nowrap">
-                                    {v.displayName || v.id}
-                                </div>
-                                <div className="p-1.5 rounded-full bg-primary border-2 border-white shadow-xl"><Navigation className="size-4 text-white" /></div>
-                            </div>
-                        </OverlayView>
+                    {followedVessels?.filter(v => v.isSharing).map(v => (
+                        <React.Fragment key={v.id}>
+                            {v.location && (
+                                <OverlayView position={{ lat: v.location.latitude, lng: v.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                    <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
+                                        <div className="px-2 py-1 bg-slate-900/90 text-white rounded text-[9px] font-black shadow-lg border border-white/20 whitespace-nowrap">
+                                            {v.displayName || v.id}
+                                        </div>
+                                        <div className="p-1.5 rounded-full bg-primary border-2 border-white shadow-xl"><Navigation className="size-4 text-white" /></div>
+                                    </div>
+                                </OverlayView>
+                            )}
+                            {/* Rendu des Marqueurs Tactiques */}
+                            {v.huntingMarkers?.map(marker => (
+                                <OverlayView key={marker.id} position={{ lat: marker.lat, lng: marker.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                    <div 
+                                        style={{ transform: 'translate(-50%, -50%)' }} 
+                                        className="flex flex-col items-center group cursor-pointer"
+                                        onClick={() => marker.photoUrl && setSelectedMarkerPhoto(marker.photoUrl)}
+                                    >
+                                        <div className="p-1 rounded-full bg-white border-2 border-slate-900 shadow-xl scale-75 group-hover:scale-100 transition-all">
+                                            {marker.label === 'MARLIN' && <Fish className="size-4 text-blue-600" />}
+                                            {marker.label === 'THON' && <Fish className="size-4 text-red-600" />}
+                                            {marker.label === 'OISEAUX' && <Bird className="size-4 text-orange-600" />}
+                                            {marker.label === 'SARDINES' && <Waves className="size-4 text-cyan-600" />}
+                                            {marker.label === 'PRISE' && <Camera className="size-4 text-purple-600" />}
+                                        </div>
+                                        <Badge variant="outline" className="bg-slate-900/80 text-white text-[7px] border-none font-black h-3 px-1 mt-0.5 opacity-0 group-hover:opacity-100 whitespace-nowrap">
+                                            {format(new Date(marker.time), 'HH:mm')}
+                                        </Badge>
+                                    </div>
+                                </OverlayView>
+                            ))}
+                        </React.Fragment>
                     ))}
                 </GoogleMap>
             ) : <div className="flex h-full w-full items-center justify-center text-white font-black uppercase text-xs animate-pulse">Initialisation des systèmes...</div>}
@@ -490,25 +569,31 @@ export default function VesselTrackerPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-4">
-            <Card className="border-2 shadow-lg bg-muted/5">
-                <CardHeader className="p-4 border-b bg-muted/10">
+            <Card className="border-2 shadow-lg bg-muted/5 relative overflow-hidden">
+                <CardHeader className="p-4 border-b bg-muted/10 flex flex-row items-center justify-between">
                     <CardTitle className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
                         <Target className="size-4" /> Signalement Tactique (Flotte)
                     </CardTitle>
+                    <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black text-destructive" onClick={handleClearTactical}>EFFACER</Button>
                 </CardHeader>
                 <CardContent className="p-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                         {[
                             { id: 'MARLIN', icon: Fish, color: 'text-blue-600', bg: 'bg-blue-50' },
                             { id: 'THON', icon: Fish, color: 'text-red-600', bg: 'bg-red-50' },
                             { id: 'OISEAUX', icon: Bird, color: 'text-orange-600', bg: 'bg-orange-50' },
                             { id: 'SARDINES', icon: Waves, color: 'text-cyan-600', bg: 'bg-cyan-50' }
                         ].map(sig => (
-                            <Button key={sig.id} variant="outline" className={cn("h-16 flex flex-col items-center justify-center gap-1 border-2 transition-all active:scale-95", sig.bg)} onClick={() => {}}>
+                            <Button key={sig.id} variant="outline" className={cn("h-16 flex flex-col items-center justify-center gap-1 border-2 transition-all active:scale-95", sig.bg)} onClick={() => handleTacticalReport(sig.id)}>
                                 <sig.icon className={cn("size-5", sig.color)} />
                                 <span className={cn("text-[8px] font-black uppercase", sig.color)}>{sig.id}</span>
                             </Button>
                         ))}
+                        <Button variant="outline" className="h-16 flex flex-col items-center justify-center gap-1 border-2 transition-all active:scale-95 bg-purple-50" onClick={() => photoInputRef.current?.click()} disabled={isCapturingPhoto}>
+                            <Camera className={cn("size-5 text-purple-600", isCapturingPhoto && "animate-spin")} />
+                            <span className="text-[8px] font-black uppercase text-purple-600">{isCapturingPhoto ? '...' : 'PRISE'}</span>
+                        </Button>
+                        <input type="file" accept="image/*" capture="environment" ref={photoInputRef} className="hidden" onChange={handlePhotoCapture} />
                     </div>
                 </CardContent>
             </Card>
@@ -584,6 +669,22 @@ export default function VesselTrackerPage() {
               </AccordionContent>
           </AccordionItem>
       </Accordion>
+
+      <Dialog open={!!selectedMarkerPhoto} onOpenChange={(o) => !o && setSelectedMarkerPhoto(null)}>
+        <DialogContent className="max-w-md rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
+            <DialogHeader className="p-4 bg-slate-900 text-white shrink-0">
+                <DialogTitle className="font-black uppercase tracking-widest text-xs flex items-center gap-2">
+                    <ImageIcon className="size-4 text-primary" /> Visualisation de la Prise
+                </DialogTitle>
+            </DialogHeader>
+            <div className="aspect-square w-full bg-black flex items-center justify-center">
+                {selectedMarkerPhoto && <img src={selectedMarkerPhoto} className="w-full h-full object-contain" alt="Capture tactique" />}
+            </div>
+            <div className="p-4 bg-slate-50 flex justify-center border-t">
+                <Button variant="outline" className="font-black uppercase text-[10px] border-2" onClick={() => setSelectedMarkerPhoto(null)}>Fermer</Button>
+            </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
