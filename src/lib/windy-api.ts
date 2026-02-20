@@ -5,7 +5,7 @@
  * Récupère le vent (vitesse/direction) et la houle.
  */
 export async function fetchWindyWeather(lat: number, lon: number) {
-  // CLÉ API WINDY (Vérifiée via capture d'écran)
+  // CLÉ API WINDY
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
@@ -43,7 +43,6 @@ export async function fetchWindyWeather(lat: number, lon: number) {
     }
 
     const data = await response.json();
-    console.log("[Windy] Données reçues avec succès");
     
     // Windy retourne des séries temporelles. On prend le premier index (maintenant).
     return {

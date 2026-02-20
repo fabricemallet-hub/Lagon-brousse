@@ -181,7 +181,6 @@ export default function VesselTrackerPage() {
     const now = Date.now();
     if ((now - lastWeatherUpdateRef.current > 3 * 3600 * 1000) && pos) {
         try {
-            console.log("[Tracker] Tentative de mise à jour météo Windy...");
             const weather = await fetchWindyWeather(pos.lat, pos.lng);
             if (weather.success) {
                 updatePayload.windSpeed = weather.windSpeed;
@@ -505,6 +504,8 @@ export default function VesselTrackerPage() {
                         <div className="grid grid-cols-2 gap-2">
                             <Button variant="outline" size="sm" className="h-10 text-[8px] font-black uppercase" onClick={() => handleManualStatusToggle('moving', 'SIMUL MOUV')}>MOUV</Button>
                             <Button variant="outline" size="sm" className="h-10 text-[8px] font-black uppercase" onClick={() => handleManualStatusToggle('stationary', 'SIMUL MOUIL')}>MOUIL</Button>
+                            <Button variant="outline" size="sm" className="h-10 text-[8px] font-black uppercase" onClick={() => handleManualStatusToggle('returning', 'SIMUL RETOUR')}>RETOUR</Button>
+                            <Button variant="outline" size="sm" className="h-10 text-[8px] font-black uppercase" onClick={() => handleManualStatusToggle('landed', 'SIMUL HOME')}>HOME</Button>
                         </div>
                         <Button variant="outline" size="sm" className="w-full h-10 text-[8px] font-black uppercase border-dashed" onClick={() => updateVesselInFirestore({})}>Forcer Sync Firestore</Button>
                     </AccordionContent>
