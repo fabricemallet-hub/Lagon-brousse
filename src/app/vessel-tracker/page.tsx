@@ -25,7 +25,9 @@ import {
   BatteryLow,
   Wind,
   Waves,
-  Thermometer
+  Thermometer,
+  Eye,
+  Info
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount } from '@/lib/types';
@@ -44,6 +46,7 @@ export default function VesselTrackerPage() {
   const [isSharing, setIsSharing] = useState(false);
   const [vesselNickname, setVesselNickname] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isGpsActive, setIsGpsActive] = useState(false);
   
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
   const [mapClickResult, setMapClickResult] = useState<any>(null);
@@ -54,6 +57,7 @@ export default function VesselTrackerPage() {
   const lastUpdateTimestampRef = useRef<number>(0);
   const lastMapClickTimeRef = useRef<number>(0);
   const watchIdRef = useRef<number | null>(null);
+  const isMapInitializedRef = useRef<boolean>(false);
 
   const sharingId = useMemo(() => (user?.uid || '').toUpperCase(), [user]);
 
@@ -73,11 +77,21 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // --- INITIALISATION WINDY MAP ---
+  // --- CONFIGURATION LABELS STABLES ---
+  const labels = useMemo(() => ({
+    status1: "Au Mouillage",
+    status2: "En Route",
+    title: "Boat Tracker"
+  }), []);
+
+  // --- INITIALISATION WINDY MAP (OPTIMISÉE v5.7) ---
   const initWindy = useCallback(() => {
-    if (typeof window === 'undefined' || !(window as any).windyInit || mapRef.current) return;
+    if (typeof window === 'undefined' || !(window as any).windyInit || isMapInitializedRef.current) return;
+
+    console.log("[Windy Init] Tentative d'authentification depuis :", window.location.origin);
 
     const options = {
+      // Clé Map Forecast (API Key spécifique aux visuels)
       key: '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4',
       lat: INITIAL_CENTER.lat,
       lon: INITIAL_CENTER.lng,
@@ -88,14 +102,16 @@ export default function VesselTrackerPage() {
         (window as any).windyInit(options, (windyAPI: any) => {
           const { map, picker } = windyAPI;
           mapRef.current = map;
+          isMapInitializedRef.current = true;
 
-          // Forçage du redessin pour éviter l'écran gris
+          // Forçage du redessin asynchrone pour éviter le Forced Reflow
           setTimeout(() => {
-            map.invalidateSize();
-          }, 250);
+            if (mapRef.current) mapRef.current.invalidateSize();
+          }, 500);
 
           map.on('click', async (e: any) => {
             const now = Date.now();
+            // Protection anti-saturation (Debounce 2s)
             if (now - lastMapClickTimeRef.current < 2000) return; 
             lastMapClickTimeRef.current = now;
 
@@ -114,16 +130,24 @@ export default function VesselTrackerPage() {
                   success: weather.success
               }));
             } catch (err) {
-              console.error("Windy Point Forecast failed:", err);
+              console.error("[Windy Click Forecast] Erreur :", err);
             } finally {
               setIsQueryingWindy(false);
             }
           });
         });
     } catch (e) {
-        console.error("Windy Init Failure:", e);
+        console.error("[Windy Critical] Échec initialisation :", e);
+        console.info("[Windy Hint] Vérifiez que l'URL suivante est autorisée sur api.windy.com/keys :", window.location.origin);
     }
   }, []);
+
+  // Montage unique de la carte
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).windyInit) {
+        initWindy();
+    }
+  }, [initWindy]);
 
   // Synchronisation des marqueurs Leaflet
   useEffect(() => {
@@ -133,7 +157,10 @@ export default function VesselTrackerPage() {
 
     followedVessels.forEach(v => {
       if (!v.location || !v.isSharing) {
-        if (markersRef.current[v.id]) { markersRef.current[v.id].remove(); delete markersRef.current[v.id]; }
+        if (markersRef.current[v.id]) { 
+            markersRef.current[v.id].remove(); 
+            delete markersRef.current[v.id]; 
+        }
         return;
       }
 
@@ -143,27 +170,29 @@ export default function VesselTrackerPage() {
       if (!markersRef.current[v.id]) {
         const icon = L.divIcon({
           className: 'vessel-marker',
-          html: `<div class="relative flex items-center justify-center" style="transform: translate(-50%, -50%)">
-                  <!-- BADGE NOM -->
-                  <div class="absolute bottom-12 px-2 py-1 bg-slate-900/90 text-white rounded text-[9px] font-black shadow-lg border border-white/20 whitespace-nowrap z-50">
+          html: `<div class="relative flex flex-col items-center" style="transform: translate(-50%, -100%)">
+                  <!-- NOM (HAUT) -->
+                  <div class="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap mb-1">
                     ${v.displayName || v.id}
                   </div>
 
-                  <!-- ICÔNE TACTIQUE (OPACITÉ 85% POUR VISEUR) -->
-                  <div class="size-12 rounded-full border-2 border-white shadow-2xl flex items-center justify-center" 
-                       style="background-color: ${statusColor}; opacity: 0.85">
-                    <svg class="size-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                        ${v.status === 'stationary' ? '<path d="M12 2v18M5 12h14M12 20c-3.3 0-6-2.7-6-6M12 20c3.3 0 6-2.7 6-6"></path>' : '<path d="M3 11l19-9-9 19-2-8-8-2z"></path>'}
-                    </svg>
+                  <!-- VISEUR TACTIQUE (CENTRE) -->
+                  <div class="relative size-12 flex items-center justify-center">
+                    <!-- ICÔNE TRANSPARENTE 85% -->
+                    <div class="absolute inset-0 rounded-full border-2 border-white shadow-xl flex items-center justify-center" 
+                         style="background-color: ${statusColor}; opacity: 0.85">
+                      <svg class="size-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                          ${v.status === 'stationary' ? '<path d="M12 2v18M5 12h14M12 20c-3.3 0-6-2.7-6-6M12 20c3.3 0 6-2.7 6-6"></path>' : '<path d="M3 11l19-9-9 19-2-8-8-2z"></path>'}
+                      </svg>
+                    </div>
+                    <!-- POINT BLEU GPS CENTRÉ (VISEUR) -->
+                    <div class="absolute size-3 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(59,130,246,1)] z-[100] animate-pulse"></div>
                   </div>
 
-                  <!-- POINT BLEU GPS (CENTRE EXACT) -->
-                  <div class="absolute size-3 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(59,130,246,1)] z-[100] animate-pulse"></div>
-
-                  <!-- BADGE ÉTAT -->
-                  <div class="absolute top-10 flex flex-col items-center gap-1 z-50">
+                  <!-- ÉTAT (BAS) -->
+                  <div class="mt-1 flex flex-col items-center gap-1">
                     <div class="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full border shadow-sm">
-                        <span class="text-[8px] font-black text-slate-700">${v.batteryLevel ?? '--'}%</span>
+                        <span class="text-[9px] font-black text-slate-700">${v.batteryLevel ?? '--'}%</span>
                     </div>
                   </div>
                 </div>`,
@@ -177,9 +206,10 @@ export default function VesselTrackerPage() {
     });
   }, [followedVessels]);
 
-  // --- MOTEUR GPS AVEC THROTTLING 5S ---
+  // --- MOTEUR GPS AVEC THROTTLING 5S (SUPPRESSION VIOLATIONS) ---
   const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
     const now = Date.now();
+    // Verrou de performance matériel : 1 point toutes les 5 secondes
     if (now - lastUpdateTimestampRef.current < 5000) return;
     lastUpdateTimestampRef.current = now;
 
@@ -207,7 +237,10 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
-        if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+        if (watchIdRef.current) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+        }
         return;
     }
     
@@ -217,12 +250,40 @@ export default function VesselTrackerPage() {
         maximumAge: 0 
     });
 
-    return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
+    return () => { 
+        if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current); 
+            watchIdRef.current = null;
+        }
+    };
   }, [isSharing, mode, handleGpsUpdate]);
+
+  const handleRecenter = () => {
+    const pos = currentPos;
+    if (pos && mapRef.current) {
+        mapRef.current.panTo([pos.lat, pos.lng]);
+        mapRef.current.setZoom(15);
+    } else {
+        toast({ description: "En attente du signal GPS..." });
+    }
+  };
+
+  const handleToggleWakeLock = async () => {
+    if (!('wakeLock' in navigator)) return;
+    if (wakeLock) {
+        try { await wakeLock.release(); setWakeLock(null); } catch (e) {}
+    } else {
+        try {
+            const lock = await (navigator as any).wakeLock.request('screen');
+            setWakeLock(lock);
+            toast({ title: "Éveil actif", description: "L'écran ne se coupera plus." });
+        } catch (err) {}
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      {/* SCRIPTS WINDY (FIX CORS & URL) */}
+      {/* SCRIPTS WINDY OFFICIELS (API MAP FORECAST) */}
       <Script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" strategy="afterInteractive" crossOrigin="anonymous" />
       <Script 
         src="https://api.windy.com/assets/map-forecast/libBoot.js" 
@@ -236,7 +297,7 @@ export default function VesselTrackerPage() {
           <Button variant={mode === 'sender' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => setMode('sender')}>Émetteur (A)</Button>
           <Button variant={mode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => setMode('receiver')}>Récepteur (B)</Button>
         </div>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-4">
           <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/10">
               <div className="space-y-0.5">
                   <Label className="text-sm font-black uppercase">Partage GPS</Label>
@@ -244,28 +305,49 @@ export default function VesselTrackerPage() {
               </div>
               <Switch checked={isSharing} onCheckedChange={setIsSharing} />
           </div>
+          {isSharing && (
+              <div className="grid grid-cols-2 gap-2 animate-in zoom-in-95">
+                  <Button variant={wakeLock ? "secondary" : "outline"} className="h-12 font-black uppercase text-[9px] border-2 gap-2" onClick={handleToggleWakeLock}>
+                      <Zap className={cn("size-4", wakeLock && "fill-primary")} /> {wakeLock ? "ÉVEIL ACTIF" : "MAINTENIR ÉCRAN"}
+                  </Button>
+                  <Button variant="outline" className="h-12 font-black uppercase text-[9px] border-2 gap-2" onClick={handleRecenter}>
+                      <LocateFixed className="size-4" /> RECENTRER
+                  </Button>
+              </div>
+          )}
         </CardContent>
       </Card>
 
-      <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all relative", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[500px]")}>
+      <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all relative bg-slate-50", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[500px]")}>
+        {/* LE CONTENEUR #WINDY DOIT AVOIR UNE TAILLE EXPLICITE */}
         <div 
             id="windy" 
-            className="absolute inset-0 w-full h-full bg-slate-100 z-10"
+            className="absolute inset-0 w-full h-full z-10"
             style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
         >
+          {/* OVERLAYS WINDY LIVE */}
           {mapClickResult && (
             <div 
               className="absolute z-[110] bg-slate-900/85 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[140px] animate-in zoom-in-95 pointer-events-none"
               style={{ top: '50%', left: '50%', transform: 'translate(-50%, -130%)' }}
             >
               <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
-                <span className="text-[10px] font-black uppercase text-primary tracking-widest">WINDY LIVE</span>
+                <span className="text-[10px] font-black uppercase text-primary tracking-widest">DIAGNOSTIC WINDY</span>
                 {isQueryingWindy && <RefreshCw className="size-3 animate-spin text-primary" />}
               </div>
               <div className="space-y-3">
-                <div className="flex items-center gap-3"><Wind className="size-5 text-blue-400" /><div className="flex flex-col"><span className="text-xl font-black">{mapClickResult.wind ?? '--'}</span><span className="text-[8px] uppercase opacity-60">Noeuds</span></div></div>
-                <div className="flex items-center gap-3"><Waves className="size-5 text-cyan-400" /><div className="flex flex-col"><span className="text-sm font-black">{mapClickResult.waves ?? '--'}m</span><span className="text-[8px] uppercase opacity-60">Houle</span></div></div>
-                <div className="flex items-center gap-3"><Thermometer className="size-5 text-orange-400" /><div className="flex flex-col"><span className="text-sm font-black">{mapClickResult.temp ?? '--'}°C</span><span className="text-[8px] uppercase opacity-60">Air</span></div></div>
+                <div className="flex items-center gap-3">
+                    <Wind className="size-5 text-blue-400" />
+                    <div className="flex flex-col"><span className="text-xl font-black">{mapClickResult.wind ?? '--'}</span><span className="text-[8px] uppercase opacity-60">Noeuds</span></div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <Waves className="size-5 text-cyan-400" />
+                    <div className="flex flex-col"><span className="text-sm font-black">{mapClickResult.waves ?? '--'}m</span><span className="text-[8px] uppercase opacity-60">Houle</span></div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <Thermometer className="size-5 text-orange-400" />
+                    <div className="flex flex-col"><span className="text-sm font-black">{mapClickResult.temp ?? '--'}°C</span><span className="text-[8px] uppercase opacity-60">Air</span></div>
+                </div>
               </div>
               <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-slate-900 rotate-45 border-r-2 border-b-2 border-white/20"></div>
             </div>
@@ -277,7 +359,7 @@ export default function VesselTrackerPage() {
                 className="shadow-lg h-10 w-10 bg-background/90 border-2" 
                 onClick={() => {
                     setIsFullscreen(!isFullscreen);
-                    setTimeout(() => { mapRef.current?.invalidateSize(); }, 300);
+                    setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 300);
                 }}
             >
                 {isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}
@@ -285,6 +367,14 @@ export default function VesselTrackerPage() {
           </div>
         </div>
       </Card>
+
+      <Alert className="bg-muted/30 border-2 border-dashed">
+          <Info className="size-4 text-primary" />
+          <AlertTitle className="text-xs font-black uppercase">Conseil Tactique</AlertTitle>
+          <AlertDescription className="text-[10px] leading-relaxed">
+              Cliquez n'importe où sur la carte pour interroger les stations météo en temps réel (Vent, Houle, Air).
+          </AlertDescription>
+      </Alert>
     </div>
   );
 }
