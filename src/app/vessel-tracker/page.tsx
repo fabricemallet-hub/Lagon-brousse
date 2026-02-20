@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   Navigation, 
   Anchor, 
@@ -65,9 +66,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
-import { Textarea } from '@/components/ui/textarea';
 import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 import { locations } from '@/lib/locations';
@@ -75,11 +73,11 @@ import { locations } from '@/lib/locations';
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
-const getClosestCommune = (lat: number, lng: number) => {
+const getClosestCommune = (lat: number, lon: number) => {
     let closestName = 'Nouméa';
     let minDistance = Infinity;
     Object.entries(locations).forEach(([name, coords]) => {
-        const dist = getDistance(lat, lng, coords.lat, coords.lon);
+        const dist = getDistance(lat, lon, coords.lat, coords.lon);
         if (dist < minDistance) { closestName = name; minDistance = dist; }
     });
     return closestName;
@@ -179,7 +177,7 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
-            // STEP 1: Load Leaflet 1.4.0 (Required by Windy)
+            // ÉTAPE 1 : Charger Leaflet 1.4.0 (Requis par Windy)
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
             let retries = 0;
@@ -188,9 +186,9 @@ export default function VesselTrackerPage() {
                 retries++; 
             }
             
-            if (!(window as any).L) throw new Error("Leaflet non trouvé après attente.");
+            if (!(window as any).L) throw new Error("Leaflet (L) non trouvé.");
 
-            // STEP 2: Load Windy Boot Library
+            // ÉTAPE 2 : Charger libBoot de Windy
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const options = {
@@ -203,7 +201,7 @@ export default function VesselTrackerPage() {
                 product: 'ecmwf',
             };
 
-            // STEP 3: Initialize Windy
+            // ÉTAPE 3 : Lancement Windy
             (window as any).windyInit(options, (windyAPI: any) => {
                 if (!windyAPI) { 
                     setAuthError(window.location.host); 
@@ -234,7 +232,7 @@ export default function VesselTrackerPage() {
                 setTimeout(() => { if(map) map.invalidateSize(); }, 1500);
             });
         } catch (e: any) {
-            console.error("Windy init failed:", e);
+            console.error("Windy init error:", e);
             setAuthError(window.location.host);
             isInitializingRef.current = false;
         }
