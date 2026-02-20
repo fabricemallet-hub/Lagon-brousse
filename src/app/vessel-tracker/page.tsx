@@ -1,7 +1,8 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
@@ -59,7 +60,7 @@ import {
   Wind
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
+import type { VesselStatus, SoundLibraryEntry } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -148,17 +149,10 @@ export default function VesselTrackerPage() {
   const mapRef = useRef<any>(null);
   const pickerTimerRef = useRef<any>(null);
 
-  // 1. FORCER LA POLITIQUE DE REFERRER POUR L'AUTH PROD
+  // 1. FORCER LA POLITIQUE DE REFERRER POUR L'AUTH
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    let meta = document.querySelector('meta[name="referrer"]') as HTMLMetaElement;
-    if (!meta) {
-        meta = document.createElement('meta');
-        meta.name = "referrer";
-        document.head.appendChild(meta);
-    }
-    meta.setAttribute("content", "no-referrer-when-downgrade");
-    document.referrerPolicy = "no-referrer-when-downgrade";
+    document.querySelector('meta[name="referrer"]')?.setAttribute("content", "no-referrer-when-downgrade");
   }, []);
 
   // 2. LANCEMENT STABILISÉ DE LA CARTE
@@ -182,7 +176,6 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
-            // Chargement de Leaflet indispensable à Windy
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
             let retries = 0;
@@ -193,7 +186,6 @@ export default function VesselTrackerPage() {
             
             if (!(window as any).L) throw new Error("Leaflet non détecté.");
 
-            // Chargement de la bibliothèque Windy
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const key = MAP_FORECAST_KEY.trim();
@@ -206,11 +198,6 @@ export default function VesselTrackerPage() {
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
-
-            // Injection directe dans l'objet global pour sécuriser l'authentification
-            if ((window as any).W) {
-                (window as any).W.key = key;
-            }
 
             (window as any).windyInit(options, (windyAPI: any) => {
                 if (!windyAPI) {
@@ -225,7 +212,6 @@ export default function VesselTrackerPage() {
                 store.set('overlay', 'wind');
                 store.set('product', 'ecmwf');
 
-                // Listener sur le sélecteur de point (Picker)
                 broadcast.on('pickerMoved', (latLon: any) => {
                     if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
                     pickerTimerRef.current = setTimeout(async () => {
@@ -254,9 +240,8 @@ export default function VesselTrackerPage() {
     attemptInit();
   }, [isInitializing, hasLaunched]);
 
-  // Initialisation automatique différée
   useEffect(() => {
-    const timer = setTimeout(initWindyMap, 2000);
+    const timer = setTimeout(initWindyMap, 3000);
     return () => clearTimeout(timer);
   }, [initWindyMap]);
 
@@ -326,7 +311,7 @@ export default function VesselTrackerPage() {
                   ) : (
                       <>
                         <AlertTriangle className="size-12 text-amber-500" />
-                        <p className="font-black uppercase text-xs text-slate-600">La carte requiert une connexion stable</p>
+                        <p className="font-black uppercase text-xs text-slate-600">Problème d'authentification ou réseau</p>
                         <Button onClick={initWindyMap} className="font-black uppercase text-[10px] h-12 gap-2 shadow-lg mt-2">
                             <Play className="size-4" /> Relancer la carte
                         </Button>
