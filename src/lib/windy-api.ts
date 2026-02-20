@@ -1,14 +1,13 @@
-
 'use server';
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Utilise exclusivement la clé Map Forecast autorisée pour les prévisions au point.
+ * Utilise la clé "Prévision ponctuelle" (Point Forecast).
  */
 
 export async function fetchWindyWeather(lat: number, lon: number) {
-  // CLÉ DE PRÉVISIONS CARTOGRAPHIQUES VÉRIFIÉE (MAP FORECAST)
-  const API_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
+  // CLÉ "PRÉVISION PONCTUELLE" (ggM4k...)
+  const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
   // URL D'IDENTIFICATION DU PROJET
