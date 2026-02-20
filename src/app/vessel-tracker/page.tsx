@@ -20,23 +20,24 @@ import {
   Zap, 
   RefreshCw,
   X,
-  BatteryCharging,
-  BatteryFull,
-  BatteryMedium,
-  BatteryLow,
   Wind,
   Waves,
   Eye,
   EyeOff,
   Info,
-  AlertCircle
+  AlertCircle,
+  Thermometer,
+  Droplets,
+  Gauge,
+  Clock
 } from 'lucide-react';
-import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, UserAccount } from '@/lib/types';
+import { cn, getDistance, degreesToCardinal } from '@/lib/utils';
+import type { VesselStatus, UserAccount, WindDirection } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { fetchWindyWeather } from '@/lib/windy-api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { getDataForDate } from '@/lib/data';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -50,15 +51,6 @@ export default function VesselTrackerPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isFallbackMode, setIsFallbackMode] = useState(false);
   const [scriptTimestamp, setScriptTimestamp] = useState(Date.now());
-
-  const labels = useMemo(() => ({
-    status1: "Au Mouillage",
-    status2: "En Route",
-    title: "Boat Tracker",
-    alertBtn: "SIGNALER POISSON",
-    alertTitle: "POISSON SIGNALÉ !",
-    alertDesc: "Poisson repéré !"
-  }), []);
 
   const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
   const [isSharing, setIsSharing] = useState(false);
@@ -91,10 +83,23 @@ export default function VesselTrackerPage() {
     if (!firestore || savedVesselIds.length === 0) return null;
     const ids = [...savedVesselIds];
     if (isSharing && !ids.includes(sharingId)) ids.push(sharingId);
-    return query(collection(firestore, 'vessels'), where('id', 'in', ids.slice(0, 10)));
+    return query(collection(firestore, 'vessels'), where('isSharing', '==', true), where('id', 'in', ids.slice(0, 10)));
   }, [firestore, savedVesselIds, sharingId, isSharing]);
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
+
+  const getTideInfoForPoint = (lat: number, lng: number) => {
+    // On cherche la commune la plus proche
+    const commune = require('@/lib/locations').allCommuneNames.sort((a: string, b: string) => {
+        const coordsA = require('@/lib/locations').locations[a];
+        const coordsB = require('@/lib/locations').locations[b];
+        return getDistance(lat, lng, coordsA.lat, coordsA.lon) - getDistance(lat, lng, coordsB.lat, coordsB.lon);
+    })[0];
+
+    if (!commune) return null;
+    const data = getDataForDate(commune, new Date());
+    return { commune, station: data.tideStation, tides: data.tides };
+  };
 
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
@@ -104,7 +109,6 @@ export default function VesselTrackerPage() {
       lat: INITIAL_CENTER.lat,
       lon: INITIAL_CENTER.lng,
       zoom: 10,
-      externalAllowedOrigins: ["cloudworkstations.dev"]
     };
 
     try {
@@ -132,7 +136,9 @@ export default function VesselTrackerPage() {
             lastMapClickTimeRef.current = now;
 
             const { lat, lng } = e.latlng;
-            setMapClickResult({ lat, lon: lng });
+            const tideData = getTideInfoForPoint(lat, lng);
+            
+            setMapClickResult({ lat, lon: lng, tideData });
             setIsQueryingWindy(true);
             picker.open({ lat, lon: lng });
 
@@ -140,7 +146,7 @@ export default function VesselTrackerPage() {
               const weather = await fetchWindyWeather(lat, lng);
               setMapClickResult((prev: any) => ({ ...prev, ...weather }));
             } catch (err) {
-              // Silenced
+              // error handled by UI
             } finally {
               setIsQueryingWindy(false);
             }
@@ -155,7 +161,6 @@ export default function VesselTrackerPage() {
     fallbackTimerRef.current = setTimeout(() => {
         if (!isMapInitializedRef.current) {
             setIsFallbackMode(true);
-            console.warn('[Windy Auth] Timeout 5s atteint. Passage en mode de secours.');
         }
     }, 5000);
     return () => { if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current); };
@@ -263,20 +268,12 @@ export default function VesselTrackerPage() {
     toast({ title: "Rechargement..." });
   };
 
-  const toggleWakeLock = async () => {
-    if (!('wakeLock' in navigator)) return;
-    if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
-    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); lock.addEventListener('release', () => setWakeLock(null)); } catch (err) {} }
-  };
-
   const handleRecenter = () => {
-    if (userLocation && mapRef.current) {
-        mapRef.current.panTo([userLocation.latitude, userLocation.longitude]);
+    if (currentPos && mapRef.current) {
+        mapRef.current.panTo([currentPos.lat, currentPos.lng]);
         mapRef.current.setZoom(15);
     }
   };
-
-  const userLocation = currentPos ? { latitude: currentPos.lat, longitude: currentPos.lng } : null;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
@@ -294,23 +291,16 @@ export default function VesselTrackerPage() {
       />
 
       {authError && (
-        <div className="animate-in slide-in-from-top-2 duration-300">
-            <div className="p-4 bg-red-50 border-2 border-red-200 rounded-2xl space-y-3 shadow-lg">
-                <div className="flex items-center gap-3 text-red-800">
-                    <AlertCircle className="size-5 shrink-0" />
-                    <div className="flex flex-col">
-                        <span className="text-xs font-black uppercase tracking-tighter">Erreur d'autorisation Windy</span>
-                        <span className="text-[9px] font-bold opacity-70">Ajoutez votre domaine dans la console Windy.</span>
-                    </div>
-                </div>
-                <div className="bg-white/50 p-2 rounded-lg border border-red-100 font-mono text-[8px] break-all">
-                    ORIGINE : {authError}
-                </div>
-                <Button onClick={handleReloadKey} variant="destructive" className="w-full h-10 font-black uppercase text-[10px] gap-2 shadow-sm">
-                    <RefreshCw className="size-3" /> Réinitialiser la clé (Casser cache)
+        <Alert variant="destructive" className="bg-red-50 border-red-200">
+            <AlertCircle className="size-5" />
+            <AlertTitle className="font-black uppercase text-xs">Erreur d'autorisation Windy</AlertTitle>
+            <AlertDescription className="space-y-3 pt-2">
+                <p className="text-[10px] font-bold">Domaine à autoriser : <code className="bg-white/50 px-1">{authError}</code></p>
+                <Button onClick={handleReloadKey} variant="destructive" className="w-full h-10 font-black uppercase text-[10px] gap-2">
+                    <RefreshCw className="size-3" /> Réinitialiser la clé
                 </Button>
-            </div>
-        </div>
+            </AlertDescription>
+        </Alert>
       )}
 
       <Card className="border-2 shadow-sm overflow-hidden">
@@ -324,7 +314,10 @@ export default function VesselTrackerPage() {
               <Switch checked={isSharing} onCheckedChange={setIsSharing} />
           </div>
           {isSharing && mode === 'sender' && (
-              <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2 gap-2" onClick={toggleWakeLock}>
+              <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2 gap-2" onClick={async () => {
+                if (wakeLock) { await wakeLock.release(); setWakeLock(null); }
+                else { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); }
+              }}>
                   <Zap className={cn("size-4", wakeLock && "fill-primary")} />
                   {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
               </Button>
@@ -335,16 +328,53 @@ export default function VesselTrackerPage() {
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all relative bg-slate-100", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[500px]")}>
         <div id="windy" className="absolute inset-0 w-full h-full z-10" style={{ minHeight: isFullscreen ? '100vh' : '500px' }}>
           {mapClickResult && (
-            <div className="absolute z-[110] bg-slate-900/85 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[140px] animate-in zoom-in-95" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -130%)' }}>
+            <div className="absolute z-[110] bg-slate-900/90 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[220px] animate-in zoom-in-95" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -110%)' }}>
               <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
-                <span className="text-[10px] font-black uppercase text-primary tracking-widest">DATA</span>
+                <span className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                    <Navigation className="size-3" /> Analyse de Point
+                </span>
                 {isQueryingWindy && <RefreshCw className="size-3 animate-spin" />}
               </div>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3"><Wind className="size-5 text-blue-400" /><div className="flex flex-col"><span className="text-xl font-black">{mapClickResult.windSpeed ?? '--'}</span><span className="text-[8px] uppercase opacity-60">Noeuds</span></div></div>
-                <div className="flex items-center gap-3"><Waves className="size-5 text-cyan-400" /><div className="flex flex-col"><span className="text-sm font-black">{mapClickResult.waves ?? '--'}m</span><span className="text-[8px] uppercase opacity-60">Houle</span></div></div>
+              
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <div className="flex flex-col">
+                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Wind className="size-2" /> Vent / Rafale</span>
+                    <span className="text-sm font-black text-blue-400">
+                        {mapClickResult.windSpeed ?? '--'} <span className="text-[8px] opacity-60">ND</span>
+                        {mapClickResult.gustSpeed > 0 && <span className="text-orange-400 ml-1">({mapClickResult.gustSpeed})</span>}
+                    </span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Waves className="size-2" /> Houle</span>
+                    <span className="text-sm font-black text-cyan-400">{mapClickResult.waves ?? '--'}<span className="text-[8px] ml-0.5">m</span></span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Thermometer className="size-2" /> Air / Eau</span>
+                    <span className="text-sm font-black">
+                        {mapClickResult.temp ?? '--'}° <span className="text-blue-300">/ {mapClickResult.sst ?? '--'}°</span>
+                    </span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Gauge className="size-2" /> Pression / Hum</span>
+                    <span className="text-sm font-black">{mapClickResult.pressure ?? '--'} <span className="text-[8px] opacity-60">hPa</span></span>
+                </div>
               </div>
-              <button onClick={() => setMapClickResult(null)} className="absolute -top-2 -right-2 bg-red-600 rounded-full p-1 shadow-lg"><X className="size-3" /></button>
+
+              {mapClickResult.tideData && (
+                <div className="mt-3 pt-2 border-t border-white/10 space-y-1">
+                    <p className="text-[8px] font-black uppercase text-primary text-center">Marées Station : {mapClickResult.tideData.station}</p>
+                    <div className="flex justify-around gap-1">
+                        {mapClickResult.tideData.tides.slice(0, 2).map((t: any, i: number) => (
+                            <div key={i} className="bg-white/5 p-1 rounded text-center flex-1">
+                                <span className="text-[7px] font-bold block opacity-60 uppercase">{t.type === 'haute' ? 'Pleine' : 'Basse'}</span>
+                                <span className="text-[9px] font-black block">{t.time} ({t.height}m)</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+              )}
+
+              <button onClick={() => setMapClickResult(null)} className="absolute -top-2 -right-2 bg-red-600 rounded-full p-1.5 shadow-lg border-2 border-white/20"><X className="size-3" /></button>
             </div>
           )}
           <div className="absolute top-3 right-3 flex flex-col gap-2 z-20">
@@ -356,7 +386,9 @@ export default function VesselTrackerPage() {
 
       <div className="p-4 bg-primary/5 border-2 border-dashed rounded-xl flex gap-3 opacity-60">
           <Info className="size-5 text-primary shrink-0" />
-          <p className="text-[10px] leading-relaxed font-medium">Cliquez sur la carte pour interroger les stations météo. En cas d'écran gris, rechargez la clé ci-dessus.</p>
+          <p className="text-[10px] font-medium leading-relaxed">
+            <strong>Analyse Tactique :</strong> Cliquez n'importe où sur la mer pour obtenir le vent, les rafales, la température de l'eau (SST), la pression et les marées prévisionnelles du point.
+          </p>
       </div>
     </div>
   );

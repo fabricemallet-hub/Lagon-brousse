@@ -3,7 +3,7 @@
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Version 6.4 : Conformité Point Forecast v2 (Typage Strict + Body Key + Referer Strict).
+ * Version 6.5 : Support multi-paramètres (Vent, Rafales, Eau, Pression, Humidité).
  */
 
 export async function fetchWindyWeather(lat: number, lon: number) {
@@ -25,7 +25,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       lat: cleanLat,
       lon: cleanLon,
       model: 'gfs',
-      parameters: ['wind', 'temp', 'waves'],
+      parameters: ['wind', 'gust', 'windDir', 'temp', 'pressure', 'rh', 'waves', 'sst'],
       levels: ['surface'],
       key: API_KEY 
     };
@@ -46,13 +46,16 @@ export async function fetchWindyWeather(lat: number, lon: number) {
 
     const data = await response.json();
     
-    // Extraction sécurisée des données selon le format v2
-    const windRaw = data.wind?.[0] ?? 0;
-    const wavesM = data.waves?.[0] ?? 0;
-
+    // Extraction sécurisée des données selon le format v2 (Windy renvoie des tableaux)
     return {
-      windSpeed: Math.round(windRaw * 1.94384), // m/s -> knots
-      waves: parseFloat(wavesM.toFixed(1)),
+      windSpeed: Math.round((data.wind?.[0] || 0) * 1.94384), // m/s -> knots
+      gustSpeed: Math.round((data.gust?.[0] || 0) * 1.94384),
+      windDir: data.windDir?.[0] || 0,
+      temp: Math.round(data.temp?.[0] - 273.15), // Kelvin -> Celsius
+      pressure: Math.round((data.pressure?.[0] || 0) / 100), // Pa -> hPa
+      rh: data.rh?.[0] || 0, // Humidité %
+      waves: parseFloat((data.waves?.[0] || 0).toFixed(1)),
+      sst: data.sst ? Math.round(data.sst[0] - 273.15) : null, // Water Temp
       success: true,
       status: 200
     };
