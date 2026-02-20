@@ -182,11 +182,9 @@ export default function VesselTrackerPage() {
   const savedVesselIds = profile?.savedVesselIds || [];
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    // Si on a un ID de flotte, on suit tout le groupe
     if (fleetId) {
         return query(collection(firestore, 'vessels'), where('fleetId', '==', fleetId), where('isSharing', '==', true));
     }
-    // Sinon on suit la liste habituelle
     if (savedVesselIds.length === 0) return null;
     const ids = [...savedVesselIds];
     if (isSharing && !ids.includes(sharingId)) ids.push(sharingId);
@@ -194,6 +192,19 @@ export default function VesselTrackerPage() {
   }, [firestore, savedVesselIds, sharingId, isSharing, fleetId]);
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
+
+  const soundsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
+  }, [firestore]);
+  const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
+
+  const availableSounds = useMemo(() => {
+    if (!dbSounds) return [];
+    return dbSounds.filter(s => 
+      !s.categories || s.categories.includes('Vessel') || s.categories.includes('General')
+    ).map(s => ({ id: s.id, label: s.label, url: s.url }));
+  }, [dbSounds]);
 
   const smsPreview = useMemo(() => {
     const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
@@ -301,6 +312,15 @@ export default function VesselTrackerPage() {
     };
     update();
   }, [user, firestore, isSharing, sharingId, fleetId, isGhostMode, vesselNickname, vesselStatus, mooringRadius]);
+
+  const playVesselSound = useCallback((soundId: string) => {
+    const sound = availableSounds.find(s => s.id === soundId || s.label === soundId);
+    if (sound) {
+      const audio = new Audio(sound.url);
+      audio.volume = 0.8;
+      audio.play().catch(() => {});
+    }
+  }, [availableSounds]);
 
   const handleTacticalReport = async (type: string, photo?: string) => {
     if (!user || !firestore || !currentPos || !isSharing) {
@@ -430,27 +450,45 @@ export default function VesselTrackerPage() {
             setCurrentSpeed(knotSpeed);
             if (isFollowMode && googleMap) googleMap.panTo(newPos);
 
-            // LOGIQUE DE SÉCURITÉ AUTOMATIQUE
+            // LOGIQUE DE SÉCURITÉ AUTOMATIQUE & MOUILLAGE OPTIMISÉ
             let nextStatus: VesselStatus['status'] = vesselStatus;
             let eventLabel: string | null = null;
 
             if (knotSpeed > 2) {
+                // REPRISE DE ROUTE SI VITESSE > 2 ND
                 nextStatus = 'moving';
                 immobilityStartTime.current = null;
-                if (vesselStatus !== 'moving') eventLabel = 'REPRISE DE ROUTE';
+                if (vesselStatus !== 'moving') {
+                    eventLabel = 'REPRISE DE ROUTE';
+                    if (anchorPos) setAnchorPos(null); // Nettoyage auto si on reprend la route
+                }
             } else if (anchorPos) {
+                // SURVEILLANCE DE DÉRIVE (SI ANCRE JETÉE)
                 const distToAnchor = getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng);
                 if (distToAnchor > mooringRadius) {
-                    nextStatus = 'drifting';
-                    eventLabel = 'ALERTE DÉRIVE !';
+                    if (nextStatus !== 'drifting') {
+                        nextStatus = 'drifting';
+                        eventLabel = 'ALERTE DÉRIVE !';
+                        playVesselSound('alerte');
+                        toast({ variant: 'destructive', title: "ALERTE DÉRIVE", description: `Distance à l'ancre : ${Math.round(distToAnchor)}m` });
+                    }
                 } else {
                     nextStatus = 'stationary';
+                }
+            } else {
+                // DÉTECTION AUTO D'IMMOBILITÉ (SANS ANCRE MANUELLE)
+                if (knotSpeed <= 0.5) {
+                    if (!immobilityStartTime.current) immobilityStartTime.current = Date.now();
+                    if (Date.now() - immobilityStartTime.current > 30000 && vesselStatus === 'moving') {
+                        nextStatus = 'stationary';
+                    }
+                } else {
+                    immobilityStartTime.current = null;
                 }
             }
 
             if (nextStatus !== vesselStatus) {
                 setVesselStatus(nextStatus);
-                if (nextStatus === 'drifting') toast({ variant: 'destructive', title: "ALERTE DÉRIVE", description: `Rayon de ${mooringRadius}m dépassé.` });
             }
 
             updateVesselInFirestore({ 
@@ -464,19 +502,33 @@ export default function VesselTrackerPage() {
         { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, mode, googleMap, isFollowMode, anchorPos, updateVesselInFirestore, toast, mooringRadius, vesselStatus]);
+  }, [isSharing, mode, googleMap, isFollowMode, anchorPos, updateVesselInFirestore, toast, mooringRadius, vesselStatus, playVesselSound]);
 
   const handleMooringToggle = () => {
+    // NETTOYAGE ET RÉINITIALISATION
     if (anchorPos) {
         setAnchorPos(null);
         setVesselStatus('moving');
-        updateVesselInFirestore({ status: 'moving', anchorLocation: null, eventLabel: 'LEVÉE D\'ANCRE' });
-        toast({ title: "Ancre levée" });
+        updateVesselInFirestore({ 
+            status: 'moving', 
+            anchorLocation: null, 
+            eventLabel: 'ANCRE LEVÉE' 
+        });
+        toast({ title: "Ancre levée", description: "Périmètre de sécurité effacé." });
     } else if (currentPos) {
+        // RÉCUPÉRATION DU RAYON ET VÉROUILLAGE DU CENTRE
+        // On place l'ancre exactement sur la position GPS actuelle au moment du clic
         setAnchorPos(currentPos);
         setVesselStatus('stationary');
-        updateVesselInFirestore({ status: 'stationary', anchorLocation: { latitude: currentPos.lat, longitude: currentPos.lng }, eventLabel: 'MOUILLAGE ACTIVÉ' });
-        toast({ title: "Point d'ancrage fixé", description: `Rayon de sécurité : ${mooringRadius}m` });
+        updateVesselInFirestore({ 
+            status: 'stationary', 
+            anchorLocation: { latitude: currentPos.lat, longitude: currentPos.lng }, 
+            eventLabel: 'MOUILLAGE ACTIF' 
+        });
+        toast({ 
+            title: "Mouillage activé", 
+            description: `Zone de sécurité verrouillée : ${mooringRadius}m` 
+        });
     } else {
         toast({ variant: "destructive", title: "GPS requis", description: "Activez le partage pour fixer l'ancre." });
     }
@@ -484,7 +536,7 @@ export default function VesselTrackerPage() {
 
   const handleRecenter = () => {
     if (currentPos && googleMap) {
-        googleMap.setZoom(18);
+        googleMap.setZoom(18); // ZOOM PRÉCISION
         googleMap.panTo(currentPos);
     } else {
         shouldPanOnNextFix.current = true;
@@ -498,7 +550,6 @@ export default function VesselTrackerPage() {
     else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); } catch (err) {} }
   };
 
-  const isLanded = vesselStatus === 'landed';
   const isDrifting = vesselStatus === 'drifting';
 
   return (
@@ -550,16 +601,18 @@ export default function VesselTrackerPage() {
                     )}
                     {anchorPos && (
                         <>
+                            {/* ICÔNE ANCRE FIXE */}
                             <OverlayView position={anchorPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div className="p-1 bg-white rounded-full border-2 border-primary shadow-xl" style={{ transform: 'translate(-50%, -50%)' }}>
                                     <Anchor className="size-4 text-primary" />
                                 </div>
                             </OverlayView>
+                            {/* CERCLE DE SÉCURITÉ FIXE ET TRANSPARENT */}
                             <Circle
                                 center={anchorPos}
                                 radius={mooringRadius}
                                 options={{
-                                    fillColor: '#3b82f6',
+                                    fillColor: isDrifting ? '#ef4444' : '#3b82f6',
                                     fillOpacity: 0.15,
                                     strokeColor: isDrifting ? '#ef4444' : '#3b82f6',
                                     strokeOpacity: 0.8,
