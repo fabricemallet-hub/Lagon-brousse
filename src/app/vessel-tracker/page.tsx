@@ -29,7 +29,7 @@ import {
   BatteryMedium,
   BatteryLow,
   BatteryCharging,
-  History,
+  History as HistoryIcon,
   MapPin,
   ChevronDown,
   X,
@@ -67,7 +67,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 
-// CLÉ "MAP FORECAST" POUR L'AFFICHAGE DE LA CARTE (1gGm...)
+// CLÉ "MAP FORECAST" POUR L'AFFICHAGE DE LA CARTE
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -153,98 +153,106 @@ export default function VesselTrackerPage() {
   const isMapInitializedRef = useRef<boolean>(false);
   const pickerTimerRef = useRef<any>(null);
 
+  // CHARGEMENT ROBUSTE ET SÉQUENTIEL DES SCRIPTS
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || isMapInitializedRef.current) return;
 
-    // Check if Windy script is loaded, if not, wait or inject
-    if (!window.windyInit) {
-        if (!document.getElementById('windy-lib-boot')) {
+    const loadScript = (id: string, src: string): Promise<void> => {
+        return new Promise((resolve, reject) => {
+            if (document.getElementById(id)) {
+                resolve();
+                return;
+            }
             const script = document.createElement('script');
-            script.id = 'windy-lib-boot';
-            script.src = 'https://api.windy.com/assets/map-forecast/libBoot.js';
+            script.id = id;
+            script.src = src;
             script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Failed to load ${src}`));
             document.head.appendChild(script);
-        }
-        setTimeout(initWindy, 500);
-        return;
-    }
+        });
+    };
 
-    if (!window.L) {
-        if (!document.getElementById('leaflet-js')) {
-            const script = document.createElement('script');
-            script.id = 'leaflet-js';
-            script.src = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js';
-            script.async = true;
-            document.head.appendChild(script);
-        }
-        setTimeout(initWindy, 500);
-        return;
-    }
-
-    isMapInitializedRef.current = true;
-
-    setTimeout(() => {
-        const options = {
-          key: MAP_FORECAST_KEY,
-          lat: INITIAL_CENTER.lat,
-          lon: INITIAL_CENTER.lng,
-          zoom: 10,
-          verbose: false,
-          externalAllowedOrigins: [window.location.host],
-          overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
-          product: 'ecmwf',
-        };
-
+    const attemptInit = async () => {
         try {
+            // 1. Charger Leaflet d'abord (L est requis par Windy)
+            await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
+            
+            // 2. Attendre que L soit globalement disponible
+            let retries = 0;
+            while (!window.L && retries < 20) {
+                await new Promise(r => setTimeout(r, 100));
+                retries++;
+            }
+
+            if (!window.L) throw new Error("Leaflet 'L' could not be initialized");
+
+            // 3. Charger Windy API (libBoot)
+            await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
+
+            // 4. Initialiser avec les options
+            const options = {
+                key: MAP_FORECAST_KEY,
+                lat: INITIAL_CENTER.lat,
+                lon: INITIAL_CENTER.lng,
+                zoom: 10,
+                verbose: false,
+                externalAllowedOrigins: [window.location.host],
+                overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
+                product: 'ecmwf',
+            };
+
             window.windyInit(options, (windyAPI: any) => {
-              if (!windyAPI) {
-                  setAuthError(window.location.host);
-                  isMapInitializedRef.current = false;
-                  return;
-              }
+                if (!windyAPI) {
+                    setAuthError(window.location.host);
+                    return;
+                }
 
-              const { map, store, picker, broadcast } = windyAPI;
-              mapRef.current = map;
+                isMapInitializedRef.current = true;
+                const { map, store, picker, broadcast } = windyAPI;
+                mapRef.current = map;
 
-              store.set('overlay', 'wind');
-              store.set('product', 'ecmwf');
+                store.set('overlay', 'wind');
+                store.set('product', 'ecmwf');
 
-              broadcast.on('pickerMoved', (latLon: any) => {
-                if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
-                
-                pickerTimerRef.current = setTimeout(async () => {
-                    const { lat, lon } = latLon;
-                    setMapClickResult({ lat, lon });
-                    setIsQueryingWindy(true);
-                    setPointTides(null);
+                broadcast.on('pickerMoved', (latLon: any) => {
+                    if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
+                    pickerTimerRef.current = setTimeout(async () => {
+                        const { lat, lon } = latLon;
+                        setMapClickResult({ lat, lon });
+                        setIsQueryingWindy(true);
+                        setPointTides(null);
 
-                    try {
-                      const weather = await fetchWindyWeather(lat, lon);
-                      setMapClickResult((prev: any) => ({ ...prev, ...weather }));
-                      const commune = getClosestCommune(lat, lon);
-                      const tideData = getDataForDate(commune, new Date());
-                      setPointTides(tideData.tides);
-                    } catch (err) {} finally {
-                      setIsQueryingWindy(false);
-                    }
-                }, 300);
-              });
+                        try {
+                            const weather = await fetchWindyWeather(lat, lon);
+                            setMapClickResult((prev: any) => ({ ...prev, ...weather }));
+                            const commune = getClosestCommune(lat, lon);
+                            const tideData = getDataForDate(commune, new Date());
+                            setPointTides(tideData.tides);
+                        } catch (err) {} finally {
+                            setIsQueryingWindy(false);
+                        }
+                    }, 400);
+                });
 
-              map.on('click', (e: any) => {
-                picker.open({ lat: e.latlng.lat, lon: e.latlng.lng });
-              });
+                map.on('click', (e: any) => {
+                    picker.open({ lat: e.latlng.lat, lon: e.latlng.lng });
+                });
 
-              setTimeout(() => { if(map) map.invalidateSize(); }, 1000);
+                setTimeout(() => { if(map) map.invalidateSize(); }, 1500);
             });
         } catch (e: any) {
+            console.error("Windy load error:", e);
             setAuthError(window.location.host);
-            isMapInitializedRef.current = false;
         }
-    }, 1000);
+    };
+
+    attemptInit();
   }, []);
 
   useEffect(() => {
-    initWindy();
+    const timer = setTimeout(initWindy, 1000);
+    return () => clearTimeout(timer);
   }, [initWindy]);
 
   const handleRecenter = () => {
@@ -257,7 +265,7 @@ export default function VesselTrackerPage() {
   const copyOrigin = () => {
     if (typeof window !== 'undefined') {
         navigator.clipboard.writeText(window.location.host);
-        toast({ title: "Hôte copié !" });
+        toast({ title: "Hôte copié !", description: "Collez-le avec une VIRGULE dans Windy." });
     }
   };
 
@@ -271,7 +279,7 @@ export default function VesselTrackerPage() {
             <AlertTitle className="font-black uppercase text-sm mb-2">ERREUR AUTHENTIFICATION WINDY (401)</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cet hôte exact (SÉPAREZ PAR UNE VIRGULE) :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cet hôte exact :</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{authError}</code>
                         <Button size="icon" variant="ghost" onClick={copyOrigin} className="h-10 w-10">
@@ -282,8 +290,8 @@ export default function VesselTrackerPage() {
                 <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
                     <p>1. Allez sur api.windy.com/keys</p>
                     <p>2. Modifiez la clé Map Forecast (1gGm...)</p>
-                    <p>3. Dans "Restrictions de domaine", mettez : <code>*.cloudworkstations.dev, studio-2943478321-f746e.web.app, localhost</code></p>
-                    <p className="font-black text-xs">⚠️ IMPORTANT : Utilisez une VIRGULE entre chaque domaine, pas d'espaces seuls.</p>
+                    <p>3. Séparez vos domaines par une <strong>VIRGULE</strong> (pas d'espace).</p>
+                    <p className="font-black text-xs">⚠️ EXEMPLE : <code>*.cloudworkstations.dev, localhost</code></p>
                 </div>
             </AlertDescription>
         </Alert>
@@ -333,7 +341,7 @@ export default function VesselTrackerPage() {
 
       <div className="space-y-4">
           <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-              <History className="size-4" /> Analyse Tactique
+              <HistoryIcon className="size-4" /> Analyse Tactique
           </h3>
           <Alert className="bg-muted/10 border-dashed border-2">
               <Info className="size-4 text-primary" />
