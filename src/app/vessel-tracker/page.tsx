@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,23 +29,23 @@ const MAP_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 export default function VesselTrackerPage() {
   const { toast } = useToast();
 
-  // --- 1. DÉFINITIONS DES FONCTIONS (Fix ReferenceError) ---
-  function handleRecenter() {
+  // --- 1. FONCTIONS DE NAVIGATION (STABLES) ---
+  const handleRecenter = useCallback(() => {
     console.log('Action: Recenter triggered');
     toast({ title: "Recentrer", description: "Recentrage sur votre position..." });
-  }
+  }, [toast]);
 
-  function handleSearch() {
+  const handleSearch = useCallback(() => {
     console.log('Action: Search triggered');
     toast({ title: "Recherche", description: "Outil de recherche actif." });
-  }
+  }, [toast]);
 
-  function handleFilter() {
+  const handleFilter = useCallback(() => {
     console.log('Action: Filter triggered');
     toast({ title: "Filtres", description: "Filtres de flotte actifs." });
-  }
+  }, [toast]);
 
-  // --- 2. ÉTATS DE DIAGNOSTIC ---
+  // --- 2. ÉTATS DE DIAGNOSTIC & INITIALISATION ---
   const [error, setError] = useState<string | null>(null);
   const [host, setHost] = useState('');
   const [origin, setOrigin] = useState('');
@@ -61,7 +61,7 @@ export default function VesselTrackerPage() {
     setOrigin(window.location.origin);
     setReferrer(document.referrer || 'Aucun (Direct)');
 
-    // Injecter la politique de Referrer à la volée pour Windy
+    // Forcer la politique de Referrer pour Windy
     const meta = document.createElement('meta');
     meta.name = "referrer";
     meta.content = "no-referrer-when-downgrade";
@@ -86,27 +86,27 @@ export default function VesselTrackerPage() {
 
     const init = async () => {
       try {
-        // Interception console.error pour éviter l'écran rouge fatal de Next.js
+        // Interception console.error pour éviter l'overlay fatal de Next.js
         const originalConsoleError = console.error;
         console.error = (...args) => {
           const msg = args[0] ? String(args[0]) : '';
           if (msg.includes('Windy API key') || msg.includes('authorize') || msg.includes('401')) {
-            setError("ERREUR 401 : Windy a rejeté la clé pour ce domaine.");
+            setError("ERREUR 401 : Authentification refusée pour ce domaine.");
             return;
           }
           originalConsoleError.apply(console, args);
         };
 
-        // 1. Leaflet
+        // 1. Leaflet (Pré-requis Windy)
         await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
         
-        // 2. Config Globale
+        // 2. Configuration API
         (window as any).W = { apiKey: MAP_KEY };
         
         // 3. Windy Boot
         await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
 
-        // 4. Attente de l'objet windyInit
+        // 4. Attente et Initialisation
         let attempts = 0;
         const checkInit = setInterval(() => {
             attempts++;
@@ -121,15 +121,15 @@ export default function VesselTrackerPage() {
 
                 (window as any).windyInit(options, (windyAPI: any) => {
                     if (!windyAPI) {
-                        setError("Échec critique : L'API Windy n'a pas pu s'initialiser (Validation domaine).");
+                        setError("Échec critique : Windy n'a pas pu s'initialiser.");
                         return;
                     }
                     setIsInitialized(true);
                 });
             }
-            if (attempts > 60) {
+            if (attempts > 50) {
                 clearInterval(checkInit);
-                setError("Délai d'attente dépassé (windyInit non disponible).");
+                setError("Délai d'attente dépassé (windyInit introuvable).");
             }
         }, 200);
 
@@ -138,8 +138,7 @@ export default function VesselTrackerPage() {
       }
     };
 
-    // Délai de sécurité pour laisser le temps au DOM de se stabiliser
-    const timer = setTimeout(init, 1500);
+    const timer = setTimeout(init, 1000);
     return () => {
         clearTimeout(timer);
         if (document.head.contains(meta)) document.head.removeChild(meta);
@@ -148,7 +147,7 @@ export default function VesselTrackerPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: "Copié dans le presse-papier !" });
+    toast({ title: "Copié !" });
   };
 
   return (
@@ -188,8 +187,7 @@ export default function VesselTrackerPage() {
             <AlertTitle className="font-black uppercase text-sm mb-4">Échec Authentification (401)</AlertTitle>
             <AlertDescription className="space-y-4 text-foreground">
               <p className="text-xs font-medium text-slate-700 leading-relaxed italic">
-                Windy rejette la clé car il ne reconnaît pas l'un de ces domaines. 
-                Veuillez ajouter ces **3 valeurs exactes** dans votre console [api.windy.com/keys](https://api.windy.com/keys) :
+                Windy rejette la clé pour votre domaine actuel. Veuillez ajouter ces **valeurs exactes** dans votre console Windy (api.windy.com/keys) :
               </p>
               
               <div className="grid gap-3">
@@ -219,7 +217,7 @@ export default function VesselTrackerPage() {
               <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-3">
                 <CheckCircle2 className="size-4 text-blue-600 mt-0.5" />
                 <p className="text-[11px] leading-relaxed text-slate-700 font-bold">
-                  Note : Dans Firebase Studio, c'est souvent `studio.firebase.google.com` qui doit être autorisé.
+                  Note : Dans Studio, `studio.firebase.google.com` est souvent le Referrer requis.
                 </p>
               </div>
             </AlertDescription>
@@ -232,7 +230,7 @@ export default function VesselTrackerPage() {
           "relative w-full transition-all duration-500 bg-slate-100 rounded-[2.5rem] border-4 shadow-2xl overflow-hidden",
           isFullscreen ? "fixed inset-0 z-[200] h-screen w-screen rounded-none" : "h-[500px]"
       )}>
-        {/* Le div Windy doit être permanent. React ne doit pas le supprimer. */}
+        {/* Calque de la carte : React ne doit jamais modifier ses enfants directs */}
         <div 
           id="windy" 
           key="windy-map-canvas"
@@ -242,16 +240,13 @@ export default function VesselTrackerPage() {
           )}
         ></div>
         
-        {/* Le Loader est un overlay ABSOLU. On utilise l'opacité pour le "cacher" sans le supprimer du DOM. */}
+        {/* Calque du Loader : Positionné au-dessus mais indépendant du nœud #windy */}
         <div className={cn(
             "absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 bg-slate-50 transition-all duration-700",
             (isInitialized || error) ? "opacity-0 pointer-events-none" : "opacity-100"
         )}>
             <RefreshCw className="size-10 animate-spin text-primary/40" />
-            <p className="font-black uppercase text-[10px] tracking-widest animate-pulse text-center px-8">
-                Initialisation tactique...<br/>
-                <span className="text-[8px] opacity-60 font-bold">Vérification de la clé de carte</span>
-            </p>
+            <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Initialisation tactique...</p>
         </div>
 
         <Button 
