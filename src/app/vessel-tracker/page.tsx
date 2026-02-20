@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, getDoc } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -56,7 +56,6 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 
-// CLÉ API WINDY FONCTIONNELLE
 const MAP_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 const IMMOBILITY_THRESHOLD_METERS = 20; 
@@ -74,6 +73,12 @@ export default function VesselTrackerPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+
+  // --- TOP LEVEL FUNCTIONS (HOISTED) ---
+  function handleRecenter() {
+    const pos = mode === 'sender' ? currentPos : (followedVessels?.find(v => v.isSharing)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location.latitude, lng: followedVessels.find(v => v.isSharing)!.location.longitude } : null);
+    if (pos && map) { map.panTo(pos); map.setZoom(15); } else { shouldPanOnNextFix.current = true; }
+  }
 
   const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
@@ -158,15 +163,131 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
 
+  // --- CORE FUNCTIONS ---
+  const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
+    if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
+    
+    const update = async () => {
+        let batteryInfo = {};
+        if ('getBattery' in navigator) {
+            const b: any = await (navigator as any).getBattery();
+            batteryInfo = { batteryLevel: Math.round(b.level * 100), isCharging: b.charging };
+        }
+
+        const updatePayload: any = { 
+            id: sharingId,
+            userId: user.uid, 
+            displayName: vesselNickname || user.displayName || 'Capitaine', 
+            isSharing: data.isSharing !== undefined ? data.isSharing : isSharing, 
+            lastActive: serverTimestamp(),
+            ...batteryInfo,
+            ...data 
+        };
+
+        if (data.status || data.eventLabel) updatePayload.statusChangedAt = serverTimestamp();
+
+        setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
+    };
+    update();
+  }, [user, firestore, isSharing, sharingId, vesselNickname]);
+
+  const handleSaveVessel = async () => {
+    if (!user || !firestore) return;
+    const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            savedVesselIds: cleanId ? arrayUnion(cleanId) : savedVesselIds,
+            lastVesselId: cleanId || customSharingId,
+            vesselNickname: vesselNickname
+        });
+        if (vesselIdToFollow) setVesselIdToFollow('');
+        toast({ title: "ID enregistré" });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur sauvegarde" });
+    }
+  };
+
+  const handleRemoveSavedVessel = async (id: string) => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            savedVesselIds: arrayRemove(id)
+        });
+        toast({ title: "Navire retiré" });
+    } catch (e) {}
+  };
+
+  const saveVesselPrefs = async (newPrefs: typeof vesselPrefs) => {
+    if (!user || !firestore) return;
+    setVesselPrefs(newPrefs);
+    await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
+  };
+
+  const handleSaveSmsSettings = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            emergencyContact: emergencyContact,
+            vesselSmsMessage: vesselSmsMessage,
+            isEmergencyEnabled: isEmergencyEnabled,
+            isCustomMessageEnabled: isCustomMessageEnabled
+        });
+        toast({ title: "Réglages SMS sauvés" });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur" });
+    }
+  };
+
+  const handleManualStatus = (st: VesselStatus['status'], label: string) => {
+    setVesselStatus(st);
+    updateVesselInFirestore({ status: st, eventLabel: label });
+    if (st === 'moving') setAnchorPos(null);
+    toast({ title: label });
+  };
+
+  const handleTacticalSignal = (label: string) => {
+    updateVesselInFirestore({ eventLabel: `SIGNAL : ${label}` });
+    toast({ title: `Signal envoyé : ${label}` });
+  };
+
+  const handleStartSharing = () => {
+    setIsSharing(true);
+    setSharingStartTime(Date.now());
+    updateVesselInFirestore({ isSharing: true, status: 'moving' });
+    toast({ title: "Partage activé", description: `ID: ${sharingId}` });
+  };
+
+  const handleStopSharing = async () => {
+    if (!user || !firestore) return;
+    setIsSharing(false);
+    setSharingStartTime(null);
+    await setDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp() }, { merge: true });
+    if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+    setCurrentPos(null);
+    toast({ title: "Partage arrêté" });
+  };
+
+  const sendEmergencySms = (type: string) => {
+    if (!emergencyContact) { toast({ variant: "destructive", title: "Numéro requis" }); return; }
+    const posUrl = currentPos ? `https://www.google.com/maps?q=${currentPos.lat.toFixed(6)},${currentPos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
+    const body = `[${sharingId}] ${type} ! ${vesselSmsMessage} Position : ${posUrl}`;
+    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+  };
+
+  const toggleWakeLock = async () => {
+    if (!('wakeLock' in navigator)) return;
+    if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
+    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); lock.addEventListener('release', () => setWakeLock(null)); } catch (err) {} }
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+    toast({ title: "Journal effacé" });
+  };
+
   // --- WINDY INIT LOGIC ---
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
-    const meta = document.createElement('meta');
-    meta.name = "referrer";
-    meta.content = "no-referrer-when-downgrade";
-    document.head.appendChild(meta);
-
     const loadScript = (id: string, src: string) => {
       return new Promise<void>((resolve, reject) => {
         if (document.getElementById(id)) { resolve(); return; }
@@ -202,85 +323,7 @@ export default function VesselTrackerPage() {
     };
 
     setTimeout(init, 500);
-    return () => { if (document.head.contains(meta)) document.head.removeChild(meta); };
   }, []);
-
-  // --- PREFERENCES & NICKNAME SYNC ---
-  useEffect(() => {
-    if (userProfile) {
-      if (userProfile.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
-      if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
-      if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
-      setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
-      setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
-      const savedNickname = userProfile.vesselNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '';
-      if (!vesselNickname) setVesselNickname(savedNickname);
-      if (userProfile.lastVesselId && !customSharingId) setCustomSharingId(userProfile.lastVesselId);
-    }
-  }, [userProfile, user]);
-
-  const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
-    if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
-    
-    const update = async () => {
-        let batteryInfo = {};
-        if ('getBattery' in navigator) {
-            const b: any = await (navigator as any).getBattery();
-            batteryInfo = { batteryLevel: Math.round(b.level * 100), isCharging: b.charging };
-        }
-
-        const updatePayload: any = { 
-            id: sharingId,
-            userId: user.uid, 
-            displayName: vesselNickname || user.displayName || 'Capitaine', 
-            isSharing: data.isSharing !== undefined ? data.isSharing : isSharing, 
-            lastActive: serverTimestamp(),
-            ...batteryInfo,
-            ...data 
-        };
-
-        if (data.status || data.eventLabel) updatePayload.statusChangedAt = serverTimestamp();
-
-        setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
-    };
-    update();
-  }, [user, firestore, isSharing, sharingId, vesselNickname]);
-
-  const handleStartSharing = () => {
-    setIsSharing(true);
-    setSharingStartTime(Date.now());
-    updateVesselInFirestore({ isSharing: true, status: 'moving' });
-    toast({ title: "Partage activé", description: `ID: ${sharingId}` });
-  };
-
-  const handleStopSharing = async () => {
-    if (!user || !firestore) return;
-    setIsSharing(false);
-    setSharingStartTime(null);
-    await setDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp() }, { merge: true });
-    if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
-    setCurrentPos(null);
-    toast({ title: "Partage arrêté" });
-  };
-
-  const handleManualStatus = (st: VesselStatus['status'], label: string) => {
-    setVesselStatus(st);
-    updateVesselInFirestore({ status: st, eventLabel: label });
-    if (st === 'moving') setAnchorPos(null);
-    toast({ title: label });
-  };
-
-  const handleTacticalSignal = (label: string) => {
-    updateVesselInFirestore({ eventLabel: `SIGNAL : ${label}` });
-    toast({ title: `Signal envoyé : ${label}`, variant: "default" });
-  };
-
-  const sendEmergencySms = (type: string) => {
-    if (!emergencyContact) { toast({ variant: "destructive", title: "Numéro requis" }); return; }
-    const posUrl = currentPos ? `https://www.google.com/maps?q=${currentPos.lat.toFixed(6)},${currentPos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
-    const body = `[${sharingId}] ${type} ! ${vesselSmsMessage} Position : ${posUrl}`;
-    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
-  };
 
   // --- GPS TRACKING LOGIC ---
   useEffect(() => {
@@ -289,7 +332,6 @@ export default function VesselTrackerPage() {
       (position) => {
         const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
         setCurrentPos(newPos);
-        
         if (vesselStatus !== 'returning' && vesselStatus !== 'landed') {
             if (!anchorPos) { setAnchorPos(newPos); return; }
             const dist = getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng);
@@ -330,7 +372,7 @@ export default function VesselTrackerPage() {
         lastStatusesRef.current[vessel.id] = currentStatus;
         lastUpdatesRef.current[vessel.id] = timeKey;
     });
-  }, [followedVessels, mode, playVesselSound]);
+  }, [followedVessels, mode, playVesselSound, toast]);
 
   const activeDuration = useMemo(() => {
     if (!sharingStartTime) return '0 min';
@@ -340,7 +382,6 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto px-1 pb-32">
-      {/* HEADER & MODE SELECTOR */}
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2">
@@ -354,7 +395,6 @@ export default function VesselTrackerPage() {
         </div>
       </div>
 
-      {/* SENDER VIEW */}
       {mode === 'sender' && (
         <div className="space-y-4 animate-in fade-in duration-500">
           {isSharing ? (
@@ -445,7 +485,6 @@ export default function VesselTrackerPage() {
         </div>
       )}
 
-      {/* RECEIVER VIEW */}
       {mode === 'receiver' && (
         <div className="space-y-4 animate-in fade-in duration-500">
           <div className="space-y-1">
@@ -489,34 +528,27 @@ export default function VesselTrackerPage() {
         </div>
       )}
 
-      {/* MAP SECTION */}
       <div className={cn(
           "relative w-full transition-all duration-500 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 shadow-2xl overflow-hidden",
           isFullscreen ? "fixed inset-0 z-[200] h-screen w-screen rounded-none" : "h-[500px]"
       )}>
         <div id="windy" className="w-full h-full"></div>
-        
-        <div className={cn(
-            "absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 bg-slate-900 transition-all duration-700 pointer-events-none z-10",
-            isInitialized ? "opacity-0 invisible" : "opacity-100 visible"
-        )}>
+        <div className={cn("absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 bg-slate-900 transition-all pointer-events-none z-10", isInitialized ? "opacity-0 invisible" : "opacity-100 visible")}>
             <RefreshCw className="size-10 animate-spin text-primary/40" />
             <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Initialisation tactique...</p>
         </div>
-
         <Button size="icon" className="absolute top-4 left-4 shadow-2xl h-10 w-10 z-[210] bg-white/90 backdrop-blur-md border-2" onClick={() => setIsFullscreen(!isFullscreen)}>
             {isFullscreen ? <Shrink className="size-5 text-primary" /> : <Expand className="size-5 text-primary" />}
         </Button>
       </div>
 
-      {/* FOOTER & ACCORDIONS */}
       {!isFullscreen && (
         <div className="space-y-4">
           <Card className="border-2 shadow-sm bg-card overflow-hidden">
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="history" className="border-none">
                 <AccordionTrigger className="px-4 py-3 hover:no-underline flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-[10px] font-black uppercase text-primary tracking-widest"><HistoryIcon className="size-4" /> Journal tactique unifié</div>
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase text-primary tracking-widest"><HistoryIcon className="size-4" /> Journal tactique</div>
                 </AccordionTrigger>
                 <AccordionContent className="p-0 border-t border-dashed bg-muted/5">
                   <div className="divide-y max-h-60 overflow-y-auto scrollbar-hide">
@@ -528,8 +560,9 @@ export default function VesselTrackerPage() {
                         </div>
                         <Button variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase border-2 px-2" onClick={() => { map?.panTo(h.pos); map?.setZoom(15); }}>GPS</Button>
                       </div>
-                    )) : <div className="p-10 text-center text-[10px] font-bold opacity-30 uppercase italic">Aucun événement enregistré</div>}
+                    )) : <div className="p-10 text-center text-[10px] font-bold opacity-30 uppercase italic">Aucun événement</div>}
                   </div>
+                  <Button variant="ghost" className="w-full h-10 text-[8px] font-black uppercase text-destructive border-t" onClick={handleClearHistory}>Effacer journal</Button>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -550,7 +583,7 @@ export default function VesselTrackerPage() {
                     <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Message personnalisé</Label>
                     <Textarea value={vesselSmsMessage} onChange={e => setVesselSmsMessage(e.target.value)} placeholder="Problème moteur, besoin assistance..." className="border-2 min-h-[80px] font-medium bg-white" />
                   </div>
-                  <Button className="w-full h-12 font-black uppercase text-[10px] shadow-md gap-2" onClick={handleSaveSmsSettings}><Save className="size-4"/> Enregistrer mes réglages SMS</Button>
+                  <Button className="w-full h-12 font-black uppercase text-[10px] shadow-md gap-2" onClick={handleSaveSmsSettings}><Save className="size-4"/> Enregistrer</Button>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -562,12 +595,12 @@ export default function VesselTrackerPage() {
               <AccordionContent className="p-4 pt-0 space-y-4">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase">Volume des alertes</span>
+                    <span className="text-[10px] font-black uppercase">Volume</span>
                     <span className="font-black text-xs">{Math.round(vesselPrefs.vesselVolume * 100)}%</span>
                   </div>
                   <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, vesselVolume: v[0] / 100 })} />
                   <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-blue-100">
-                    <span className="text-[10px] font-black uppercase">Signaux sonores actifs</span>
+                    <span className="text-[10px] font-black uppercase">Sons actifs</span>
                     <Switch checked={vesselPrefs.isNotifyEnabled} onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isNotifyEnabled: v })} />
                   </div>
                 </div>
