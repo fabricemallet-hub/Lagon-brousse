@@ -114,7 +114,6 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
 };
 
 const WINDY_LAYERS = [
-    { id: 'satellite', icon: Globe, label: 'Satellite' },
     { id: 'wind', icon: Wind, label: 'Vent' },
     { id: 'radar', icon: Radio, label: 'Radar' },
     { id: 'gust', icon: Wind, label: 'Rafales' },
@@ -143,7 +142,7 @@ export default function VesselTrackerPage() {
   const [isWindyLoaded, setIsWindyLoaded] = useState(false);
   const [wakeLock, setWakeLock] = useState<any>(null);
 
-  const [activeOverlay, setActiveOverlay] = useState('satellite');
+  const [activeOverlay, setActiveOverlay] = useState('wind');
   const [vesselValueAtPos, setVesselValueAtPos] = useState<string>('--');
 
   const [syncCountdown, setSyncCountdown] = useState(60);
@@ -177,7 +176,6 @@ export default function VesselTrackerPage() {
 
   const watchIdRef = useRef<number | null>(null);
   const shouldPanOnNextFix = useRef(false);
-  const lastSentStatusRef = useRef<string | null>(null);
   const lastStatusesRef = useRef<Record<string, string>>({});
 
   const smsPreview = useMemo(() => {
@@ -188,50 +186,80 @@ export default function VesselTrackerPage() {
     return `${nicknamePrefix}${customText} Position : https://www.google.com/maps?q=${lat},${lng}`;
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname, currentPos]);
 
-  // INITIALISATION WINDY (SÉCURISÉE)
+  // CHARGEMENT ROBUSTE DE LEAFLET ET WINDY
   const initWindy = useCallback(() => {
-    if (typeof window === 'undefined' || isWindyLoaded || !isGoogleLoaded) return;
-    
-    // S'assurer que le script est injecté
-    if (!document.getElementById('windy-boot')) {
-        const s = document.createElement('script');
-        s.id = 'windy-boot';
-        s.src = 'https://api.windy.com/assets/map-forecast/libBoot.js';
-        s.async = true;
-        document.head.appendChild(s);
-    }
+    if (typeof window === 'undefined' || isWindyLoaded) return;
 
-    const checkAndBoot = () => {
-        if ((window as any).windyInit) {
-            try {
-                (window as any).windyInit({
-                    key: WINDY_KEY,
-                    lat: INITIAL_CENTER.lat,
-                    lon: INITIAL_CENTER.lng,
-                    zoom: 13,
-                }, (api: any) => {
-                    const { map: wMap, store, picker } = api;
-                    setWindyMap(wMap);
-                    setIsWindyLoaded(true);
-                    
-                    // Chargement du calque satellite par défaut
-                    store.set('overlay', 'satellite');
-                    
-                    picker.on('pickerOpened', (data: any) => {
-                        if (data.overlay === 'wind') setVesselValueAtPos(`${Math.round(data.wind * 1.94384)} kts`);
-                        else if (data.overlay === 'waves') setVesselValueAtPos(`${data.waves.toFixed(1)}m`);
-                        else if (data.overlay === 'temp') setVesselValueAtPos(`${Math.round(data.temp - 273.15)}°C`);
-                        else setVesselValueAtPos('--');
+    const loadLeaflet = () => {
+        return new Promise<void>((resolve) => {
+            if ((window as any).L) return resolve();
+            
+            // CSS Leaflet
+            if (!document.getElementById('leaflet-css')) {
+                const link = document.createElement('link');
+                link.id = 'leaflet-css';
+                link.rel = 'stylesheet';
+                link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+                document.head.appendChild(link);
+            }
+
+            // JS Leaflet
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            script.onload = () => resolve();
+            document.head.appendChild(script);
+        });
+    };
+
+    const loadWindyScript = () => {
+        return new Promise<void>((resolve) => {
+            if (document.getElementById('windy-boot')) return resolve();
+            const s = document.createElement('script');
+            s.id = 'windy-boot';
+            s.src = 'https://api.windy.com/assets/map-forecast/libBoot.js';
+            s.async = true;
+            s.onload = () => resolve();
+            document.head.appendChild(s);
+        });
+    };
+
+    const bootSequentially = async () => {
+        try {
+            await loadLeaflet();
+            await loadWindyScript();
+
+            const checkDependencies = () => {
+                if ((window as any).windyInit && (window as any).L) {
+                    (window as any).windyInit({
+                        key: WINDY_KEY,
+                        lat: INITIAL_CENTER.lat,
+                        lon: INITIAL_CENTER.lng,
+                        zoom: 13,
+                    }, (api: any) => {
+                        const { map: wMap, store, picker } = api;
+                        setWindyMap(wMap);
+                        setIsWindyLoaded(true);
+                        store.set('overlay', 'wind');
+                        
+                        picker.on('pickerOpened', (data: any) => {
+                            if (data.overlay === 'wind') setVesselValueAtPos(`${Math.round(data.wind * 1.94384)} kts`);
+                            else if (data.overlay === 'waves') setVesselValueAtPos(`${data.waves.toFixed(1)}m`);
+                            else if (data.overlay === 'temp') setVesselValueAtPos(`${Math.round(data.temp - 273.15)}°C`);
+                            else setVesselValueAtPos('--');
+                        });
                     });
-                });
-            } catch (e) { console.error("Windy Boot Error", e); }
-        } else {
-            setTimeout(checkAndBoot, 300);
+                } else {
+                    setTimeout(checkDependencies, 300);
+                }
+            };
+            checkDependencies();
+        } catch (e) {
+            console.warn("Windy/Leaflet Boot Error", e);
         }
     };
 
-    checkAndBoot();
-  }, [isWindyLoaded, isGoogleLoaded]);
+    bootSequentially();
+  }, [isWindyLoaded]);
 
   // GESTION DES CALQUES WINDY (MAILLAGE STRICT)
   const handleLayerChange = useCallback((layerId: string) => {
@@ -365,6 +393,15 @@ export default function VesselTrackerPage() {
     } catch (e) { toast({ variant: 'destructive', title: "Erreur sauvegarde" }); }
   };
 
+  const sendEmergencySms = (type: string) => {
+    if (!emergencyContact) {
+        toast({ variant: 'destructive', title: "Numéro manquant", description: "Renseignez un contact d'urgence dans les réglages." });
+        return;
+    }
+    const body = `${type} - ${smsPreview}`;
+    window.location.href = `sms:${emergencyContact}?body=${encodeURIComponent(body)}`;
+  };
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       <div className="w-full bg-slate-900 text-white rounded-2xl p-4 shadow-xl border border-white/10 relative overflow-hidden">
@@ -395,15 +432,8 @@ export default function VesselTrackerPage() {
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden transition-all bg-slate-950", isFullscreen ? "fixed inset-0 z-[150] h-screen w-screen rounded-none" : "h-[600px]")}>
         
-        {!isGoogleLoaded && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-50 bg-slate-950">
-                <Loader2 className="size-12 text-primary animate-spin" />
-                <p className="font-black uppercase text-[10px] text-white/40 tracking-[0.2em]">Initialisation des systèmes...</p>
-            </div>
-        )}
-
-        <div className={cn("absolute inset-0 z-0 transition-opacity duration-500", viewMode === 'windy' ? "opacity-0" : "opacity-100")}>
-            {isGoogleLoaded && (
+        <div className={cn("absolute inset-0 z-0 transition-opacity duration-500", viewMode === 'windy' ? "opacity-0 pointer-events-none" : "opacity-100")}>
+            {isGoogleLoaded ? (
                 <GoogleMap
                     mapContainerClassName="w-full h-full"
                     defaultCenter={INITIAL_CENTER}
@@ -425,14 +455,14 @@ export default function VesselTrackerPage() {
                         <OverlayView key={v.id} position={{ lat: v.location.latitude, lng: v.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                             <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
                                 <div className="px-2 py-1 bg-slate-900/90 text-white rounded text-[9px] font-black shadow-lg border border-white/20 whitespace-nowrap">
-                                    {v.displayName || v.id} | {v.status === 'moving' ? 'MOUV' : 'MOUIL'}
+                                    {v.displayName || v.id}
                                 </div>
                                 <div className="p-1.5 rounded-full bg-primary border-2 border-white shadow-xl"><Navigation className="size-4 text-white" /></div>
                             </div>
                         </OverlayView>
                     ))}
                 </GoogleMap>
-            )}
+            ) : <Skeleton className="h-full w-full" />}
         </div>
 
         <div 
@@ -468,7 +498,12 @@ export default function VesselTrackerPage() {
                     const nextMode = viewMode === 'google' ? 'windy' : 'google';
                     setViewMode(nextMode);
                     setIsOverlayActive(false);
-                    if (nextMode === 'windy' && !isWindyLoaded) initWindy();
+                    if (nextMode === 'windy') {
+                        setGoogleMap(null); // Nettoyage partiel
+                        if (!isWindyLoaded) initWindy();
+                    } else {
+                        setWindyMap(null); // Nettoyage partiel
+                    }
                 }}
                 className={cn("h-12 px-4 border-2 font-black uppercase text-[10px] shadow-2xl rounded-xl gap-2 backdrop-blur-md", viewMode === 'windy' ? "bg-blue-600 text-white border-white" : "bg-slate-900/80 text-white border-white/20")}
             >
@@ -520,7 +555,7 @@ export default function VesselTrackerPage() {
 
             <div className="space-y-4">
                 {isSharing ? (
-                    <Button variant="destructive" className="w-full h-16 font-black uppercase shadow-xl rounded-2xl border-4 border-white/20 gap-3" onClick={() => setIsSharing(false)}>
+                    <Button variant="destructive" className="w-full h-16 font-black uppercase shadow-xl rounded-2xl border-4 border-white/20 gap-3" onClick={handleStopSharing}>
                         <X className="size-6" /> ARRÊTER LE PARTAGE
                     </Button>
                 ) : (
@@ -534,7 +569,7 @@ export default function VesselTrackerPage() {
         <Card className="border-2 shadow-sm overflow-hidden h-full">
             <CardHeader className="p-4 border-b bg-muted/5 flex-row items-center justify-between">
                 <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><HistoryIcon className="size-3" /> Logs de navigation</CardTitle>
-                <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black text-destructive" onClick={() => setTechnicalLogs([])}><Trash2 className="size-3 mr-1" /> Effacer</Button>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={() => setTechnicalLogs([])}><Trash2 className="size-3 mr-1" /> Effacer</Button>
             </CardHeader>
             <CardContent className="p-0">
                 <ScrollArea className="h-64">
