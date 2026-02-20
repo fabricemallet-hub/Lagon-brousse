@@ -2,11 +2,11 @@
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Version 5.8 : Conformité totale au protocole JSON v2 (Typage Strict + Body Key).
+ * Version 6.0 : Conformité totale au protocole JSON v2 (Typage Strict + Body Key + Referer Strict).
  */
 
 export async function fetchWindyWeather(lat: number, lon: number) {
-  // Clé Point Forecast (Spécifique aux données au point)
+  // Clé Point Forecast
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
@@ -15,7 +15,6 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   
   try {
     // PILIER 1 : TYPAGE NUMÉRIQUE STRICT
-    // On force la conversion en nombre pour éviter le rejet 400 (Bad Request)
     const cleanLat = Number(Number(lat).toFixed(6));
     const cleanLon = Number(Number(lon).toFixed(6));
 
@@ -35,7 +34,6 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       key: API_KEY
     };
 
-    // Log diagnostic serveur
     console.log("[Windy API v2] Payload envoi :", JSON.stringify(requestBody));
 
     const response = await fetch(url, {
@@ -65,7 +63,6 @@ export async function fetchWindyWeather(lat: number, lon: number) {
 
     const data = await response.json();
     
-    // Extraction des premières valeurs (index 0)
     const windRaw = data.wind?.[0] ?? 0;
     const tempK = data.temp?.[0] ?? 273.15;
     const wavesM = data.waves?.[0] ?? 0;

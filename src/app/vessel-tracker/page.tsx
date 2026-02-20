@@ -27,6 +27,7 @@ import {
   Waves,
   Thermometer,
   Eye,
+  EyeOff,
   Info
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
@@ -42,11 +43,18 @@ export default function VesselTrackerPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  // --- 1. CONSTANTES TACTIQUES (Fix labels ReferenceError) ---
+  // --- 1. ÉTATS DE CHARGEMENT DES SCRIPTS ---
+  const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
+  const [isWindyLoaded, setIsWindyLoaded] = useState(false);
+
+  // --- 2. CONSTANTES TACTIQUES ---
   const labels = useMemo(() => ({
     status1: "Au Mouillage",
     status2: "En Route",
-    title: "Boat Tracker"
+    title: "Boat Tracker",
+    alertBtn: "SIGNALER POISSON",
+    alertTitle: "POISSON SIGNALÉ !",
+    alertDesc: "Poisson repéré !"
   }), []);
 
   const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
@@ -84,9 +92,12 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // --- 2. INITIALISATION WINDY MAP (v5.8) ---
+  // --- 3. INITIALISATION WINDY MAP (Fix L is not defined) ---
   const initWindy = useCallback(() => {
-    if (typeof window === 'undefined' || !(window as any).windyInit || isMapInitializedRef.current) return;
+    // SÉCURITÉ CRITIQUE : Vérifier que Leaflet (window.L) et Windy (window.windyInit) sont prêts
+    if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) {
+        return;
+    }
 
     console.log("[Windy Init] Authentification origine :", window.location.origin);
 
@@ -98,12 +109,12 @@ export default function VesselTrackerPage() {
     };
 
     try {
-        (window as any).windyInit(options, (windyAPI: any) => {
+        window.windyInit(options, (windyAPI: any) => {
           const { map, picker } = windyAPI;
           mapRef.current = map;
           isMapInitializedRef.current = true;
 
-          // Forced Reflow Optimization : Redessin différé
+          // Forced Reflow Optimization : Redessin différé pour ne pas bloquer le thread
           setTimeout(() => {
             if (mapRef.current) mapRef.current.invalidateSize();
           }, 500);
@@ -135,22 +146,22 @@ export default function VesselTrackerPage() {
           });
         });
     } catch (e) {
-        console.error("[Windy Auth Error] 401 Unauthorized");
+        console.error("[Windy Auth Error] Échec authentification");
         console.error("[Windy Auth] ORIGINE À AUTORISER :", window.location.origin);
     }
   }, []);
 
+  // Déclencher l'init quand les deux scripts sont prêts
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).windyInit) {
+    if (isLeafletLoaded && isWindyLoaded) {
         initWindy();
     }
-  }, [initWindy]);
+  }, [isLeafletLoaded, isWindyLoaded, initWindy]);
 
   // Synchronisation des marqueurs Leaflet
   useEffect(() => {
-    if (!mapRef.current || !followedVessels || typeof window === 'undefined') return;
-    const L = (window as any).L;
-    if (!L) return;
+    if (!mapRef.current || !followedVessels || typeof window === 'undefined' || !window.L) return;
+    const L = window.L;
 
     followedVessels.forEach(v => {
       if (!v.location || !v.isSharing) {
@@ -196,7 +207,7 @@ export default function VesselTrackerPage() {
     });
   }, [followedVessels, labels]);
 
-  // --- 3. MOTEUR GPS AVEC THROTTLING 5S (Fix Violations) ---
+  // --- 4. MOTEUR GPS AVEC THROTTLING 5S (Fix Violations) ---
   const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
     const now = Date.now();
     if (now - lastUpdateTimestampRef.current < 5000) return;
@@ -272,12 +283,25 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      <Script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" strategy="afterInteractive" crossOrigin="anonymous" />
+      {/* CHARGEMENT SÉQUENTIEL DES DÉPENDANCES */}
       <Script 
-        src="https://api.windy.com/assets/map-forecast/libBoot.js" 
+        src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" 
+        id="leaflet-src"
         strategy="afterInteractive" 
         crossOrigin="anonymous" 
-        onLoad={initWindy} 
+        onLoad={() => {
+            console.log("[Script] Leaflet v1.4.0 chargé.");
+            setIsLeafletLoaded(true);
+        }}
+      />
+      <Script 
+        src="https://api.windy.com/assets/map-forecast/libBoot.js" 
+        strategy="lazyOnload" 
+        crossOrigin="anonymous" 
+        onLoad={() => {
+            console.log("[Script] Windy libBoot chargé.");
+            setIsWindyLoaded(true);
+        }}
       />
 
       <Card className="border-2 shadow-sm overflow-hidden">
@@ -310,7 +334,7 @@ export default function VesselTrackerPage() {
         <div 
             id="windy" 
             className="absolute inset-0 w-full h-full z-10"
-            style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+            style={{ minHeight: isFullscreen ? '100vh' : '500px' }}
         >
           {mapClickResult && (
             <div 
@@ -354,7 +378,6 @@ export default function VesselTrackerPage() {
         </div>
       </Card>
 
-      {/* Remplacement Alert (ReferenceError fix) par div stylisée */}
       <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 flex gap-3 shadow-sm">
           <Info className="size-5 text-primary shrink-0" />
           <div className="space-y-1">
