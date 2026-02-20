@@ -1,18 +1,75 @@
 
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Globe, ShieldAlert, CheckCircle2, Copy, RefreshCw, XCircle, Search, Filter, LocateFixed } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where } from 'firebase/firestore';
+import { GoogleMap, OverlayView } from '@react-google-maps/api';
+import { useGoogleMaps } from '@/context/google-maps-context';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  Navigation, 
+  Anchor, 
+  LocateFixed, 
+  ShieldAlert, 
+  Save, 
+  WifiOff, 
+  Move, 
+  Expand, 
+  Shrink, 
+  Zap, 
+  AlertTriangle,
+  Bell,
+  BatteryFull,
+  BatteryMedium,
+  BatteryLow,
+  BatteryCharging,
+  History as HistoryIcon,
+  MapPin,
+  ChevronDown,
+  X,
+  Play,
+  Volume2,
+  Check,
+  Trash2,
+  Ship,
+  Home,
+  RefreshCw,
+  Settings,
+  Battery,
+  MessageSquare,
+  Eye,
+  Smartphone,
+  Phone,
+  Waves,
+  Globe,
+  Search,
+  Filter,
+  XCircle,
+  CheckCircle2,
+  Copy
+} from 'lucide-react';
+import { cn, getDistance } from '@/lib/utils';
+import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const MAP_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 
 export default function VesselTrackerPage() {
-  // --- DÉFINITION DES FONCTIONS CRITIQUES POUR ÉVITER LES REFERENCEERROR ---
+  // --- DÉFINITION DES FONCTIONS DE RECENTREMENT ---
   const handleRecenter = useCallback(() => {
     console.log('Action: Recenter triggered');
   }, []);
@@ -46,7 +103,7 @@ export default function VesselTrackerPage() {
         script.id = id;
         script.src = src;
         script.async = true;
-        script.referrerPolicy = 'unsafe-url';
+        script.referrerPolicy = 'no-referrer-when-downgrade';
         script.onload = () => resolve();
         script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
         document.head.appendChild(script);
@@ -55,31 +112,27 @@ export default function VesselTrackerPage() {
 
     const init = async () => {
       try {
-        // Injection forcée de la Referrer Policy dans le document
+        // Politique de referrer pour autoriser Studio
         let meta = document.querySelector('meta[name="referrer"]') as HTMLMetaElement;
         if (!meta) {
           meta = document.createElement('meta');
           meta.name = "referrer";
           document.head.appendChild(meta);
         }
-        meta.content = "unsafe-url";
+        meta.content = "no-referrer-when-downgrade";
 
-        // INTERCEPTION console.error pour éviter le crash fatal de Next.js
+        // Interception console.error Windy (Fix Next.js crash Overlay)
         const originalConsoleError = console.error;
         console.error = (...args) => {
           if (args[0] && typeof args[0] === 'string' && args[0].includes('Windy API key')) {
-            setError("401 Unauthorized - La clé a été rejetée par Windy.");
+            setError("401 Unauthorized - La clé a été rejetée.");
             return;
           }
           originalConsoleError.apply(console, args);
         };
 
-        // Chargement séquentiel
         await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
-        
-        // Configuration globale requise par Windy
         (window as any).W = { apiKey: MAP_KEY };
-
         await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
 
         if (!(window as any).windyInit) {
@@ -94,7 +147,6 @@ export default function VesselTrackerPage() {
           zoom: 7,
         };
 
-        // Lancement de l'initialisation
         (window as any).windyInit(options, (windyAPI: any) => {
           if (!windyAPI) {
             setError("401 Unauthorized - Échec de validation du domaine par Windy.");
@@ -108,15 +160,11 @@ export default function VesselTrackerPage() {
       }
     };
 
-    // Délai pour laisser le temps aux politiques de se stabiliser
     const timer = setTimeout(init, 1000);
     return () => {
         clearTimeout(timer);
-        if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     };
   }, []);
-
-  const watchIdRef = React.useRef<number | null>(null);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -128,9 +176,9 @@ export default function VesselTrackerPage() {
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2">
-            <Globe className="text-primary" /> Boat Tracker v18.1
+            <Globe className="text-primary" /> Boat Tracker v18.2
           </h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Test d'authentification et diagnostic</p>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Surveillance & Diagnostic</p>
         </div>
         {isInitialized ? (
           <Badge className="bg-green-600 text-white font-black px-3 py-1">AUTH VALIDÉE</Badge>
@@ -182,11 +230,11 @@ export default function VesselTrackerPage() {
 
               <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-3">
                 <p className="text-[10px] font-black uppercase text-blue-800 flex items-center gap-2">
-                  <CheckCircle2 className="size-3" /> Solution :
+                  <CheckCircle2 className="size-3" /> Action Requise :
                 </p>
                 <ol className="text-[11px] space-y-2 list-decimal list-inside text-slate-700 font-medium">
                   <li>Allez sur <a href="https://api.windy.com/keys" target="_blank" className="underline font-black text-blue-600">votre console Windy</a>.</li>
-                  <li>Ajoutez l'<strong>Hôte</strong> et l'<strong>Origine</strong> ci-dessus aux restrictions de votre clé.</li>
+                  <li>Ajoutez l'<strong>Hôte</strong> et l'<strong>Origine</strong> ci-dessus à votre clé.</li>
                 </ol>
               </div>
             </AlertDescription>
@@ -194,10 +242,7 @@ export default function VesselTrackerPage() {
         </div>
       )}
 
-      {/* 
-          FIX removeChild: Le loader est un FRÈRE du div#windy. 
-          React ne touchera jamais aux enfants de #windy une fois créé.
-      */}
+      {/* FIX removeChild : Le loader est un FRÈRE du div#windy pour ne pas perturber React */}
       <div className="relative w-full h-[500px] rounded-[2.5rem] border-4 shadow-2xl overflow-hidden group">
         <div 
           id="windy" 
