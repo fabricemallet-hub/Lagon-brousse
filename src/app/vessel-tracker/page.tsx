@@ -162,10 +162,8 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
-            // Étape 1 : Charger Leaflet
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
-            // Attendre que l'objet L soit réellement disponible
             let retries = 0;
             while (!(window as any).L && retries < 50) { 
                 await new Promise(r => setTimeout(r, 100)); 
@@ -174,7 +172,6 @@ export default function VesselTrackerPage() {
             
             if (!(window as any).L) throw new Error("Leaflet non trouvé après attente.");
 
-            // Étape 2 : Charger Windy seulement après Leaflet
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const options = {
@@ -229,7 +226,6 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     const timer = setTimeout(initWindy, 1000);
-    // Panneau de secours si chargement bloqué
     const diagTimer = setTimeout(() => {
         if (!mapRef.current) setAuthError(window.location.host);
     }, 6000);
