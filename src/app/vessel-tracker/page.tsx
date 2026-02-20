@@ -46,7 +46,9 @@ import {
   AlertTriangle,
   Move,
   Wind,
-  WifiOff
+  WifiOff,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -96,10 +98,12 @@ export default function VesselTrackerPage() {
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status'] | 'offline'>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
+  // RÉFÉRENCES TECHNIQUES POUR LA PERFORMANCE (Stabilité & Throttling)
   const currentPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const anchorPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const statusRef = useRef<VesselStatus['status'] | 'offline'>('moving');
   const watchIdRef = useRef<number | null>(null);
+  const lastUpdateTimestampRef = useRef<number>(0);
   const lastWeatherUpdateRef = useRef<number>(0);
   const [isForcingWindy, setIsForcingWindy] = useState(false);
 
@@ -143,9 +147,20 @@ export default function VesselTrackerPage() {
     }
   }, [userProfile, isSharing]);
 
-  const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>) => {
+  /**
+   * MISE À JOUR FIRESTORE AVEC THROTTLING (Optimisation Performance)
+   * On limite les écritures et les re-rendus à une fois toutes les 5 secondes.
+   */
+  const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
     if (!user || !firestore || !sharingId) return;
     
+    const now = Date.now();
+    // Throttling : On ne met à jour que toutes les 5s, sauf si 'force' est vrai (ex: SOS ou Changement Statut)
+    if (!force && (now - lastUpdateTimestampRef.current < 5000)) {
+        return;
+    }
+    lastUpdateTimestampRef.current = now;
+
     let batteryInfo: any = {};
     if ('getBattery' in navigator) {
         try {
@@ -178,7 +193,6 @@ export default function VesselTrackerPage() {
     }
 
     // Auto-update Windy every 3h
-    const now = Date.now();
     if ((now - lastWeatherUpdateRef.current > 3 * 3600 * 1000) && pos) {
         try {
             const weather = await fetchWindyWeather(pos.lat, pos.lng);
@@ -217,11 +231,11 @@ export default function VesselTrackerPage() {
                 windDir: weather.windDir,
                 wavesHeight: weather.wavesHeight,
                 lastWeatherUpdate: serverTimestamp()
-            });
+            }, true);
             lastWeatherUpdateRef.current = Date.now();
-            toast({ title: "Diagnostic OK (200)", description: `Vent: ${weather.windSpeed}nd | Mer: ${weather.wavesHeight}m` });
+            toast({ title: "Communication OK (200)", description: `Vent: ${weather.windSpeed}nd | Mer: ${weather.wavesHeight}m` });
         } else {
-            toast({ variant: "destructive", title: "Erreur Diagnostic", description: `${weather.error} (Status: ${weather.status})` });
+            toast({ variant: "destructive", title: `Erreur ${weather.status}`, description: weather.error });
         }
     } catch (e) {
         toast({ variant: "destructive", title: "Échec critique", description: "Vérifiez Referer & restrictions." });
@@ -297,7 +311,7 @@ export default function VesselTrackerPage() {
         anchorPosRef.current = null;
     }
 
-    updateVesselInFirestore(updates);
+    updateVesselInFirestore(updates, true);
     addToTechnicalLog(label);
     toast({ title: label });
   };
@@ -306,17 +320,28 @@ export default function VesselTrackerPage() {
     setMap(mapInstance);
   }, []);
 
+  /**
+   * CYCLE GPS OPTIMISÉ (v3.9)
+   * On utilise une seule instance de watchPosition pour éviter les violations de thread.
+   */
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
+      if (watchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(watchIdRef.current);
+          watchIdRef.current = null;
+      }
       return;
     }
+
+    // Protection contre les relancements multiples
+    if (watchIdRef.current !== null) return;
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         const newPos = { lat: latitude, lng: longitude };
+        
+        // Filtre de précision minimale (500m) pour éviter les sauts GPS
         if (accuracy > 500) return;
 
         currentPosRef.current = newPos;
@@ -327,29 +352,37 @@ export default function VesselTrackerPage() {
             if (!anchorPosRef.current) {
                 anchorPosRef.current = newPos;
                 setAnchorPos(newPos);
-                updateVesselInFirestore({ location: { latitude, longitude }, status: 'moving', accuracy: Math.round(accuracy) });
-                addToTechnicalLog("EN MOUVEMENT");
+                updateVesselInFirestore({ location: { latitude, longitude }, status: 'moving', accuracy: Math.round(accuracy) }, true);
+                addToTechnicalLog("DÉMARRAGE GPS");
             } else {
                 const distFromAnchor = getDistance(latitude, longitude, anchorPosRef.current.lat, anchorPosRef.current.lng);
+                
+                // Sortie de mouillage automatique (si > 100m)
                 if (distFromAnchor > 100) {
                     statusRef.current = 'moving';
                     setVesselStatus('moving');
                     anchorPosRef.current = null;
                     setAnchorPos(null);
-                    updateVesselInFirestore({ location: { latitude, longitude }, status: 'moving', eventLabel: null, accuracy: Math.round(accuracy) });
-                    addToTechnicalLog("EN MOUVEMENT");
-                } else if (distFromAnchor > mooringRadius) {
+                    updateVesselInFirestore({ location: { latitude, longitude }, status: 'moving', eventLabel: null, accuracy: Math.round(accuracy) }, true);
+                    addToTechnicalLog("SORTIE DE MOUILLAGE");
+                } 
+                // Dérive détectée (si entre rayon et 100m)
+                else if (distFromAnchor > mooringRadius) {
                     if (statusRef.current !== 'drifting') {
                         statusRef.current = 'drifting';
                         setVesselStatus('drifting');
-                        updateVesselInFirestore({ location: { latitude, longitude }, status: 'drifting', eventLabel: 'À LA DÉRIVE !' });
-                        addToTechnicalLog("À LA DÉRIVE !");
+                        updateVesselInFirestore({ location: { latitude, longitude }, status: 'drifting', eventLabel: 'À LA DÉRIVE !' }, true);
+                        addToTechnicalLog("ALERTE DÉRIVE !");
+                    } else {
+                        updateVesselInFirestore({ location: { latitude, longitude }, accuracy: Math.round(accuracy) });
                     }
-                } else {
+                } 
+                // Immobilité confirmée
+                else {
                     if (statusRef.current !== 'stationary') {
                         statusRef.current = 'stationary';
                         setVesselStatus('stationary');
-                        updateVesselInFirestore({ location: { latitude, longitude }, status: 'stationary', eventLabel: 'AU MOUILLAGE' });
+                        updateVesselInFirestore({ location: { latitude, longitude }, status: 'stationary', eventLabel: 'AU MOUILLAGE' }, true);
                         addToTechnicalLog("AU MOUILLAGE");
                     } else {
                         updateVesselInFirestore({ location: { latitude, longitude }, accuracy: Math.round(accuracy) });
@@ -360,11 +393,16 @@ export default function VesselTrackerPage() {
             updateVesselInFirestore({ location: { latitude, longitude }, accuracy: Math.round(accuracy) });
         }
       },
-      (err) => console.error(err),
+      (err) => console.error("[GPS Error]", err),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
 
-    return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
+    return () => { 
+        if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current); 
+            watchIdRef.current = null;
+        }
+    };
   }, [isSharing, mode, sharingId, mooringRadius, updateVesselInFirestore, addToTechnicalLog]);
 
   const getVesselIconInfo = (status: string) => {
@@ -388,7 +426,7 @@ export default function VesselTrackerPage() {
         time: format(new Date(), 'HH:mm'),
         label: type
     };
-    updateVesselInFirestore({ huntingMarkers: arrayUnion(marker) });
+    updateVesselInFirestore({ huntingMarkers: arrayUnion(marker) }, true);
     toast({ title: `${type} signalé !` });
   };
 
@@ -500,7 +538,7 @@ export default function VesselTrackerPage() {
                 <AccordionItem value="test-pont" className="border-none mt-2">
                     <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-slate-100 rounded-xl">
                         <Zap className="size-4 text-slate-600" />
-                        <span className="text-[10px] font-black uppercase">Pont de Test (Admin)</span>
+                        <span className="text-[10px] font-black uppercase">Pont de Test (Diagnostic)</span>
                     </AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-3">
                         <div className="grid grid-cols-2 gap-2">
@@ -595,7 +633,11 @@ export default function VesselTrackerPage() {
                                           <div className={cn("size-24 rounded-full border-8 border-white shadow-2xl transition-opacity flex items-center justify-center opacity-60", statusInfo.color)}>
                                               {React.createElement(statusInfo.icon, { className: "size-12 text-white drop-shadow-md" })}
                                           </div>
-                                          {isMe && mode === 'sender' && <PulsingDot />}
+                                          {isMe && mode === 'sender' && (
+                                              <div className="absolute z-[100]">
+                                                  <PulsingDot />
+                                              </div>
+                                          )}
                                       </div>
 
                                       {/* BOTTOM STACK: BATTERY, ALERTS, WINDY */}

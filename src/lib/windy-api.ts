@@ -3,17 +3,18 @@
 
 /**
  * Service de récupération météo via Windy Point Forecast API.
- * Récupère le vent (vitesse/direction) et la houle.
+ * Optimisé pour la Version 2 - Fix Erreur 400
  */
 export async function fetchWindyWeather(lat: number, lon: number) {
   // CLÉ API WINDY
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
-  // REFERER : Doit correspondre EXACTEMENT à l'identifiant saisi dans la console Windy
-  const projectReferer = 'https://studio.firebase.google.com/project/studio-2943478321-f746e';
+  // DOMAINE DE PRODUCTION AUTORISÉ
+  const prodDomain = 'https://studio-2943478321-f746e.web.app';
 
   try {
+    // FORMATAGE STRICT : Windy V2 exige des Numbers (pas de Strings)
     const cleanLat = Number(lat.toFixed(6));
     const cleanLon = Number(lon.toFixed(6));
 
@@ -21,7 +22,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
         throw new Error("Coordonnées GPS invalides");
     }
 
-    // Payload STRICT pour Windy V2
+    // Payload MINIMALISTE pour Windy V2 (Évite l'erreur 400 due à des champs superflus)
     const requestBody = {
       lat: cleanLat,
       lon: cleanLon,
@@ -30,29 +31,35 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       levels: ['surface']
     };
 
-    console.log(`[Windy API] Requête vers ${url}`);
-    console.log(`[Windy API] Payload:`, JSON.stringify(requestBody));
+    console.log(`[Windy Diagnostic] Envoi vers ${url}`);
+    console.log(`[Windy Diagnostic] Body:`, JSON.stringify(requestBody));
     
     const response = await fetch(url, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'x-windy-api-key': API_KEY,
-        'Referer': projectReferer
+        'Referer': prodDomain,
+        'Origin': prodDomain
       },
       body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[Windy API] Erreur ${response.status}:`, errorText);
-        return { success: false, error: `Erreur Windy ${response.status}`, status: response.status };
+        console.error(`[Windy Error] Status: ${response.status}`, errorText);
+        return { 
+            success: false, 
+            error: `Windy ${response.status}`, 
+            status: response.status,
+            details: errorText 
+        };
     }
 
     const data = await response.json();
-    console.log("[Windy API] Données reçues");
     
     return {
+      // Conversion m/s en Noeuds (nds)
       windSpeed: data.wind?.[0] !== undefined ? Math.round(data.wind[0] * 1.94384) : 0,
       windDir: data.windDir?.[0] || 0,
       wavesHeight: data.waves?.[0] || 0,
@@ -60,7 +67,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       status: 200
     };
   } catch (error: any) {
-    console.error("[Windy API] Échec critique fetch:", error);
-    return { success: false, error: error.message || "Erreur technique", status: 500 };
+    console.error("[Windy Critical] Fetch failure:", error);
+    return { success: false, error: error.message || "Network Error", status: 500 };
   }
 }
