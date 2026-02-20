@@ -87,7 +87,9 @@ import {
   Thermometer,
   CloudRain,
   Lock,
-  Unlock
+  Unlock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -110,13 +112,14 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
 
 const WINDY_LAYERS = [
     { id: 'wind', icon: Wind, label: 'Vent' },
-    { id: 'radar', icon: Radio, label: 'Radar' },
+    { id: 'radarHistory', icon: Radio, label: 'Radar' },
     { id: 'gust', icon: Wind, label: 'Rafales' },
     { id: 'temp', icon: Thermometer, label: 'Temp.' },
     { id: 'rain', icon: CloudRain, label: 'Pluie' },
     { id: 'waves', icon: Waves, label: 'Houle' },
     { id: 'pressure', icon: Activity, label: 'Pression' },
     { id: 'uv', icon: Sun, label: 'UV' },
+    { id: 'satellite', icon: Globe, label: 'Satellite' },
 ];
 
 export default function VesselTrackerPage() {
@@ -197,30 +200,31 @@ export default function VesselTrackerPage() {
   const lastStatusesRef = useRef<Record<string, string>>({});
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  // GESTION DU CALQUE AVEC OPTIMISATION PRODUCT (RAFALES)
   const handleLayerChange = useCallback((layerId: string) => {
-    if (!(window as any).W) return;
-    const store = (window as any).W.store;
+    if (!layerId || !(window as any).W) return;
     
-    if (layerId === 'gust') {
-        store.set('overlay', 'wind');
-        store.set('product', 'gust');
-    } else {
-        store.set('overlay', layerId);
-        // Si on quitte les rafales, Windy gère généralement le reset du produit, 
-        // mais on peut forcer le produit par défaut si nécessaire
-    }
-    
-    setActiveOverlay(layerId);
-    setIsLayersOpen(false);
-    toast({ title: `Calque : ${layerId.toUpperCase()}` });
+    // Defer processing to keep UI responsive
+    setTimeout(() => {
+        try {
+            const store = (window as any).W.store;
+            if (layerId === 'gust') {
+                store.set('overlay', 'wind');
+                store.set('product', 'gust');
+            } else {
+                store.set('overlay', layerId);
+            }
+            setActiveOverlay(layerId);
+            setIsLayersOpen(false);
+            toast({ title: `Activation : ${layerId.toUpperCase()}` });
+        } catch (e) {
+            console.error("Windy Layer Error:", e);
+            toast({ variant: 'destructive', title: "Erreur Calque", description: "Impossible d'activer cette couche." });
+        }
+    }, 0);
   }, [toast]);
 
   const toggleSatellite = () => {
-    if (!(window as any).W) return;
-    const store = (window as any).W.store;
-    const current = store.get('overlay');
-    const next = current === 'radar' ? 'wind' : 'radar';
+    const next = activeOverlay === 'satellite' ? 'wind' : 'satellite';
     handleLayerChange(next);
   };
 
@@ -354,8 +358,7 @@ export default function VesselTrackerPage() {
                   picker.on('pickerClosed', () => setPickerData(null));
                 });
             } catch (initErr) {
-                console.error("Windy Critical Init Error:", initErr);
-                toast({ variant: 'destructive', title: "Erreur Carte", description: "Impossible d'initialiser Windy." });
+                console.error("Windy Init Error:", initErr);
             }
           }
         }, 200);
@@ -364,17 +367,13 @@ export default function VesselTrackerPage() {
     initMap();
   }, [toast]);
 
-  // OPTIMISATION : Ecouteurs d'événements passifs sur le conteneur de la carte
   useEffect(() => {
     const el = mapContainerRef.current;
     if (!el) return;
-    
-    const options = { passive: true };
+    const opt = { passive: true };
     const noop = () => {};
-    
-    el.addEventListener('wheel', noop, options);
-    el.addEventListener('touchstart', noop, options);
-    
+    el.addEventListener('wheel', noop, opt);
+    el.addEventListener('touchstart', noop, opt);
     return () => {
         el.removeEventListener('wheel', noop);
         el.removeEventListener('touchstart', noop);
@@ -429,12 +428,11 @@ export default function VesselTrackerPage() {
 
     followedVessels.forEach(vessel => {
         const isOffline = (Date.now() - (vessel.lastActive?.toMillis() || 0)) > 70000;
-        const currentStatus = isOffline ? 'OFFLINE' : (vessel.status === 'emergency' ? 'SOS' : vessel.status === 'stationary' ? 'MOUIL' : 'MOUV');
+        const currentStatusLabel = isOffline ? 'OFFLINE' : (vessel.status === 'emergency' ? 'SOS' : vessel.status === 'stationary' ? 'MOUIL' : 'MOUV');
         
         if (!vessel.isSharing || isOffline) {
             if (mapMarkersRef.current[vessel.id]) {
                 map.removeLayer(mapMarkersRef.current[vessel.id].marker);
-                if (mapMarkersRef.current[vessel.id].circle) map.removeLayer(mapMarkersRef.current[vessel.id].circle);
                 delete mapMarkersRef.current[vessel.id];
             }
             return;
@@ -446,7 +444,7 @@ export default function VesselTrackerPage() {
         const iconHtml = `
             <div class="flex flex-col items-center gap-1">
                 <div class="bg-slate-900/90 text-white px-2 py-1 rounded text-[10px] font-black shadow-2xl border border-white/20 flex flex-col items-center backdrop-blur-md">
-                    <span>${vessel.displayName} | ${currentStatus}</span>
+                    <span>${vessel.displayName} | ${currentStatusLabel}</span>
                     <span class="text-[8px] flex items-center gap-1 opacity-70">
                         ${vessel.batteryLevel ?? 100}% ${vessel.isCharging ? '⚡' : ''}
                     </span>
@@ -466,19 +464,18 @@ export default function VesselTrackerPage() {
             entry.marker.setIcon(L.divIcon({ html: iconHtml, className: '', iconSize: [60, 80], iconAnchor: [30, 80] }));
         }
 
-        // Journal technique
         const lastStatus = lastStatusesRef.current[vessel.id];
-        if (lastStatus && lastStatus !== currentStatus) {
+        if (lastStatus && lastStatus !== currentStatusLabel) {
             setTechnicalLogs(prev => [{
                 vesselName: vessel.displayName || vessel.id,
-                statusLabel: currentStatus,
+                statusLabel: currentStatusLabel,
                 time: new Date(),
                 pos: vessel.location ? { lat: vessel.location.latitude, lng: vessel.location.longitude } : INITIAL_CENTER,
                 batteryLevel: vessel.batteryLevel,
                 isCharging: vessel.isCharging
             }, ...prev].slice(0, 50));
         }
-        lastStatusesRef.current[vessel.id] = currentStatus;
+        lastStatusesRef.current[vessel.id] = currentStatusLabel;
     });
   }, [map, followedVessels]);
 
@@ -512,7 +509,7 @@ export default function VesselTrackerPage() {
       <header className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2"><Globe className="text-primary" /> Cockpit Navigation</h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Pilot Interface v22.2</p>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Pilot Interface v22.3</p>
         </div>
         <div className="flex bg-slate-900/10 p-1 rounded-xl border-2">
           <Button variant={mode === 'sender' ? 'default' : 'ghost'} size="sm" className="font-black uppercase text-[9px] h-8 px-3" onClick={() => setMode('sender')}>Émetteur (A)</Button>
@@ -531,7 +528,7 @@ export default function VesselTrackerPage() {
                           <p className="text-xl font-black tracking-tighter">{currentSpeed} <span className="text-[10px] opacity-60">Kts</span></p>
                           <div className="h-4 w-px bg-white/20" />
                           <p className="text-[10px] font-mono text-slate-400">
-                              {currentPos ? `${currentPos.lat.toFixed(4)}°S / ${currentPos.lng.toFixed(4)}°E` : 'RECHERCHE GPS...'}
+                              {currentPos ? `${currentPos.lat.toFixed(4)}°S / ${currentPos.lng.toFixed(4)}°E` : 'GPS...'}
                           </p>
                       </div>
                   </div>
@@ -550,7 +547,7 @@ export default function VesselTrackerPage() {
         <div id="windy" className="w-full h-full"></div>
         <div className={cn("absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 bg-slate-950 transition-opacity z-10", isInitialized ? "opacity-0 invisible pointer-events-none" : "opacity-100 visible")}>
             <RefreshCw className="size-10 animate-spin text-primary/40" />
-            <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Chargement Windy...</p>
+            <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Initialisation Système...</p>
         </div>
         
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-[160]">
@@ -571,8 +568,8 @@ export default function VesselTrackerPage() {
             <div className="mt-4 flex flex-col gap-2">
                 <Button size="icon" className="bg-white/90 border-2 h-10 w-10 shadow-xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5 text-primary" /> : <Expand className="size-5 text-primary" />}</Button>
                 
-                <Button size="icon" className={cn("bg-white border-2 h-10 w-10 shadow-xl", activeOverlay === 'radar' ? "border-primary bg-primary/10" : "border-slate-200")} onClick={toggleSatellite}>
-                    <Globe className={cn("size-5", activeOverlay === 'radar' ? "text-primary" : "text-slate-400")} />
+                <Button size="icon" className={cn("bg-white border-2 h-10 w-10 shadow-xl", activeOverlay === 'satellite' ? "border-primary bg-primary/10" : "border-slate-200")} onClick={toggleSatellite}>
+                    <Globe className={cn("size-5", activeOverlay === 'satellite' ? "text-primary" : "text-slate-400")} />
                 </Button>
 
                 <Button size="icon" className={cn("bg-white border-2 h-10 w-10 shadow-xl", isFollowMode ? "border-blue-500 bg-blue-50" : "border-slate-200")} onClick={() => setIsFollowMode(!isFollowMode)}>
@@ -594,13 +591,13 @@ export default function VesselTrackerPage() {
                     <CardHeader className="p-4 border-b border-white/10 flex flex-row items-center justify-between space-y-0">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-primary/20 rounded-lg"><Target className="size-4 text-primary" /></div>
-                            <div><CardTitle className="text-xs font-black uppercase tracking-widest">INFO POINT</CardTitle><CardDescription className="text-[8px] font-bold text-slate-400 uppercase">Données locales</CardDescription></div>
+                            <div><CardTitle className="text-xs font-black uppercase tracking-widest">INFO POINT</CardTitle><CardDescription className="text-[8px] font-bold text-slate-400 uppercase">Analyse locale</CardDescription></div>
                         </div>
                         <button onClick={() => (window as any).W.picker.close()} className="p-1.5 hover:bg-white/10 rounded-full"><X className="size-4" /></button>
                     </CardHeader>
                     <CardContent className="p-4 grid grid-cols-2 gap-4">
-                        <div className="space-y-1"><span className="text-[8px] font-black uppercase text-slate-500">Coordonnées</span><p className="text-xs font-mono font-bold">{pickerData.lat.toFixed(4)} / {pickerData.lon.toFixed(4)}</p></div>
-                        <div className="space-y-1 text-right"><span className="text-[8px] font-black uppercase text-primary">Valeur</span><p className="text-lg font-black text-primary">{activeOverlay.toUpperCase()} : {vesselValueAtPos}</p></div>
+                        <div className="space-y-1"><span className="text-[8px] font-black uppercase text-slate-500">GPS</span><p className="text-xs font-mono font-bold">{pickerData.lat.toFixed(4)} / {pickerData.lon.toFixed(4)}</p></div>
+                        <div className="space-y-1 text-right"><span className="text-[8px] font-black uppercase text-primary">Capteur</span><p className="text-lg font-black text-primary">{activeOverlay.toUpperCase()} : {vesselValueAtPos}</p></div>
                     </CardContent>
                 </Card>
             </div>
@@ -617,22 +614,22 @@ export default function VesselTrackerPage() {
                                 <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
                                 <CardHeader className="p-5">
                                     <div className="flex items-center justify-between">
-                                        <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Zap className="size-3 fill-yellow-300" /> Partage Actif</p>
-                                        <Badge onClick={() => updateVesselInFirestore({ eventLabel: 'MAJ FORCÉE' })} className="bg-white/20 border-white/20 text-white font-black text-[10px] h-6 px-3 cursor-pointer">SYNC {syncCountdown}S</Badge>
+                                        <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Zap className="size-3 fill-yellow-300" /> Flux Actif</p>
+                                        <Badge onClick={() => updateVesselInFirestore({ eventLabel: 'SYNC MAN' })} className="bg-white/20 border-white/20 text-white font-black text-[10px] h-6 px-3 cursor-pointer">SYNC {syncCountdown}S</Badge>
                                     </div>
-                                    <h3 className="text-3xl font-black mt-2 uppercase">{vesselNickname || sharingId}</h3>
+                                    <h3 className="text-3xl font-black mt-2 uppercase truncate">{vesselNickname || sharingId}</h3>
                                 </CardHeader>
                             </Card>
                             <div className="grid grid-cols-2 gap-2">
-                                <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2" onClick={() => handleManualStatusSet('returning', 'RETOUR MAISON')}><Navigation className="mr-2 size-4" /> RETOUR MAISON</Button>
-                                <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2" onClick={() => handleManualStatusSet('landed', 'HOME (À TERRE)')}><Home className="mr-2 size-4" /> HOME (À TERRE)</Button>
+                                <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatusSet('returning', 'RETOUR MAISON')}><Navigation className="size-4" /> RETOUR MAISON</Button>
+                                <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatusSet('landed', 'HOME (À TERRE)')}><Home className="size-4" /> HOME (À TERRE)</Button>
                             </div>
                             <Button variant="destructive" className="w-full h-14 font-black uppercase text-xs tracking-widest" onClick={handleStopSharingInternal}>
                                 <X className="mr-2 size-4" /> ARRÊTER LE PARTAGE
                             </Button>
                         </div>
                     ) : (
-                        <Button className="w-full h-20 text-lg font-black uppercase tracking-widest shadow-xl rounded-2xl gap-4" onClick={() => setIsSharing(true)}><Navigation className="size-8" /> Partager ma position</Button>
+                        <Button className="w-full h-20 text-lg font-black uppercase tracking-widest shadow-xl rounded-2xl gap-4" onClick={() => setIsSharing(true)}><Navigation className="size-8" /> Activer le pilotage</Button>
                     )}
                 </div>
             ) : (
@@ -669,7 +666,7 @@ export default function VesselTrackerPage() {
                                 <Button variant="outline" size="sm" className="h-7 text-[8px] font-black uppercase" onClick={() => { map?.setView([h.pos.lat, h.pos.lng], 18); }}>GPS</Button>
                             </div>
                         ))}
-                        {technicalLogs.length === 0 && <p className="p-8 text-center text-[10px] font-black uppercase opacity-20 italic">Aucun événement</p>}
+                        {technicalLogs.length === 0 && <p className="p-8 text-center text-[10px] font-black uppercase opacity-20 italic">Initialisation du journal...</p>}
                     </div>
                 </ScrollArea>
             </CardContent>
