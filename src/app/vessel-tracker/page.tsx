@@ -111,15 +111,15 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
 };
 
 const WINDY_LAYERS = [
+    { id: 'satellite', icon: Globe, label: 'Satellite' },
     { id: 'wind', icon: Wind, label: 'Vent' },
-    { id: 'radarHistory', icon: Radio, label: 'Radar' },
+    { id: 'radar', icon: Radio, label: 'Radar' },
     { id: 'gust', icon: Wind, label: 'Rafales' },
     { id: 'temp', icon: Thermometer, label: 'Temp.' },
     { id: 'rain', icon: CloudRain, label: 'Pluie' },
     { id: 'waves', icon: Waves, label: 'Houle' },
     { id: 'pressure', icon: Activity, label: 'Pression' },
     { id: 'uv', icon: Sun, label: 'UV' },
-    { id: 'satellite', icon: Globe, label: 'Satellite' },
 ];
 
 export default function VesselTrackerPage() {
@@ -135,7 +135,7 @@ export default function VesselTrackerPage() {
   const [map, setMap] = useState<any>(null);
   const [wakeLock, setWakeLock] = useState<any>(null);
 
-  const [activeOverlay, setActiveOverlay] = useState('wind');
+  const [activeOverlay, setActiveOverlay] = useState('satellite');
   const [isLayersOpen, setIsLayersOpen] = useState(false);
   const [pickerData, setPickerData] = useState<any>(null);
   const [vesselValueAtPos, setVesselValueAtPos] = useState<string>('--');
@@ -200,27 +200,64 @@ export default function VesselTrackerPage() {
   const lastStatusesRef = useRef<Record<string, string>>({});
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
+  // LOGIQUE DE CHANGEMENT DE CALQUE AVEC SECURITE ET RETRY (Stricte)
   const handleLayerChange = useCallback((layerId: string) => {
     if (!layerId || !(window as any).W) return;
-    
-    // Defer processing to keep UI responsive
-    setTimeout(() => {
+
+    const performChange = (retry = true) => {
+      // Exécution asynchrone optimale pour le navigateur
+      requestAnimationFrame(() => {
         try {
-            const store = (window as any).W.store;
-            if (layerId === 'gust') {
+          const W = (window as any).W;
+          const store = W.store;
+          if (!store) return;
+
+          // Sécurité : vérifier si le dictionnaire Windy est prêt
+          try {
+            store.get('overlay');
+          } catch (e) {
+            if (retry) {
+              console.warn("windyStore non prêt, nouvel essai dans 500ms...");
+              setTimeout(() => performChange(false), 500);
+            }
+            return;
+          }
+
+          // Mappage strict demandé
+          switch(layerId) {
+            case 'gust':
                 store.set('overlay', 'wind');
                 store.set('product', 'gust');
-            } else {
+                break;
+            case 'satellite':
+                store.set('overlay', 'satellite');
+                break;
+            case 'radar':
+                store.set('overlay', 'radar');
+                break;
+            case 'rain':
+                store.set('overlay', 'rain');
+                break;
+            case 'waves':
+                store.set('overlay', 'waves');
+                break;
+            case 'uv':
+                store.set('overlay', 'uv');
+                break;
+            default:
                 store.set('overlay', layerId);
-            }
-            setActiveOverlay(layerId);
-            setIsLayersOpen(false);
-            toast({ title: `Activation : ${layerId.toUpperCase()}` });
-        } catch (e) {
-            console.error("Windy Layer Error:", e);
-            toast({ variant: 'destructive', title: "Erreur Calque", description: "Impossible d'activer cette couche." });
+          }
+
+          setActiveOverlay(layerId);
+          setIsLayersOpen(false);
+          toast({ title: `Activation : ${layerId.toUpperCase()}` });
+        } catch (err) {
+          console.error("Windy Layer Change Error:", err);
         }
-    }, 0);
+      });
+    };
+
+    performChange();
   }, [toast]);
 
   const toggleSatellite = () => {
@@ -344,15 +381,25 @@ export default function VesselTrackerPage() {
                   const { map, store } = api;
                   setMap(map);
                   map.setMaxZoom(18);
-                  store.set('overlay', 'wind');
-                  setActiveOverlay('wind');
-                  setIsInitialized(true);
+                  
+                  // Initialisation sécurisée sur Satellite par défaut
+                  requestAnimationFrame(() => {
+                    try {
+                        store.set('overlay', 'satellite');
+                        setActiveOverlay('satellite');
+                    } catch (e) {
+                        store.set('overlay', 'wind');
+                        setActiveOverlay('wind');
+                    }
+                    setIsInitialized(true);
+                  });
 
                   const picker = (window as any).W.picker;
                   picker.on('pickerOpened', (data: any) => {
                       setPickerData(data);
                       if (data.overlay === 'wind') setVesselValueAtPos(`${Math.round(data.wind * 1.94384)} kts`);
                       else if (data.overlay === 'waves') setVesselValueAtPos(`${data.waves.toFixed(1)}m`);
+                      else if (data.overlay === 'temp') setVesselValueAtPos(`${Math.round(data.temp - 273.15)}°C`);
                       else setVesselValueAtPos('--');
                   });
                   picker.on('pickerClosed', () => setPickerData(null));
@@ -367,6 +414,7 @@ export default function VesselTrackerPage() {
     initMap();
   }, [toast]);
 
+  // Optimisation Performance : Listeners Passifs (Anti-Violation)
   useEffect(() => {
     const el = mapContainerRef.current;
     if (!el) return;
@@ -498,18 +546,12 @@ export default function VesselTrackerPage() {
     else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); lock.addEventListener('release', () => setWakeLock(null)); } catch (err) {} }
   };
 
-  const sendEmergencySmsInternal = (type: string) => {
-    if (!emergencyContact) { toast({ variant: "destructive", title: "Contact requis" }); return; }
-    const body = `${smsPreview} [${type}]`;
-    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
-  };
-
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       <header className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2"><Globe className="text-primary" /> Cockpit Navigation</h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Pilot Interface v22.3</p>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Pilot Interface v22.4</p>
         </div>
         <div className="flex bg-slate-900/10 p-1 rounded-xl border-2">
           <Button variant={mode === 'sender' ? 'default' : 'ghost'} size="sm" className="font-black uppercase text-[9px] h-8 px-3" onClick={() => setMode('sender')}>Émetteur (A)</Button>
