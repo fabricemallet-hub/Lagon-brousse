@@ -11,10 +11,10 @@ import {
   collection, 
   query, 
   orderBy, 
-  arrayUnion, 
-  arrayRemove, 
-  where, 
-  getDoc
+  where,
+  Timestamp,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,31 +67,25 @@ import {
   RefreshCw,
   Settings,
   Smartphone,
-  Phone,
   Waves,
   Bird,
-  Camera,
   Globe,
   ChevronDown,
-  Repeat,
   Target,
   Compass,
   Fish,
   Radio,
   Sun,
   Activity,
-  LayoutGrid,
   Wind,
   Plus,
-  Minus,
   Thermometer,
   CloudRain,
   Lock,
   Unlock,
   Eye,
   EyeOff,
-  Layers,
-  Loader2
+  Layers
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, WindDirection } from '@/lib/types';
@@ -186,28 +180,27 @@ export default function VesselTrackerPage() {
     return `${nicknamePrefix}${customText} Position : https://www.google.com/maps?q=${lat},${lng}`;
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname, currentPos]);
 
-  // CHARGEMENT ROBUSTE DE LEAFLET ET WINDY
+  const loadLeafletAssets = useCallback(() => {
+    return new Promise<void>((resolve) => {
+        if ((window as any).L) return resolve();
+        
+        if (!document.getElementById('leaflet-css')) {
+            const link = document.createElement('link');
+            link.id = 'leaflet-css';
+            link.rel = 'stylesheet';
+            link.href = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.css'; // Version 1.4.0 requise par Windy
+            document.head.appendChild(link);
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js';
+        script.onload = () => resolve();
+        document.head.appendChild(script);
+    });
+  }, []);
+
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || isWindyLoaded) return;
-
-    const loadLeafletAssets = () => {
-        return new Promise<void>((resolve) => {
-            if ((window as any).L) return resolve();
-            
-            if (!document.getElementById('leaflet-css')) {
-                const link = document.createElement('link');
-                link.id = 'leaflet-css';
-                link.rel = 'stylesheet';
-                link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-                document.head.appendChild(link);
-            }
-
-            const script = document.createElement('script');
-            script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-            script.onload = () => resolve();
-            document.head.appendChild(script);
-        });
-    };
 
     const loadWindyScript = () => {
         return new Promise<void>((resolve) => {
@@ -248,7 +241,7 @@ export default function VesselTrackerPage() {
                             });
                         });
                     } catch (e) {
-                        console.warn("Windy Init Execution Error", e);
+                        console.warn("Windy Init Error", e);
                     }
                 } else {
                     setTimeout(checkDependencies, 300);
@@ -256,14 +249,13 @@ export default function VesselTrackerPage() {
             };
             checkDependencies();
         } catch (e) {
-            console.warn("Windy/Leaflet Sequential Boot Error", e);
+            console.warn("Boot Sequence Error", e);
         }
     };
 
     bootSequentially();
-  }, [isWindyLoaded]);
+  }, [isWindyLoaded, loadLeafletAssets]);
 
-  // GESTION DES CALQUES WINDY
   const handleLayerChange = useCallback((layerId: string) => {
     if (!isWindyLoaded || !(window as any).W) return;
     
@@ -283,7 +275,6 @@ export default function VesselTrackerPage() {
     });
   }, [isWindyLoaded]);
 
-  // SYNCHRONISATION DES CARTES
   useEffect(() => {
     if (!googleMap || !windyMap || (!isOverlayActive && viewMode !== 'windy')) return;
 
@@ -301,7 +292,20 @@ export default function VesselTrackerPage() {
     return () => google.maps.event.removeListener(listener);
   }, [googleMap, windyMap, isOverlayActive, viewMode]);
 
-  // TRACKING GPS
+  const updateVesselInFirestore = useCallback((data: any) => {
+    if (!user || !firestore || !isSharing) return;
+    const vesselRef = doc(firestore, 'vessels', sharingId);
+    setDoc(vesselRef, {
+        id: sharingId,
+        userId: user.uid,
+        displayName: vesselNickname || user.displayName || 'Capitaine',
+        isSharing: true,
+        lastActive: serverTimestamp(),
+        status: vesselStatus,
+        ...data
+    }, { merge: true }).catch(e => console.warn("Firestore Update Warn", e));
+  }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
+
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) return;
 
@@ -332,9 +336,8 @@ export default function VesselTrackerPage() {
         clearInterval(interval);
         if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     };
-  }, [isSharing, mode, googleMap, isFollowMode, anchorPos]);
+  }, [isSharing, mode, googleMap, isFollowMode, anchorPos, updateVesselInFirestore, toast]);
 
-  // LOGS TECHNIQUES
   useEffect(() => {
     if (!followedVessels) return;
     followedVessels.forEach(v => {
@@ -354,20 +357,6 @@ export default function VesselTrackerPage() {
         lastStatusesRef.current[v.id] = currentLabel;
     });
   }, [followedVessels]);
-
-  const updateVesselInFirestore = useCallback((data: any) => {
-    if (!user || !firestore || !isSharing) return;
-    const vesselRef = doc(firestore, 'vessels', sharingId);
-    setDoc(vesselRef, {
-        id: sharingId,
-        userId: user.uid,
-        displayName: vesselNickname || user.displayName || 'Capitaine',
-        isSharing: true,
-        lastActive: serverTimestamp(),
-        status: vesselStatus,
-        ...data
-    }, { merge: true }).catch(e => console.warn("Firestore Update Warn", e));
-  }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
 
   const handleRecenter = () => {
     if (currentPos && googleMap) {
