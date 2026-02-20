@@ -1,8 +1,7 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
@@ -132,7 +131,7 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
 };
 
 export default function VesselTrackerPage() {
-  const { user } = useUser();
+  const { user } = useUserHook();
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -193,7 +192,7 @@ export default function VesselTrackerPage() {
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
-                verbose: false,
+                verbose: true,
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
