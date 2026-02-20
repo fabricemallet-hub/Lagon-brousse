@@ -170,16 +170,18 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
+            // ÉTAPE 1 : Charger Leaflet 1.4.0
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
             let retries = 0;
-            while (!(window as any).L && retries < 30) { 
+            while (!(window as any).L && retries < 20) { 
                 await new Promise(r => setTimeout(r, 500)); 
                 retries++; 
             }
             
             if (!(window as any).L) throw new Error("Leaflet (L) non trouvé.");
 
+            // ÉTAPE 2 : Charger libBoot
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const options = {
@@ -192,13 +194,12 @@ export default function VesselTrackerPage() {
                 product: 'ecmwf',
             };
 
-            // LOG TECHNIQUE REQUIS
             console.log("Clé utilisée pour windyInit:", options.key);
 
             try {
                 (window as any).windyInit(options, (windyAPI: any) => {
                     if (!windyAPI) { 
-                        setAuthError(window.location.origin); 
+                        setAuthError(window.location.host); 
                         return; 
                     }
                     const { map, store, broadcast, picker } = windyAPI;
@@ -227,23 +228,22 @@ export default function VesselTrackerPage() {
                 });
             } catch (authE) {
                 console.error("Windy Auth Exception:", authE);
-                setAuthError(window.location.origin);
+                setAuthError(window.location.host);
             }
         } catch (e: any) {
             console.error("Windy init error:", e);
-            setAuthError(window.location.origin);
+            setAuthError(window.location.host);
             isInitializingRef.current = false;
         }
     };
 
     attemptInit();
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
-    // Délai augmenté à 3000ms pour Cloud Workstations
     const timer = setTimeout(initWindy, 3000);
     const diagTimer = setTimeout(() => {
-        if (!mapRef.current) setAuthError(window.location.origin);
+        if (!mapRef.current) setAuthError(window.location.host);
     }, 8000);
     return () => { clearTimeout(timer); clearTimeout(diagTimer); };
   }, [initWindy]);
@@ -257,7 +257,6 @@ export default function VesselTrackerPage() {
 
   const copyOrigin = () => {
     if (typeof window !== 'undefined') {
-        const origin = window.location.origin;
         const host = window.location.host;
         navigator.clipboard.writeText(host);
         toast({ title: "HÔTE COPIÉ !", description: `Copié : ${host}` });
@@ -271,21 +270,22 @@ export default function VesselTrackerPage() {
       {authError && (
         <Alert variant="destructive" className="bg-red-50 border-red-600 rounded-2xl border-2 shadow-xl animate-in slide-in-from-top-4">
             <ShieldAlert className="size-6" />
-            <AlertTitle className="font-black uppercase text-sm mb-2">DIAGNOSTIC WINDY (401)</AlertTitle>
+            <AlertTitle className="font-black uppercase text-sm mb-2">DIAGNOSTIC AUTHENTIFICATION (401)</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
                     <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Hôte détecté (Referer) :</p>
                     <div className="flex items-center gap-2">
-                        <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{window.location.host}</code>
+                        <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{authError}</code>
                         <Button size="icon" variant="ghost" onClick={copyOrigin} className="h-10 w-10 hover:bg-red-200">
                             <Copy className="size-4" />
                         </Button>
                     </div>
                 </div>
-                <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
+                <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2 leading-relaxed">
+                    <p>⚠️ <strong>IMPORTANT :</strong> Le joker <code>*.cloudworkstations.dev</code> ne fonctionne pas pour les sous-domaines imbriqués (votre cas actuel).</p>
                     <p>1. Allez sur <strong>api.windy.com/keys</strong></p>
                     <p>2. Modifiez la clé Map Forecast (<strong>1gGm...</strong>)</p>
-                    <p>3. Assurez-vous d'avoir exactement <code>*.cloudworkstations.dev,*.web.app,localhost</code></p>
+                    <p>3. Ajoutez l'hôte complet copié ci-dessus à votre liste.</p>
                     <p className="font-black text-xs text-red-600">AUCUN ESPACE entre les virgules.</p>
                 </div>
             </AlertDescription>
