@@ -64,7 +64,7 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 const PulsingDot = () => (
-    <div className="absolute" style={{ transform: 'translate(-50%, -50%)', zIndex: 100 }}>
+    <div className="absolute z-[100]" style={{ transform: 'translate(-50%, -50%)' }}>
       <div className="size-6 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
       <div className="size-6 rounded-full bg-blue-500 border-4 border-white relative shadow-2xl"></div>
     </div>
@@ -73,9 +73,9 @@ const PulsingDot = () => (
 const BatteryStatusIcon = ({ level, charging, size = 4 }: { level: number; charging: boolean, size?: number | string }) => {
   const props = { className: `size-${size}` };
   if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
-  if (level < 20) return <BatteryLow {...props} className="text-red-500" />;
+  if (level < 20) return <BatteryLow {...props} className="text-red-600" />;
   if (level < 60) return <BatteryMedium {...props} className="text-orange-500" />;
-  return <BatteryFull {...props} className="text-green-500" />;
+  return <BatteryFull {...props} className="text-green-600" />;
 };
 
 export default function VesselTrackerPage() {
@@ -184,7 +184,7 @@ export default function VesselTrackerPage() {
         updatePayload.anchorLocation = null;
     }
 
-    // GESTION WINDY (Referer Firebase Studio)
+    // GESTION WINDY
     const now = Date.now();
     if ((now - lastWeatherUpdateRef.current > 3 * 3600 * 1000) && pos) {
         try {
@@ -299,7 +299,7 @@ export default function VesselTrackerPage() {
     toast({ title: label });
   };
 
-  // GPS WATCH LOOP
+  // GPS WATCH LOOP - TOLÉRANCE 500M
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
@@ -472,7 +472,7 @@ export default function VesselTrackerPage() {
 
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="prefs" className="border-none">
-                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
                         <Settings className="size-4 text-primary" />
                         <span className="text-[10px] font-black uppercase">Identité & IDs</span>
                     </AccordionTrigger>
@@ -572,9 +572,10 @@ export default function VesselTrackerPage() {
                                 </>
                               )}
 
-                              {/* NAVIRE MOBILE */}
+                              {/* NAVIRE MOBILE - NOUVEAU RENDU V3 (CONFORME PHOTO) */}
                               <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                   <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-50">
+                                      {/* BADGE NOM | STATUT (HAUT) */}
                                       <div className={cn(
                                           "px-3 py-2 backdrop-blur-md rounded-lg text-[11px] font-black shadow-2xl border-2 flex items-center gap-2 mb-1", 
                                           isOffline ? "bg-red-600 text-white border-white/40" : "bg-white/95 text-slate-900 border-primary/20"
@@ -583,6 +584,7 @@ export default function VesselTrackerPage() {
                                           <span className={cn("border-l-2 pl-2", isOffline ? "text-white/60" : "text-primary/60")}>{statusInfo.label}</span>
                                       </div>
 
+                                      {/* ICÔNE CENTRALE MASSIVE (MILIEU) */}
                                       <div className="relative">
                                           {isMe && mode === 'sender' && <PulsingDot />}
                                           <div className={cn("p-4 rounded-full border-4 border-white shadow-2xl", statusInfo.color)}>
@@ -590,18 +592,22 @@ export default function VesselTrackerPage() {
                                           </div>
                                       </div>
 
+                                      {/* ÉTAGES DE BULLES D'ÉTAT (BAS) */}
                                       <div className="flex flex-col items-center gap-1 mt-2">
+                                          {/* BULLE BATTERIE */}
                                           <div className={cn(
                                               "px-2.5 py-1 rounded-full text-[9px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
-                                              battery < 20 ? "text-red-600 border-red-200" : "text-slate-700 border-slate-100"
+                                              battery < 20 ? "text-red-600 border-red-200" : (battery < 60 ? "text-orange-600 border-orange-100" : "text-slate-700 border-slate-100")
                                           )}>
                                               <BatteryStatusIcon level={battery} charging={isCharging} size={3.5} />
                                               <span>{battery}%</span>
                                           </div>
 
-                                          {isCharging && <Badge className="bg-blue-600 text-white text-[8px] font-black shadow-lg">⚡ EN CHARGE</Badge>}
-                                          {battery < 20 && !isCharging && <Badge className="bg-red-600 text-white text-[8px] font-black shadow-lg animate-pulse">⚠️ BATTERIE FAIBLE</Badge>}
+                                          {/* BULLES D'ALERTE DYNAMIQUE */}
+                                          {isCharging && <Badge className="bg-blue-600 text-white text-[8px] font-black shadow-lg border-2 border-white/30">⚡ EN CHARGE</Badge>}
+                                          {battery < 20 && !isCharging && <Badge className="bg-red-600 text-white text-[8px] font-black shadow-lg animate-pulse border-2 border-white/30">⚠️ BATTERIE FAIBLE</Badge>}
 
+                                          {/* BULLE MÉTÉO WINDY (LIGNES CONTRASTÉES) */}
                                           {vessel.windSpeed !== undefined && (
                                               <div className="bg-slate-900 text-white px-3 py-1.5 rounded-2xl text-[9px] font-black shadow-2xl border border-white/20 flex items-center gap-3">
                                                   <div className="flex items-center gap-1.5"><Wind className="size-3 text-blue-400" /> {vessel.windSpeed} ND</div>
