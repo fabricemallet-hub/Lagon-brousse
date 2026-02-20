@@ -57,7 +57,8 @@ import {
   Thermometer,
   Gauge,
   ArrowUp,
-  Wind
+  Wind,
+  Terminal
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -141,6 +142,7 @@ export default function VesselTrackerPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentModel, setCurrentModel] = useState('ecmwf');
   const [currentOverlay, setCurrentOverlay] = useState('wind');
+  const [isTestingApi, setIsTestingApi] = useState(false);
   
   const [mapClickResult, setMapClickResult] = useState<any>(null);
   const [pointTides, setPointTides] = useState<any[] | null>(null);
@@ -170,7 +172,6 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
-            // ÉTAPE 1 : Charger Leaflet 1.4.0
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
             let retries = 0;
@@ -181,11 +182,11 @@ export default function VesselTrackerPage() {
             
             if (!(window as any).L) throw new Error("Leaflet (L) non trouvé.");
 
-            // ÉTAPE 2 : Charger libBoot
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
+            const cleanKey = MAP_FORECAST_KEY.trim();
             const options = {
-                key: MAP_FORECAST_KEY.trim(),
+                key: cleanKey,
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
@@ -194,8 +195,9 @@ export default function VesselTrackerPage() {
                 product: 'ecmwf',
             };
 
-            console.log("Hôte (Referer) envoyé:", window.location.host);
-            console.log("Clé utilisée pour windyInit:", options.key);
+            console.log("--- INITIALISATION WINDY ---");
+            console.log("Clé (Ligne 204):", cleanKey);
+            console.log("Hôte (Referer):", window.location.host);
 
             try {
                 (window as any).windyInit(options, (windyAPI: any) => {
@@ -256,11 +258,48 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const copyOrigin = () => {
+  const testApiComm = async () => {
+    setIsTestingApi(true);
+    console.log("--- TEST MANUEL API WINDY ---");
+    console.log("Origin:", window.location.origin);
+    console.log("Host:", window.location.host);
+    console.log("Key:", MAP_FORECAST_KEY.trim());
+    
+    try {
+      const response = await fetch('https://api.windy.com/api/map-forecast/v2/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          key: MAP_FORECAST_KEY.trim(),
+          lat: INITIAL_CENTER.lat,
+          lon: INITIAL_CENTER.lng,
+        })
+      });
+      
+      console.log("Status de réponse:", response.status);
+      const data = await response.json();
+      console.log("Réponse JSON:", data);
+      
+      if (response.status === 200) {
+        toast({ title: "TEST RÉUSSI", description: "L'API a validé la clé et le domaine." });
+      } else {
+        toast({ variant: "destructive", title: `ERREUR ${response.status}`, description: data.error || "Non autorisé" });
+      }
+    } catch (e: any) {
+      console.error("Test Error:", e);
+      toast({ variant: "destructive", title: "ERREUR RÉSEAU", description: e.message });
+    } finally {
+      setIsTestingApi(false);
+    }
+  };
+
+  const copyHost = () => {
     if (typeof window !== 'undefined') {
         const host = window.location.host;
         navigator.clipboard.writeText(host);
-        toast({ title: "HÔTE COPIÉ !", description: `Copié : ${host}` });
+        toast({ title: "HÔTE COPIÉ !", description: host });
     }
   };
 
@@ -274,20 +313,27 @@ export default function VesselTrackerPage() {
             <AlertTitle className="font-black uppercase text-sm mb-2">DIAGNOSTIC AUTHENTIFICATION (401)</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Hôte détecté (Referer) :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Hôte exact à copier :</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{authError}</code>
-                        <Button size="icon" variant="ghost" onClick={copyOrigin} className="h-10 w-10 hover:bg-red-200">
+                        <Button size="icon" variant="ghost" onClick={copyHost} className="h-10 w-10 hover:bg-red-200">
                             <Copy className="size-4" />
                         </Button>
                     </div>
                 </div>
-                <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2 leading-relaxed">
-                    <p>⚠️ <strong>IMPORTANT :</strong> Le joker <code>*.cloudworkstations.dev</code> ne fonctionne pas pour les sous-domaines imbriqués (votre cas actuel).</p>
+                
+                <div className="grid grid-cols-1 gap-2">
+                    <Button onClick={testApiComm} disabled={isTestingApi} variant="outline" className="bg-white h-12 font-black uppercase text-[10px] gap-2 border-2">
+                        {isTestingApi ? <RefreshCw className="size-4 animate-spin" /> : <Terminal className="size-4" />}
+                        Tester la communication avec l'API
+                    </Button>
+                    <p className="text-[8px] text-center font-bold text-red-900 uppercase">Consultez les logs console (F12) après le test</p>
+                </div>
+
+                <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2 leading-relaxed border border-red-200">
                     <p>1. Allez sur <strong>api.windy.com/keys</strong></p>
                     <p>2. Modifiez la clé Map Forecast (<strong>1gGm...</strong>)</p>
-                    <p>3. Ajoutez l'hôte complet copié ci-dessus à votre liste.</p>
-                    <p className="font-black text-xs text-red-600">AUCUN ESPACE entre les virgules.</p>
+                    <p>3. Ajoutez l'hôte complet copié ci-dessus à votre liste (virgule, sans espace).</p>
                 </div>
             </AlertDescription>
         </Alert>
