@@ -155,26 +155,43 @@ export default function VesselTrackerPage() {
   const handleApiTest = async () => {
     setIsTesting(true);
     setTestResult(null);
+    console.log("--- START WINDY API TRACE ---");
+    console.log("Target URL: https://api.windy.com/api/map-forecast/v2/auth");
+    console.log("Key used:", MAP_KEY);
+    console.log("Referrer Policy used: no-referrer-when-downgrade");
+    
     try {
-        // Test manuel du endpoint d'auth avec la clé
+        const payload = { key: MAP_KEY };
+        console.log("Request Payload:", payload);
+
         const res = await fetch('https://api.windy.com/api/map-forecast/v2/auth', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: MAP_KEY })
+            headers: { 
+                'Content-Type': 'application/json',
+                // Note: Referer and Origin are protected headers, browser handles them
+            },
+            body: JSON.stringify(payload)
         });
         
+        console.log("Response Status:", res.status);
+        console.log("Response OK:", res.ok);
+
         if (res.status === 200) {
             setTestResult({ status: 200, ok: true, msg: "Authentification RÉUSSIE ! La carte devrait s'afficher." });
             toast({ title: "Test API OK ✅", description: "Communication Windy rétablie." });
         } else if (res.status === 401) {
             setTestResult({ status: 401, ok: false, msg: "ÉCHEC 401 : Le domaine n'est toujours pas autorisé." });
-            toast({ variant: "destructive", title: "Test API Échoué ❌", description: "Vérifiez vos restrictions Windy." });
+            toast({ variant: "destructive", title: "Test API Échoué 401 ❌", description: "Vérifiez vos restrictions Windy." });
+        } else if (res.status === 400) {
+            setTestResult({ status: 400, ok: false, msg: "ÉCHEC 400 : Requête mal formée. Windy attend peut-être un format différent." });
         } else {
             setTestResult({ status: res.status, ok: false, msg: `Erreur inattendue : Statut ${res.status}` });
         }
     } catch (e: any) {
+        console.error("Fetch Error Trace:", e);
         setTestResult({ status: 0, ok: false, msg: `Erreur réseau : ${e.message}` });
     } finally {
+        console.log("--- END WINDY API TRACE ---");
         setIsTesting(false);
     }
   };
@@ -210,7 +227,7 @@ export default function VesselTrackerPage() {
             <Search className="size-3" /> Chercher
         </Button>
         <Button variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase border-2 gap-2" onClick={handleFilter}>
-            <Filter className="size-3" /> Filtrer
+            <Filter className="size-3" /> Filtres
         </Button>
       </div>
 
@@ -250,7 +267,7 @@ export default function VesselTrackerPage() {
 
               <div className="space-y-4 pt-4 border-t border-red-100">
                 <h4 className="text-[10px] font-black uppercase text-red-800 tracking-widest flex items-center gap-2">
-                    <Zap className="size-3 fill-red-600" /> Test de communication
+                    <Zap className="size-3 fill-red-600" /> Test de communication Deep Trace
                 </h4>
                 
                 <Button 
@@ -277,7 +294,7 @@ export default function VesselTrackerPage() {
               <div className="p-4 bg-blue-50 rounded-2xl border-2 border-blue-100 flex items-start gap-3 shadow-sm">
                 <AlertTriangle className="size-5 text-blue-600 mt-0.5 shrink-0" />
                 <p className="text-[10px] leading-relaxed text-blue-900 font-bold">
-                  Note Studio : Le domaine `studio.firebase.google.com` est indispensable car l'app s'affiche dans une Iframe.
+                  Note Studio : Si le Referrer est `studio.firebase.google.com`, vous DEVEZ l'ajouter car l'application s'affiche dans une Iframe.
                 </p>
               </div>
             </AlertDescription>
@@ -290,7 +307,6 @@ export default function VesselTrackerPage() {
           "relative w-full transition-all duration-500 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 shadow-2xl overflow-hidden",
           isFullscreen ? "fixed inset-0 z-[200] h-screen w-screen rounded-none" : "h-[500px]"
       )}>
-        {/* Calque de la carte : React ne doit jamais modifier ses enfants directs */}
         <div 
           id="windy" 
           key="windy-map-canvas"
@@ -300,7 +316,6 @@ export default function VesselTrackerPage() {
           )}
         ></div>
         
-        {/* Calque du Loader : Géré par opacité pour éviter removeChild Error */}
         <div className={cn(
             "absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 bg-slate-900 transition-all duration-700 pointer-events-none",
             (isInitialized || error) ? "opacity-0" : "opacity-100"
