@@ -7,7 +7,7 @@
  */
 
 export async function fetchWindyWeather(lat: number, lon: number) {
-  // CLÉ "PRÉVISION PONCTUELLE" (ggM4k...)
+  // CLÉ "PRÉVISION PONCTUELLE" (EXCLUSIVEMENT ggM4k...)
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   

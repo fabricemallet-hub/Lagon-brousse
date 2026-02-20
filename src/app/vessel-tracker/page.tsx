@@ -37,7 +37,10 @@ import {
   Copy,
   Info,
   ArrowUp,
-  ChevronDown
+  ChevronDown,
+  Database,
+  Layers,
+  Search
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, Tide } from '@/lib/types';
@@ -47,17 +50,20 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getDataForDate } from '@/lib/data';
 
-// CLÉ "MAP FORECAST" (POUR LA CARTE) - VÉRIFIÉE
+// CLÉ "MAP FORECAST" (EXCLUSIVEMENT 1gGm...)
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
+/**
+ * Panneau d'affichage des données météo marines extraites au point.
+ */
 const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClose: () => void, isLoading: boolean, tides: Tide[] | null }) => {
     if (!data) return null;
     return (
-        <div className="absolute z-[110] bg-slate-900/95 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[300px] animate-in zoom-in-95" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -110%)' }}>
+        <div className="absolute z-[110] bg-slate-900/95 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[280px] animate-in zoom-in-95" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -110%)' }}>
             <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
                 <span className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                    <Activity className="size-3" /> Analyse Marine & Marée
+                    <Activity className="size-3" /> Analyse Marine
                 </span>
                 {isLoading && <RefreshCw className="size-3 animate-spin text-primary" />}
             </div>
@@ -80,23 +86,19 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
                     <span className="text-sm font-black text-cyan-400">{data.waves ?? '--'}<span className="text-[8px] ml-0.5">m</span></span>
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Thermometer className="size-2" /> Air / Eau (SST)</span>
+                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Thermometer className="size-2" /> Air / Eau</span>
                     <span className="text-sm font-black">
                         {data.temp ?? '--'}° <span className="text-blue-300">/ {data.sst ?? '--'}°</span>
                     </span>
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Gauge className="size-2" /> Pression / Hum.</span>
-                    <span className="text-sm font-black">
-                        {data.pressure ?? '--'} <span className="text-[8px] opacity-60">hPa</span>
-                        <span className="text-blue-300 ml-1">/ {data.rh ?? '--'}%</span>
-                    </span>
+                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Gauge className="size-2" /> Pression</span>
+                    <span className="text-sm font-black">{data.pressure ?? '--'} <span className="text-[8px] opacity-60">hPa</span></span>
                 </div>
             </div>
 
             {tides && (
-                <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
-                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Waves className="size-2" /> Prochaines Marées</span>
+                <div className="mt-3 pt-3 border-t border-white/10">
                     <div className="grid grid-cols-2 gap-2">
                         {tides.slice(0, 2).map((t, i) => (
                             <div key={i} className="bg-white/5 rounded p-1.5 text-center">
@@ -123,13 +125,11 @@ export default function VesselTrackerPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [currentOrigin, setCurrentOrigin] = useState('');
   
-  const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
   const [isSharing, setIsSharing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentModel, setCurrentModel] = useState('ecmwf');
   const [currentOverlay, setCurrentOverlay] = useState('wind');
   
-  const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
   const [mapClickResult, setMapClickResult] = useState<any>(null);
   const [pointTides, setPointTides] = useState<Tide[] | null>(null);
   const [isQueryingWindy, setIsQueryingWindy] = useState(false);
@@ -141,9 +141,7 @@ export default function VesselTrackerPage() {
   const watchIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-        setCurrentOrigin(window.location.host);
-    }
+    if (typeof window !== 'undefined') setCurrentOrigin(window.location.host);
   }, []);
 
   const sharingId = useMemo(() => (user?.uid || '').toUpperCase(), [user]);
@@ -167,8 +165,9 @@ export default function VesselTrackerPage() {
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
-    isMapInitializedRef.current = true; // Empêcher les doubles appels immédiats
+    isMapInitializedRef.current = true;
 
+    // Délai de confort pour laisser React stabiliser le rendu avant Windy
     setTimeout(() => {
         const options = {
           key: MAP_FORECAST_KEY,
@@ -176,8 +175,8 @@ export default function VesselTrackerPage() {
           lon: INITIAL_CENTER.lng,
           zoom: 10,
           verbose: true,
-          externalAllowedOrigins: [window.location.host, "cloudworkstations.dev", "web.app"],
-          overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell', 'currents'],
+          externalAllowedOrigins: [window.location.host, "web.app", "cloudworkstations.dev"],
+          overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
           product: 'ecmwf',
         };
 
@@ -193,9 +192,11 @@ export default function VesselTrackerPage() {
               mapRef.current = map;
               windyMapInstance.current = windyAPI;
 
+              // Configuration initiale des couches
               store.set('overlay', 'wind');
               store.set('product', 'ecmwf');
 
+              // Listener du sélecteur (Picker)
               broadcast.on('pickerMoved', async (latLon: any) => {
                 const { lat, lon } = latLon;
                 setMapClickResult({ lat, lon });
@@ -203,9 +204,11 @@ export default function VesselTrackerPage() {
                 setPointTides(null);
 
                 try {
+                  // Appel à l'API Point Forecast via le serveur
                   const weather = await fetchWindyWeather(lat, lon);
                   setMapClickResult((prev: any) => ({ ...prev, ...weather }));
 
+                  // Marées locales
                   const commune = getClosestCommune(lat, lon);
                   const tideData = getDataForDate(commune, new Date());
                   setPointTides(tideData.tides);
@@ -219,6 +222,7 @@ export default function VesselTrackerPage() {
                 picker.open({ lat: e.latlng.lat, lon: e.latlng.lng });
               });
 
+              // Correction du rendu gris
               setTimeout(() => { 
                 map.invalidateSize(); 
                 window.dispatchEvent(new Event('resize')); 
@@ -235,11 +239,12 @@ export default function VesselTrackerPage() {
     if (isLeafletLoaded && isWindyLoaded) initWindy();
   }, [isLeafletLoaded, isWindyLoaded, initWindy]);
 
+  // Rendu de la flotte optimisé
   useEffect(() => {
     if (!mapRef.current || !followedVessels || !window.L) return;
     const L = window.L;
 
-    const updateMarkers = () => {
+    const renderFleet = () => {
         followedVessels.forEach(v => {
           if (!v.location || !v.isSharing) {
             if (markersRef.current[v.id]) { markersRef.current[v.id].remove(); delete markersRef.current[v.id]; }
@@ -247,23 +252,22 @@ export default function VesselTrackerPage() {
           }
 
           const pos = [v.location.latitude, v.location.longitude];
-          const statusColor = v.status === 'stationary' ? '#f97316' : '#2563eb';
+          const color = v.status === 'stationary' ? '#f97316' : '#2563eb';
 
           if (!markersRef.current[v.id]) {
             const icon = L.divIcon({
               className: 'vessel-marker',
-              html: `<div class="relative flex flex-col items-center" style="transform: translate(-50%, -100%)">
-                      <div class="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap mb-1">
+              html: `<div class="flex flex-col items-center" style="transform: translate(-50%, -100%)">
+                      <div class="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 mb-1">
                         ${v.displayName || v.id}
                       </div>
-                      <div class="p-1.5 rounded-full border-2 border-white shadow-xl" style="background-color: ${statusColor}">
+                      <div class="p-1.5 rounded-full border-2 border-white shadow-xl" style="background-color: ${color}">
                         <svg class="size-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                            <path d="M12 2v18M5 12h14M12 20c-3.3 0-6-2.7-6-6M12 20c3.3 0 6-2.7 6-6"></path>
+                            <path d="M12 2v18M5 12h14"></path>
                         </svg>
                       </div>
                     </div>`,
-              iconSize: [0, 0],
-              iconAnchor: [0, 0]
+              iconSize: [0, 0]
             });
             markersRef.current[v.id] = L.marker(pos, { icon }).addTo(mapRef.current);
           } else {
@@ -272,39 +276,20 @@ export default function VesselTrackerPage() {
         });
     };
 
-    const animFrame = requestAnimationFrame(updateMarkers);
-    return () => cancelAnimationFrame(animFrame);
+    const frame = requestAnimationFrame(renderFleet);
+    return () => cancelAnimationFrame(frame);
   }, [followedVessels]);
 
-  const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
-    const { latitude, longitude } = pos.coords;
-    setCurrentPos({ lat: latitude, lng: longitude });
+  const handleSetModel = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const m = e.target.value;
+    setCurrentModel(m);
+    if (window.windyStore) window.windyStore.set('product', m);
+  };
 
-    if (user && firestore && isSharing) {
-        setDoc(doc(firestore, 'vessels', sharingId), { 
-            id: sharingId,
-            userId: user.uid, 
-            location: { latitude, longitude },
-            isSharing: true, 
-            lastActive: serverTimestamp()
-        }, { merge: true }).catch(() => {});
-    }
-  }, [user, firestore, isSharing, sharingId]);
-
-  useEffect(() => {
-    if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
-        if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
-        return;
-    }
-    watchIdRef.current = navigator.geolocation.watchPosition(handleGpsUpdate, null, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-    return () => { if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; } };
-  }, [isSharing, mode, handleGpsUpdate]);
-
-  const handleRecenter = () => {
-    if (currentPos && mapRef.current) {
-        mapRef.current.panTo([currentPos.lat, currentPos.lng]);
-        mapRef.current.setZoom(15);
-    }
+  const handleSetOverlay = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const o = e.target.value;
+    setCurrentOverlay(o);
+    if (window.windyStore) window.windyStore.set('overlay', o);
   };
 
   return (
@@ -317,65 +302,47 @@ export default function VesselTrackerPage() {
       {authError && (
         <Alert variant="destructive" className="bg-red-50 border-red-600 rounded-2xl border-2 shadow-xl animate-in slide-in-from-top-4">
             <ShieldAlert className="size-6" />
-            <AlertTitle className="font-black uppercase text-sm mb-2">ERREUR 401 : MAUVAISE CLÉ OU RESTRICTION</AlertTitle>
+            <AlertTitle className="font-black uppercase text-sm mb-2">ERREUR 401 : CONFIGURATION REQUISE</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Attention : Vous avez configuré la clé Point Forecast (ggM4k...). Pour la carte, vous devez configurer la clé Map Forecast (1gGm...) avec cette URL :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cette URL exacte dans vos restrictions de domaine sur api.windy.com/keys (pour la clé 1gGm...) :</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{currentOrigin}</code>
                         <Button size="icon" variant="ghost" onClick={() => { navigator.clipboard.writeText(currentOrigin); toast({ title: "Copié !" }); }}><Copy className="size-4" /></Button>
                     </div>
                 </div>
-                <div className="bg-white/50 p-3 rounded-lg text-[9px] font-bold leading-relaxed italic text-red-900">
-                    {"Veuillez cliquer sur la clé commençant par 1gGm dans votre console Windy et ajouter l'URL ci-dessus dans les restrictions de domaine."}
+                <div className="bg-white/50 p-3 rounded-lg text-[9px] font-bold text-red-900 italic">
+                    {"Assurez-vous que studio-2943478321-f746e.web.app est également présent."}
                 </div>
             </AlertDescription>
         </Alert>
       )}
 
       <Card className="border-2 shadow-sm overflow-hidden">
-        <div className="flex bg-muted/30 p-1">
-          <Button variant={mode === 'sender' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => setMode('sender')}>Émetteur (A)</Button>
-          <Button variant={mode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => setMode('receiver')}>Récepteur (B)</Button>
-        </div>
         <CardContent className="p-4 space-y-4">
-          <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/10 shadow-inner">
+          <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/10">
               <div className="space-y-0.5"><Label className="text-sm font-black uppercase">Partage GPS</Label><p className="text-[9px] font-bold text-muted-foreground uppercase">{isSharing ? 'En cours' : 'Inactif'}</p></div>
               <Switch checked={isSharing} onCheckedChange={setIsSharing} />
           </div>
           
           <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Modèle Météo</Label>
-                  <div className="relative">
-                      <select 
-                        value={currentModel}
-                        onChange={(e) => { setCurrentModel(e.target.value); if(window.windyStore) window.windyStore.set('product', e.target.value); }}
-                        className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none focus:border-primary"
-                      >
-                          <option value="ecmwf">ECMWF (9km)</option>
-                          <option value="gfs">GFS (22km)</option>
-                          <option value="icon">ICON (7km)</option>
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 size-3 opacity-30 pointer-events-none" />
-                  </div>
+                  <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Modèle</Label>
+                  <select value={currentModel} onChange={handleSetModel} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
+                      <option value="ecmwf">ECMWF (9km)</option>
+                      <option value="gfs">GFS (22km)</option>
+                      <option value="icon">ICON (7km)</option>
+                  </select>
               </div>
               <div className="space-y-1.5">
                   <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Calque Tactique</Label>
-                  <div className="relative">
-                      <select 
-                        value={currentOverlay}
-                        onChange={(e) => { setCurrentOverlay(e.target.value); if(window.windyStore) window.windyStore.set('overlay', e.target.value); }}
-                        className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none focus:border-primary"
-                      >
-                          <option value="wind">Vent & Rafales</option>
-                          <option value="waves">Mer & Vagues</option>
-                          <option value="sst">Eau (SST)</option>
-                          <option value="pressure">Pression</option>
-                          <option value="rh">Humidité</option>
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 size-3 opacity-30 pointer-events-none" />
-                  </div>
+                  <select value={currentOverlay} onChange={handleSetOverlay} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
+                      <option value="wind">Vent & Rafales</option>
+                      <option value="waves">Mer & Vagues</option>
+                      <option value="sst">Eau (SST)</option>
+                      <option value="pressure">Pression</option>
+                      <option value="rh">Humidité</option>
+                  </select>
               </div>
           </div>
         </CardContent>
@@ -387,19 +354,19 @@ export default function VesselTrackerPage() {
           
           <div className="absolute top-4 right-4 flex flex-col gap-3 z-20">
             <Button size="icon" className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-6 text-primary" /> : <Expand className="size-6 text-primary" />}</Button>
-            <Button onClick={handleRecenter} className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-0"><LocateFixed className="size-6 text-primary" /></Button>
+            <Button onClick={() => { if(currentPos && mapRef.current) mapRef.current.panTo([currentPos.lat, currentPos.lng]); }} className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-0"><LocateFixed className="size-6 text-primary" /></Button>
           </div>
         </div>
       </div>
 
       <div className="space-y-4">
           <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-              <History className="size-4" /> Analyse Tactique au Point
+              <History className="size-4" /> Analyse Tactique
           </h3>
           <Alert className="bg-muted/10 border-dashed border-2">
               <Info className="size-4 text-primary" />
               <AlertDescription className="text-[10px] font-bold uppercase leading-relaxed">
-                  Cliquez n'importe où sur la mer pour ouvrir le sélecteur Windy et obtenir un rapport complet incluant les marées et la température de l'eau.
+                  Cliquez n'importe où sur la mer pour ouvrir l'analyseur Windy et obtenir un rapport complet incluant les marées et la température de l'eau.
               </AlertDescription>
           </Alert>
       </div>
