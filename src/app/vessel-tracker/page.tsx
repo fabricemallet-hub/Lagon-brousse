@@ -3,50 +3,88 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, query, where, orderBy, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where } from 'firebase/firestore';
+import { GoogleMap, OverlayView } from '@react-google-maps/api';
+import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import Script from 'next/script';
 import { 
   Navigation, 
   Anchor, 
   LocateFixed, 
+  ShieldAlert, 
+  Save, 
+  WifiOff, 
+  Move, 
   Expand, 
   Shrink, 
   Zap, 
-  RefreshCw,
+  AlertTriangle,
+  Bell,
+  BatteryFull,
+  BatteryMedium,
+  BatteryLow,
+  BatteryCharging,
+  History,
+  MapPin,
+  ChevronDown,
   X,
-  Wind,
+  Play,
+  Volume2,
+  Check,
+  Trash2,
+  Ship,
+  Home,
+  RefreshCw,
+  Settings,
+  Battery,
+  MessageSquare,
+  Eye,
+  Smartphone,
+  Phone,
+  Mail,
   Waves,
+  Info,
+  Search,
+  Copy,
+  Layers,
+  Database,
   Activity,
   Thermometer,
   Gauge,
-  ShieldAlert,
-  ChevronDown,
-  ArrowUp,
-  Database,
-  Layers,
-  Search,
-  Copy,
-  Info,
-  Check
+  ArrowUp
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, UserAccount, Tide } from '@/lib/types';
+import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
 import { fetchWindyWeather } from '@/lib/windy-api';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getDataForDate } from '@/lib/data';
 
-// CLÉ "MAP FORECAST" POUR L'AFFICHAGE DE LA CARTE
+// CLÉ "MAP FORECAST" POUR L'AFFICHAGE DE LA CARTE (1gGm...)
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
-const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClose: () => void, isLoading: boolean, tides: Tide[] | null }) => {
+const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
+  if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
+  const props = { className: cn("size-4", className) };
+  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
+  if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
+  if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
+  return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
+};
+
+const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClose: () => void, isLoading: boolean, tides: any[] | null }) => {
     if (!data) return null;
     return (
         <div className="absolute z-[110] bg-slate-900/95 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[280px] animate-in zoom-in-95" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -110%)' }}>
@@ -59,7 +97,7 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
             
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <div className="flex flex-col">
-                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Wind className="size-2" /> Vent / Rafale</span>
+                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Wind className="size-2" /> Vent</span>
                     <div className="flex items-center gap-2">
                         <span className="text-sm font-black text-blue-400">
                             {data.windSpeed ?? '--'} <span className="text-[8px] opacity-60">ND</span>
@@ -68,17 +106,14 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
                             <ArrowUp className="size-3 text-white/40" style={{ transform: `rotate(${data.windDir}deg)` }} />
                         )}
                     </div>
-                    {data.gustSpeed > 0 && <span className="text-[9px] font-bold text-orange-400">Rafales : {data.gustSpeed} ND</span>}
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Waves className="size-2" /> Mer / Houle</span>
+                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Waves className="size-2" /> Mer</span>
                     <span className="text-sm font-black text-cyan-400">{data.waves ?? '--'}<span className="text-[8px] ml-0.5">m</span></span>
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Thermometer className="size-2" /> Air / Eau</span>
-                    <span className="text-sm font-black">
-                        {data.temp ?? '--'}° <span className="text-blue-300">/ {data.sst ?? '--'}°</span>
-                    </span>
+                    <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Thermometer className="size-2" /> Eau (SST)</span>
+                    <span className="text-sm font-black text-emerald-400">{data.sst ?? '--'}°C</span>
                 </div>
                 <div className="flex flex-col">
                     <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Gauge className="size-2" /> Pression</span>
@@ -105,36 +140,23 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
 };
 
 export default function VesselTrackerPage() {
-  const { user } = useUser();
+  const { user } = useUserHook();
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
-  const [isWindyLoaded, setIsWindyLoaded] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [currentOrigin, setCurrentOrigin] = useState('');
-  const [hasCopiedOrigin, setHasCopiedOrigin] = useState(false);
-  
   const [isSharing, setIsSharing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentModel, setCurrentModel] = useState('ecmwf');
   const [currentOverlay, setCurrentOverlay] = useState('wind');
   
   const [mapClickResult, setMapClickResult] = useState<any>(null);
-  const [pointTides, setPointTides] = useState<Tide[] | null>(null);
+  const [pointTides, setPointTides] = useState<any[] | null>(null);
   const [isQueryingWindy, setIsQueryingWindy] = useState(false);
   
   const mapRef = useRef<any>(null);
-  const windyMapInstance = useRef<any>(null);
-  const markersRef = useRef<Record<string, any>>({});
   const isMapInitializedRef = useRef<boolean>(false);
   const pickerTimerRef = useRef<any>(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') setCurrentOrigin(window.location.host);
-  }, []);
-
-  const sharingId = useMemo(() => (user?.uid || '').toUpperCase(), [user]);
 
   const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -142,22 +164,11 @@ export default function VesselTrackerPage() {
   }, [user, firestore]);
   const { data: profile } = useDoc<UserAccount>(userProfileRef);
 
-  const savedVesselIds = profile?.savedVesselIds || [];
-  const vesselsQuery = useMemoFirebase(() => {
-    if (!firestore || savedVesselIds.length === 0) return null;
-    const ids = [...savedVesselIds];
-    if (isSharing && !ids.includes(sharingId)) ids.push(sharingId);
-    return query(collection(firestore, 'vessels'), where('isSharing', '==', true), where('id', 'in', ids.slice(0, 10)));
-  }, [firestore, savedVesselIds, sharingId, isSharing]);
-  
-  const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
-
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
     isMapInitializedRef.current = true;
 
-    // Délai prolongé pour Cloud Workstations (laisser React finir le rendu)
     setTimeout(() => {
         const options = {
           key: MAP_FORECAST_KEY,
@@ -165,7 +176,7 @@ export default function VesselTrackerPage() {
           lon: INITIAL_CENTER.lng,
           zoom: 10,
           verbose: true,
-          externalAllowedOrigins: [window.location.host, "*.cloudworkstations.dev", "web.app"],
+          externalAllowedOrigins: [window.location.host],
           overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
           product: 'ecmwf',
         };
@@ -180,12 +191,10 @@ export default function VesselTrackerPage() {
 
               const { map, store, picker, broadcast } = windyAPI;
               mapRef.current = map;
-              windyMapInstance.current = windyAPI;
 
               store.set('overlay', 'wind');
               store.set('product', 'ecmwf');
 
-              // Optimisation du Picker avec Debounce (Evite les violations de thread)
               broadcast.on('pickerMoved', (latLon: any) => {
                 if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
                 
@@ -221,83 +230,25 @@ export default function VesselTrackerPage() {
   }, []);
 
   useEffect(() => {
-    if (isLeafletLoaded && isWindyLoaded) initWindy();
-  }, [isLeafletLoaded, isWindyLoaded, initWindy]);
-
-  useEffect(() => {
-    if (!mapRef.current || !followedVessels || !window.L) return;
-    const L = window.L;
-
-    const renderFleet = () => {
-        followedVessels.forEach(v => {
-          if (!v.location || !v.isSharing) {
-            if (markersRef.current[v.id]) { markersRef.current[v.id].remove(); delete markersRef.current[v.id]; }
-            return;
-          }
-
-          const pos = [v.location.latitude, v.location.longitude];
-          const color = v.status === 'stationary' ? '#f97316' : '#2563eb';
-
-          if (!markersRef.current[v.id]) {
-            const icon = L.divIcon({
-              className: 'vessel-marker',
-              html: `<div class="flex flex-col items-center" style="transform: translate(-50%, -100%)">
-                      <div class="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 mb-1">
-                        ${v.displayName || v.id}
-                      </div>
-                      <div class="p-1.5 rounded-full border-2 border-white shadow-xl" style="background-color: ${color}">
-                        <svg class="size-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                            <path d="M12 2v18M5 12h14"></path>
-                        </svg>
-                      </div>
-                    </div>`,
-              iconSize: [0, 0]
-            });
-            markersRef.current[v.id] = L.marker(pos, { icon }).addTo(mapRef.current);
-          } else {
-            markersRef.current[v.id].setLatLng(pos);
-          }
-        });
-    };
-
-    const frame = requestAnimationFrame(renderFleet);
-    return () => cancelAnimationFrame(frame);
-  }, [followedVessels]);
+    initWindy();
+  }, [initWindy]);
 
   const handleRecenter = () => {
-    const activeVessel = followedVessels?.find(v => v.isSharing);
-    if (activeVessel?.location && mapRef.current) {
-        mapRef.current.panTo([activeVessel.location.latitude, activeVessel.location.longitude]);
-        mapRef.current.setZoom(15);
-    } else {
-        toast({ description: "Aucun navire actif à centrer." });
+    if (mapRef.current) {
+        mapRef.current.panTo([INITIAL_CENTER.lat, INITIAL_CENTER.lng]);
+        mapRef.current.setZoom(10);
     }
   };
 
-  const handleSetModel = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const m = e.target.value;
-    setCurrentModel(m);
-    if (window.windyStore) window.windyStore.set('product', m);
-  };
-
-  const handleSetOverlay = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const o = e.target.value;
-    setCurrentOverlay(o);
-    if (window.windyStore) window.windyStore.set('overlay', o);
-  };
-
   const copyOrigin = () => {
-    navigator.clipboard.writeText(currentOrigin);
-    setHasCopiedOrigin(true);
-    toast({ title: "Hôte copié !" });
-    setTimeout(() => setHasCopiedOrigin(false), 2000);
+    if (typeof window !== 'undefined') {
+        navigator.clipboard.writeText(window.location.host);
+        toast({ title: "Hôte copié !" });
+    }
   };
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      <Script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" strategy="afterInteractive" onLoad={() => setIsLeafletLoaded(true)} />
-      <Script src={`https://api.windy.com/assets/map-forecast/libBoot.js?v=${Date.now()}`} strategy="lazyOnload" crossOrigin="anonymous" onLoad={() => setIsWindyLoaded(true)} />
-
       <meta name="referrer" content="no-referrer-when-downgrade" />
 
       {authError && (
@@ -306,19 +257,19 @@ export default function VesselTrackerPage() {
             <AlertTitle className="font-black uppercase text-sm mb-2">ERREUR AUTHENTIFICATION WINDY (401)</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cet hôte exact dans vos restrictions Windy (Clé 1gGm...) :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cet hôte exact (Utilisez des VIRGULES entre chaque domaine) :</p>
                     <div className="flex items-center gap-2">
-                        <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{currentOrigin}</code>
+                        <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{authError}</code>
                         <Button size="icon" variant="ghost" onClick={copyOrigin} className="h-10 w-10">
-                            {hasCopiedOrigin ? <Check className="size-4 text-green-600" /> : <Copy className="size-4" />}
+                            <Copy className="size-4" />
                         </Button>
                     </div>
                 </div>
                 <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
                     <p>1. Allez sur api.windy.com/keys</p>
                     <p>2. Modifiez la clé Map Forecast (1gGm...)</p>
-                    <p>3. Saisissez l'hôte ci-dessus séparé par une VIRGULE.</p>
-                    <p>4. N'oubliez pas d'ajouter également : <code className="bg-white/50 px-1">*.cloudworkstations.dev</code></p>
+                    <p>3. Saisissez les hôtes séparés par une **VIRGULE** (pas d'espace).</p>
+                    <p>4. Exemple : <code>*.cloudworkstations.dev, studio-2943478321-f746e.web.app, localhost</code></p>
                 </div>
             </AlertDescription>
         </Alert>
@@ -326,16 +277,11 @@ export default function VesselTrackerPage() {
 
       <Card className="border-2 shadow-sm overflow-hidden">
         <CardContent className="p-4 space-y-4">
-          <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/10">
-              <div className="space-y-0.5"><Label className="text-sm font-black uppercase">Partage GPS</Label><p className="text-[9px] font-bold text-muted-foreground uppercase">{isSharing ? 'En cours' : 'Inactif'}</p></div>
-              <Switch checked={isSharing} onCheckedChange={setIsSharing} className="touch-manipulation" />
-          </div>
-          
           <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Modèle</Label>
+                  <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Modèle Météo</Label>
                   <div className="relative">
-                      <select value={currentModel} onChange={handleSetModel} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
+                      <select value={currentModel} onChange={(e) => setCurrentModel(e.target.value)} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
                           <option value="ecmwf">ECMWF (9km)</option>
                           <option value="gfs">GFS (22km)</option>
                           <option value="icon">ICON (7km)</option>
@@ -346,10 +292,10 @@ export default function VesselTrackerPage() {
               <div className="space-y-1.5">
                   <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Calque Tactique</Label>
                   <div className="relative">
-                      <select value={currentOverlay} onChange={handleSetOverlay} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
+                      <select value={currentOverlay} onChange={(e) => setCurrentOverlay(e.target.value)} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
                           <option value="wind">Vent & Rafales</option>
                           <option value="waves">Mer & Vagues</option>
-                          <option value="sst">Eau (SST)</option>
+                          <option value="sst">Temp. Eau (SST)</option>
                           <option value="pressure">Pression</option>
                           <option value="rh">Humidité</option>
                       </select>
@@ -397,23 +343,4 @@ const getClosestCommune = (lat: number, lng: number) => {
         }
     });
     return closestName;
-};
-
-const locations: Record<string, { lat: number, lon: number }> = {
-    'Bélep': { lat: -19.70, lon: 163.66 }, 'Boulouparis': { lat: -21.86, lon: 165.99 },
-    'Bourail': { lat: -21.56, lon: 165.48 }, 'Canala': { lat: -21.52, lon: 165.96 },
-    'Dumbéa': { lat: -22.15, lon: 166.44 }, 'Farino': { lat: -21.64, lon: 165.77 },
-    'Hienghène': { lat: -20.68, lon: 164.93 }, 'Houaïlou': { lat: -21.28, lon: 165.62 },
-    'Ile des Pins': { lat: -22.64, lon: 167.48 }, 'Kaala-Gomen': { lat: -20.66, lon: 164.40 },
-    'Koné': { lat: -21.05, lon: 164.86 }, 'Kouaoua': { lat: -21.39, lon: 165.82 },
-    'Koumac': { lat: -20.56, lon: 164.28 }, 'La Foa': { lat: -21.71, lon: 165.82 },
-    'Lifou': { lat: -20.91, lon: 167.24 }, 'Maré': { lat: -21.48, lon: 167.98 },
-    'Moindou': { lat: -21.69, lon: 165.68 }, 'Le Mont-Dore': { lat: -22.21, lon: 166.57 },
-    'Nouméa': { lat: -22.27, lon: 166.45 }, 'Ouégoa': { lat: -20.35, lon: 164.43 },
-    'Ouvéa': { lat: -20.45, lon: 166.56 }, 'Païta': { lat: -22.13, lon: 166.35 },
-    'Poindimié': { lat: -20.94, lon: 165.33 }, 'Ponérihouen': { lat: -21.09, lon: 165.40 },
-    'Pouébo': { lat: -20.39, lon: 164.58 }, 'Pouembout': { lat: -21.13, lon: 164.90 },
-    'Poum': { lat: -20.23, lon: 164.02 }, 'Poya': { lat: -21.34, lon: 165.15 },
-    'Sarraméa': { lat: -21.63, lon: 165.84 }, 'Thio': { lat: -21.61, lon: 166.21 },
-    'Voh': { lat: -20.96, lon: 164.70 }, 'Yaté': { lat: -22.15, lon: 166.93 },
 };
