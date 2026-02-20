@@ -129,7 +129,7 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
                         {tides.slice(0, 2).map((t, i) => (
                             <div key={i} className="bg-white/5 rounded p-1.5 text-center">
                                 <p className={cn("text-[7px] font-black uppercase", t.type === 'haute' ? 'text-primary' : 'text-orange-400')}>Mer {t.type}</p>
-                                <p className="text-[10px] font-black">{t.time} • {t.height.toFixed(2)}m</p>
+                                <p className="text-10 font-black">{t.time} • {t.height.toFixed(2)}m</p>
                             </div>
                         ))}
                     </div>
@@ -282,8 +282,8 @@ export default function VesselTrackerPage() {
                 <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
                     <p>1. Allez sur <strong>api.windy.com/keys</strong></p>
                     <p>2. Modifiez la clé Map Forecast (<strong>1gGm...</strong>)</p>
-                    <p>3. Supprimez les espaces et utilisez des <strong>VIRGULES</strong>.</p>
-                    <p className="font-black text-xs text-red-600">Exemple: domaine1.dev,domaine2.app,localhost</p>
+                    <p>3. Utilisez des <strong>VIRGULES</strong> sans espaces.</p>
+                    <p className="font-black text-xs text-red-600">Exemple: *.cloudworkstations.dev,*.web.app,localhost</p>
                 </div>
             </AlertDescription>
         </Alert>
