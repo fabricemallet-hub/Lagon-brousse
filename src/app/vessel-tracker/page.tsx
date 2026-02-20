@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Globe, ShieldAlert, CheckCircle2, Copy, RefreshCw } from 'lucide-react';
+import { Globe, ShieldAlert, CheckCircle2, Copy, RefreshCw, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -33,10 +33,9 @@ export default function VesselTrackerPage() {
         script.id = id;
         script.src = src;
         script.async = true;
-        // On force l'envoi de l'URL complète pour le diagnostic
         script.referrerPolicy = 'unsafe-url';
         script.onload = () => resolve();
-        script.onerror = () => reject(new Error(`Erreur chargement: ${src}`));
+        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
         document.head.appendChild(script);
       });
     };
@@ -52,6 +51,16 @@ export default function VesselTrackerPage() {
         }
         meta.content = "unsafe-url";
 
+        // INTERCEPTION console.error pour éviter le crash Overlay de Next.js
+        const originalConsoleError = console.error;
+        console.error = (...args) => {
+          if (args[0] && typeof args[0] === 'string' && args[0].includes('Windy API key')) {
+            setError("401 Unauthorized - La clé a été rejetée par Windy.");
+            return;
+          }
+          originalConsoleError.apply(console, args);
+        };
+
         // Chargement séquentiel
         await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
         
@@ -62,6 +71,7 @@ export default function VesselTrackerPage() {
 
         if (!(window as any).windyInit) {
             setError("L'objet window.windyInit est introuvable.");
+            console.error = originalConsoleError;
             return;
         }
 
@@ -74,8 +84,11 @@ export default function VesselTrackerPage() {
 
         // Lancement de l'initialisation
         (window as any).windyInit(options, (windyAPI: any) => {
+          // Restauration de la console après init
+          console.error = originalConsoleError;
+          
           if (!windyAPI) {
-            setError("401 Unauthorized - La clé a été rejetée par Windy.");
+            setError("401 Unauthorized - Échec de validation du domaine par Windy.");
             return;
           }
           setIsInitialized(true);
@@ -101,49 +114,54 @@ export default function VesselTrackerPage() {
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2">
-            <Globe className="text-primary" /> Test Windy v17.9
+            <Globe className="text-primary" /> Diagnostic Windy v18.0
           </h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Diagnostic d'authentification</p>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Test d'authentification de production</p>
         </div>
-        {isInitialized && <Badge className="bg-green-600 text-white font-black px-3 py-1">AUTH VALIDÉE</Badge>}
+        {isInitialized ? (
+          <Badge className="bg-green-600 text-white font-black px-3 py-1">AUTH VALIDÉE</Badge>
+        ) : error ? (
+          <Badge variant="destructive" className="font-black px-3 py-1">ÉCHEC AUTH</Badge>
+        ) : (
+          <Badge variant="outline" className="font-black px-3 py-1 animate-pulse">INIT EN COURS...</Badge>
+        )}
       </div>
 
       {error && (
         <div className="animate-in slide-in-from-top-4 duration-500">
           <Alert variant="destructive" className="border-2 shadow-xl bg-white text-destructive">
-            <ShieldAlert className="size-5" />
-            <AlertTitle className="font-black uppercase text-sm mb-4">Erreur 401 - Accès refusé</AlertTitle>
+            <XCircle className="size-5" />
+            <AlertTitle className="font-black uppercase text-sm mb-4">Erreur d'accès à la carte (401)</AlertTitle>
             <AlertDescription className="space-y-4">
               <p className="text-xs font-medium text-slate-700 leading-relaxed">
-                Windy rejette la clé <strong>1gGm...</strong>. Voici les informations exactes que votre navigateur tente d'envoyer :
+                Windy rejette la clé car l'URL envoyée par votre navigateur ne correspond pas à vos restrictions.
               </p>
               
-              <div className="p-4 bg-red-50 rounded-2xl border-2 border-red-100 space-y-4">
-                <div className="space-y-1.5">
-                  <p className="text-[9px] font-black uppercase text-red-800 tracking-widest">Valeur Host (Hôte)</p>
-                  <div className="flex gap-2">
-                    <code className="flex-1 p-2 bg-white border-2 rounded-lg font-black text-xs truncate select-all">{host}</code>
-                    <Button size="icon" variant="outline" className="h-9 w-9 shrink-0" onClick={() => copyToClipboard(host)}><Copy className="size-4 text-slate-400" /></Button>
+              <div className="grid gap-3">
+                <div className="p-3 bg-red-50 rounded-xl border border-red-100 flex items-center justify-between">
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[8px] font-black uppercase opacity-60">Valeur Host (Hôte)</span>
+                    <code className="text-[10px] font-black truncate select-all">{host}</code>
                   </div>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => copyToClipboard(host)}><Copy className="size-3" /></Button>
                 </div>
-
-                <div className="space-y-1.5">
-                  <p className="text-[9px] font-black uppercase text-red-800 tracking-widest">Valeur Origin (Origine)</p>
-                  <div className="flex gap-2">
-                    <code className="flex-1 p-2 bg-white border-2 rounded-lg font-black text-xs truncate select-all">{origin}</code>
-                    <Button size="icon" variant="outline" className="h-9 w-9 shrink-0" onClick={() => copyToClipboard(origin)}><Copy className="size-4 text-slate-400" /></Button>
+                <div className="p-3 bg-red-50 rounded-xl border border-red-100 flex items-center justify-between">
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[8px] font-black uppercase opacity-60">Valeur Origin (Origine)</span>
+                    <code className="text-[10px] font-black truncate select-all">{origin}</code>
                   </div>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => copyToClipboard(origin)}><Copy className="size-3" /></Button>
                 </div>
               </div>
 
-              <div className="p-4 bg-blue-50 rounded-2xl border-2 border-blue-100 space-y-3">
-                <p className="text-[10px] font-black uppercase text-blue-800 tracking-widest flex items-center gap-2">
-                  <CheckCircle2 className="size-3" /> Solution :
+              <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-3">
+                <p className="text-[10px] font-black uppercase text-blue-800 flex items-center gap-2">
+                  <CheckCircle2 className="size-3" /> Action corrective :
                 </p>
                 <ol className="text-[11px] space-y-2 list-decimal list-inside text-slate-700 font-medium">
-                  <li>Copiez l'<strong>Hôte</strong> ci-dessus via le bouton.</li>
+                  <li>Copiez l'<strong>Hôte</strong> ci-dessus.</li>
                   <li>Allez sur <a href="https://api.windy.com/keys" target="_blank" className="underline font-black text-blue-600">votre console Windy</a>.</li>
-                  <li>Remplacez vos restrictions par l'hôte copié (sans http).</li>
+                  <li>Remplacez vos restrictions par l'hôte exactement tel qu'il est écrit.</li>
                   <li>Sauvegardez et rafraîchissez cette page.</li>
                 </ol>
               </div>
@@ -165,12 +183,6 @@ export default function VesselTrackerPage() {
                 <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Initialisation des scripts...</p>
             </div>
         )}
-      </div>
-
-      <div className="bg-muted/30 p-4 rounded-2xl border-2 border-dashed text-center">
-        <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.2em]">
-          Mode Diagnostic • Clé 1gGm... • v17.9
-        </p>
       </div>
     </div>
   );
