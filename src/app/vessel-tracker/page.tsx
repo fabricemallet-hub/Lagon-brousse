@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -70,7 +69,7 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 import { locations } from '@/lib/locations';
 
-// CLÉ "PRÉVISIONS CARTOGRAPHIQUES" (Validée sur Windy.com)
+// CLÉ "PRÉVISIONS CARTOGRAPHIQUES" (Souveraine pour la carte)
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -149,10 +148,9 @@ export default function VesselTrackerPage() {
   const mapRef = useRef<any>(null);
   const pickerTimerRef = useRef<any>(null);
 
-  // 1. FORCER LE REFERRER COMPLET AU DÉMARRAGE
+  // 1. FORCER LA POLITIQUE DE REFERRER POUR L'AUTH PROD
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    // Manipulation directe pour garantir l'envoi de l'URL du cluster
     let meta = document.querySelector('meta[name="referrer"]') as HTMLMetaElement;
     if (!meta) {
         meta = document.createElement('meta');
@@ -160,10 +158,11 @@ export default function VesselTrackerPage() {
         document.head.appendChild(meta);
     }
     meta.setAttribute("content", "no-referrer-when-downgrade");
+    document.referrerPolicy = "no-referrer-when-downgrade";
   }, []);
 
-  // 2. FONCTION DE LANCEMENT MANUEL (SANS BOUCLE)
-  const manualWindyLaunch = useCallback(() => {
+  // 2. LANCEMENT STABILISÉ DE LA CARTE
+  const initWindyMap = useCallback(() => {
     if (typeof window === 'undefined' || isInitializing || hasLaunched) return;
     setIsInitializing(true);
 
@@ -183,10 +182,9 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
-            // Chargement de Leaflet
+            // Chargement de Leaflet indispensable à Windy
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
-            // Attente courte stabilisée
             let retries = 0;
             while (!(window as any).L && retries < 15) { 
                 await new Promise(r => setTimeout(r, 500)); 
@@ -195,7 +193,7 @@ export default function VesselTrackerPage() {
             
             if (!(window as any).L) throw new Error("Leaflet non détecté.");
 
-            // Chargement de Windy
+            // Chargement de la bibliothèque Windy
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const key = MAP_FORECAST_KEY.trim();
@@ -204,12 +202,12 @@ export default function VesselTrackerPage() {
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
-                verbose: true,
+                verbose: false,
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
 
-            // Injection directe de secours
+            // Injection directe dans l'objet global pour sécuriser l'authentification
             if ((window as any).W) {
                 (window as any).W.key = key;
             }
@@ -227,6 +225,7 @@ export default function VesselTrackerPage() {
                 store.set('overlay', 'wind');
                 store.set('product', 'ecmwf');
 
+                // Listener sur le sélecteur de point (Picker)
                 broadcast.on('pickerMoved', (latLon: any) => {
                     if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
                     pickerTimerRef.current = setTimeout(async () => {
@@ -255,11 +254,11 @@ export default function VesselTrackerPage() {
     attemptInit();
   }, [isInitializing, hasLaunched]);
 
-  // Lancement automatique après 3 secondes (une seule fois)
+  // Initialisation automatique différée
   useEffect(() => {
-    const timer = setTimeout(manualWindyLaunch, 3000);
+    const timer = setTimeout(initWindyMap, 2000);
     return () => clearTimeout(timer);
-  }, [manualWindyLaunch]);
+  }, [initWindyMap]);
 
   const handleRecenter = () => {
     if (mapRef.current) {
@@ -270,29 +269,20 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      {/* TEST SUR DOMAINE DE SECOURS WEBAPP */}
-      {!hasLaunched && !isInitializing && (
-          <Alert className="bg-primary/5 border-primary/20 animate-in fade-in">
-              <Zap className="size-4 text-primary" />
-              <AlertTitle className="text-xs font-black uppercase">Erreur d'authentification ?</AlertTitle>
-              <AlertDescription className="flex flex-col gap-3">
-                  <p className="text-[10px] font-medium leading-relaxed">Si la carte reste grise sur Cloud Workstations, utilisez le domaine de secours déjà validé par Windy.</p>
-                  <Button asChild variant="outline" className="h-10 font-black uppercase text-[10px] border-2 bg-white gap-2">
-                      <a href="https://studio-2943478321-f746e.web.app/vessel-tracker" target="_blank" rel="noopener noreferrer">
-                          <RefreshCw className="size-3" /> Ouvrir sur L&B WebApp
-                      </a>
-                  </Button>
-              </AlertDescription>
-          </Alert>
-      )}
-
       <Card className="border-2 shadow-sm overflow-hidden">
         <CardContent className="p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                   <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Modèle Météo</Label>
                   <div className="relative">
-                      <select value={currentModel} onChange={(e) => { setCurrentModel(e.target.value); if(mapRef.current) mapRef.current.fire('changeModel', e.target.value); }} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
+                      <select 
+                        value={currentModel} 
+                        onChange={(e) => { 
+                            setCurrentModel(e.target.value); 
+                            if(mapRef.current) mapRef.current.fire('changeModel', e.target.value); 
+                        }} 
+                        className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none"
+                      >
                           <option value="ecmwf">ECMWF (9km)</option>
                           <option value="gfs">GFS (22km)</option>
                           <option value="icon">ICON (7km)</option>
@@ -303,7 +293,14 @@ export default function VesselTrackerPage() {
               <div className="space-y-1.5">
                   <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Calque Tactique</Label>
                   <div className="relative">
-                      <select value={currentOverlay} onChange={(e) => { setCurrentOverlay(e.target.value); if(mapRef.current) mapRef.current.fire('changeOverlay', e.target.value); }} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
+                      <select 
+                        value={currentOverlay} 
+                        onChange={(e) => { 
+                            setCurrentOverlay(e.target.value); 
+                            if(mapRef.current) mapRef.current.fire('changeOverlay', e.target.value); 
+                        }} 
+                        className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none"
+                      >
                           <option value="wind">Vent & Rafales</option>
                           <option value="waves">Mer & Vagues</option>
                           <option value="sst">Temp. Eau (SST)</option>
@@ -329,9 +326,9 @@ export default function VesselTrackerPage() {
                   ) : (
                       <>
                         <AlertTriangle className="size-12 text-amber-500" />
-                        <p className="font-black uppercase text-xs text-slate-600">La carte n'a pas pu démarrer</p>
-                        <Button onClick={manualWindyLaunch} className="font-black uppercase text-[10px] h-12 gap-2 shadow-lg">
-                            <Play className="size-4" /> Relancer manuellement
+                        <p className="font-black uppercase text-xs text-slate-600">La carte requiert une connexion stable</p>
+                        <Button onClick={initWindyMap} className="font-black uppercase text-[10px] h-12 gap-2 shadow-lg mt-2">
+                            <Play className="size-4" /> Relancer la carte
                         </Button>
                       </>
                   )}
