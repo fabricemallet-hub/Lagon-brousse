@@ -170,7 +170,6 @@ export default function VesselTrackerPage() {
             script.id = id;
             script.src = src;
             script.async = true;
-            // GESTION DU REFERRER : On s'assure que l'hôte cloudworkstations est transmis
             script.referrerPolicy = 'no-referrer-when-downgrade';
             script.onload = () => resolve();
             script.onerror = () => reject(new Error(`Failed to load ${src}`));
@@ -183,7 +182,6 @@ export default function VesselTrackerPage() {
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
             let retries = 0;
-            // OPTIMISATION : Ralentissement de la boucle pour éviter les violations
             while (!(window as any).L && retries < 30) { 
                 await new Promise(r => setTimeout(r, 300)); 
                 retries++; 
@@ -198,12 +196,11 @@ export default function VesselTrackerPage() {
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
-                verbose: true, // MODE VERBOSE ACTIVÉ POUR DIAGNOSTIC 401
+                verbose: true,
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
 
-            // LOG TECHNIQUE DE LA CLÉ UTILISÉE
             console.log("Clé utilisée pour windyInit:", options.key);
 
             try {
@@ -248,10 +245,9 @@ export default function VesselTrackerPage() {
     };
 
     attemptInit();
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
-    // DÉLAI PORTÉ À 3000ms POUR LA STABILITÉ
     const timer = setTimeout(initWindy, 3000);
     const diagTimer = setTimeout(() => {
         if (!mapRef.current) setAuthError(window.location.host);
@@ -276,7 +272,6 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      {/* Balise Referrer explicite */}
       <meta name="referrer" content="no-referrer-when-downgrade" />
 
       {authError && (
