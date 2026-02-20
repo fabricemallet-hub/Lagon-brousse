@@ -98,7 +98,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 // CONFIGURATION WINDY (CLÉ DE PRODUCTION UNIQUE)
-const MAP_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
+const WINDY_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
@@ -128,8 +128,9 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
 
   const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
+  const [viewMode, setViewMode] = useState<'osm' | 'windy'>('osm');
   const [isSharing, setIsSharing] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [isWindyInitialized, setIsWindyInitialized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isFollowMode, setIsFollowMode] = useState(false);
   const [map, setMap] = useState<any>(null);
@@ -195,238 +196,163 @@ export default function VesselTrackerPage() {
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname, currentPos]);
 
   const watchIdRef = useRef<number | null>(null);
-  const mapMarkersRef = useRef<Record<string, { marker: any, circle?: any }>>({});
+  const mapMarkersRef = useRef<Record<string, any>>({});
   const lastSentStatusRef = useRef<string | null>(null);
   const lastStatusesRef = useRef<Record<string, string>>({});
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  // LOGIQUE DE CHANGEMENT DE CALQUE AVEC SECURITE ET RETRY (Stricte)
+  // LOGIQUE DE CHANGEMENT DE CALQUE (Stricte pour Windy)
   const handleLayerChange = useCallback((layerId: string) => {
-    if (!layerId || !(window as any).W) return;
+    if (!layerId || !(window as any).W || viewMode !== 'windy') return;
 
-    const performChange = (retry = true) => {
-      // Exécution asynchrone optimale pour le navigateur
-      requestAnimationFrame(() => {
-        try {
-          const W = (window as any).W;
-          const store = W.store;
-          if (!store) return;
+    requestAnimationFrame(() => {
+      try {
+        const W = (window as any).W;
+        const store = W.store;
+        if (!store) return;
 
-          // Sécurité : vérifier si le dictionnaire Windy est prêt
-          try {
-            store.get('overlay');
-          } catch (e) {
-            if (retry) {
-              console.warn("windyStore non prêt, nouvel essai dans 500ms...");
-              setTimeout(() => performChange(false), 500);
-            }
-            return;
-          }
-
-          // Mappage strict demandé
-          switch(layerId) {
-            case 'gust':
-                store.set('overlay', 'wind');
-                store.set('product', 'gust');
-                break;
-            case 'satellite':
-                store.set('overlay', 'satellite');
-                break;
-            case 'radar':
-                store.set('overlay', 'radar');
-                break;
-            case 'rain':
-                store.set('overlay', 'rain');
-                break;
-            case 'waves':
-                store.set('overlay', 'waves');
-                break;
-            case 'uv':
-                store.set('overlay', 'uv');
-                break;
-            default:
-                store.set('overlay', layerId);
-          }
-
-          setActiveOverlay(layerId);
-          setIsLayersOpen(false);
-          toast({ title: `Activation : ${layerId.toUpperCase()}` });
-        } catch (err) {
-          console.error("Windy Layer Change Error:", err);
+        switch(layerId) {
+          case 'gust':
+              store.set('overlay', 'wind');
+              store.set('product', 'gust');
+              break;
+          case 'satellite':
+              store.set('overlay', 'satellite');
+              break;
+          case 'radar':
+              store.set('overlay', 'radar');
+              break;
+          case 'rain':
+              store.set('overlay', 'rain');
+              break;
+          case 'waves':
+              store.set('overlay', 'waves');
+              break;
+          case 'uv':
+              store.set('overlay', 'uv');
+              break;
+          default:
+              store.set('overlay', layerId);
         }
-      });
-    };
 
-    performChange();
-  }, [toast]);
-
-  const toggleSatellite = () => {
-    const next = activeOverlay === 'satellite' ? 'wind' : 'satellite';
-    handleLayerChange(next);
-  };
+        setActiveOverlay(layerId);
+        setIsLayersOpen(false);
+        toast({ title: `Calque : ${layerId.toUpperCase()}` });
+      } catch (err) {
+        console.error("Windy Layer Error:", err);
+      }
+    });
+  }, [toast, viewMode]);
 
   const handleRecenter = useCallback(() => {
     if (!map) return;
     const activeVessel = followedVessels?.find(v => v.id === sharingId);
     const pos = mode === 'sender' ? currentPos : (activeVessel?.location ? { lat: activeVessel.location.latitude, lng: activeVessel.location.longitude } : null);
     if (pos) {
-        map.setView([pos.lat, pos.lng], 18, { animate: true });
+        map.setView([pos.lat, pos.lng], 18);
         toast({ title: "Recentrage Tactique" });
     }
   }, [map, mode, currentPos, followedVessels, sharingId, toast]);
 
-  const handleZoomIn = () => map?.zoomIn();
-  const handleZoomOut = () => map?.zoomOut();
-
-  const handleSaveVessel = async () => {
-    if (!user || !firestore) return;
-    const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
-    if (!cleanId) return;
-    updateDoc(doc(firestore, 'users', user.uid), {
-        savedVesselIds: arrayUnion(cleanId),
-        lastVesselId: cleanId
-    }).then(() => {
-        setVesselIdToFollow('');
-        toast({ title: "Navire enregistré" });
-    });
-  };
-
-  const handleRemoveSavedVessel = async (id: string) => {
-    if (!user || !firestore) return;
-    updateDoc(doc(firestore, 'users', user.uid), {
-        savedVesselIds: arrayRemove(id)
-    });
-  };
-
-  const handleSaveSmsSettings = async () => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            emergencyContact: emergencyContact,
-            vesselSmsMessage: vesselSmsMessage,
-            isEmergencyEnabled: isEmergencyEnabled,
-            isCustomMessageEnabled: isCustomMessageEnabled
-        });
-        toast({ title: "Paramètres SMS sauvegardés" });
-    } catch (e) {
-        toast({ variant: 'destructive', title: "Erreur sauvegarde SMS" });
-    }
-  };
-
-  const playVesselSound = useCallback((soundId: string) => {
-    if (!vesselPrefs.isNotifyEnabled) return;
-    const sound = availableSounds.find(s => s.id === soundId || s.label === soundId);
-    if (sound) {
-        const audio = new Audio(sound.url);
-        audio.volume = vesselPrefs.vesselVolume;
-        audio.play().catch(() => {});
-    }
-  }, [vesselPrefs, availableSounds]);
-
-  const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>) => {
-    if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
-    
-    const vesselRef = doc(firestore, 'vessels', sharingId);
-    let batteryUpdate: any = {};
-    if ('getBattery' in navigator) {
-        const b: any = await (navigator as any).getBattery();
-        batteryUpdate = { batteryLevel: Math.round(b.level * 100), isCharging: b.charging };
-    }
-
-    const payload: any = {
-        id: sharingId,
-        userId: user.uid,
-        displayName: vesselNickname || user.displayName || 'Capitaine',
-        isSharing: data.isSharing ?? isSharing,
-        lastActive: serverTimestamp(),
-        status: data.status || vesselStatus,
-        ...batteryUpdate,
-        ...data
-    };
-
-    if (payload.status !== lastSentStatusRef.current || data.eventLabel) {
-        payload.statusChangedAt = serverTimestamp();
-        lastSentStatusRef.current = payload.status;
-    }
-
-    setDoc(vesselRef, payload, { merge: true }).catch(() => {});
-    setSyncCountdown(60);
-  }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
-
-  useEffect(() => {
+  // INITIALISATION OPENSTREETMAP (PAR DÉFAUT)
+  const initOsmMap = useCallback(() => {
     if (typeof window === 'undefined') return;
-    const initMap = async () => {
-      try {
-        if (!document.getElementById('leaflet-js')) {
-          const s = document.createElement('script'); s.id = 'leaflet-js'; s.src = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js'; s.async = true;
-          document.head.appendChild(s);
-        }
-        (window as any).W = { apiKey: MAP_KEY };
+    const L = (window as any).L;
+    if (!L || map) return;
+
+    const osm = L.map('map-container', {
+        center: [INITIAL_CENTER.lat, INITIAL_CENTER.lng],
+        zoom: 13,
+        zoomControl: false,
+        attributionControl: false
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+    }).addTo(osm);
+
+    setMap(osm);
+    setViewMode('osm');
+  }, [map]);
+
+  // INITIALISATION WINDY (DYNAMIQUE)
+  const initWindyMap = useCallback(async () => {
+    if (typeof window === 'undefined' || isWindyInitialized) return;
+    
+    try {
         if (!document.getElementById('windy-boot')) {
-          const s = document.createElement('script'); s.id = 'windy-boot'; s.src = 'https://api.windy.com/assets/map-forecast/libBoot.js'; s.async = true;
-          document.head.appendChild(s);
+            const s = document.createElement('script');
+            s.id = 'windy-boot';
+            s.src = 'https://api.windy.com/assets/map-forecast/libBoot.js';
+            s.async = true;
+            document.head.appendChild(s);
         }
 
         const check = setInterval(() => {
-          if ((window as any).windyInit) {
-            clearInterval(check);
-            try {
-                (window as any).windyInit({ 
-                  key: MAP_KEY, 
-                  lat: INITIAL_CENTER.lat, 
-                  lon: INITIAL_CENTER.lng, 
-                  zoom: 13,
-                  labels: true 
-                }, (api: any) => {
-                  const { map, store } = api;
-                  setMap(map);
-                  map.setMaxZoom(18);
-                  
-                  // Initialisation sécurisée sur Satellite par défaut
-                  requestAnimationFrame(() => {
-                    try {
-                        store.set('overlay', 'satellite');
-                        setActiveOverlay('satellite');
-                    } catch (e) {
-                        store.set('overlay', 'wind');
-                        setActiveOverlay('wind');
-                    }
-                    setIsInitialized(true);
-                  });
+            if ((window as any).windyInit) {
+                clearInterval(check);
+                try {
+                    if (map) map.remove(); // On détruit l'instance OSM si elle existe
 
-                  const picker = (window as any).W.picker;
-                  picker.on('pickerOpened', (data: any) => {
-                      setPickerData(data);
-                      if (data.overlay === 'wind') setVesselValueAtPos(`${Math.round(data.wind * 1.94384)} kts`);
-                      else if (data.overlay === 'waves') setVesselValueAtPos(`${data.waves.toFixed(1)}m`);
-                      else if (data.overlay === 'temp') setVesselValueAtPos(`${Math.round(data.temp - 273.15)}°C`);
-                      else setVesselValueAtPos('--');
-                  });
-                  picker.on('pickerClosed', () => setPickerData(null));
-                });
-            } catch (initErr) {
-                console.error("Windy Init Error:", initErr);
+                    (window as any).windyInit({
+                        key: WINDY_KEY,
+                        lat: INITIAL_CENTER.lat,
+                        lon: INITIAL_CENTER.lng,
+                        zoom: 13,
+                        labels: true
+                    }, (api: any) => {
+                        const { map: windyMap, store } = api;
+                        setMap(windyMap);
+                        windyMap.setMaxZoom(18);
+                        
+                        requestAnimationFrame(() => {
+                            try {
+                                store.set('overlay', 'satellite');
+                                setActiveOverlay('satellite');
+                            } catch (e) {}
+                            setIsWindyInitialized(true);
+                            setViewMode('windy');
+                        });
+
+                        const picker = (window as any).W.picker;
+                        picker.on('pickerOpened', (data: any) => {
+                            setPickerData(data);
+                            if (data.overlay === 'wind') setVesselValueAtPos(`${Math.round(data.wind * 1.94384)} kts`);
+                            else if (data.overlay === 'waves') setVesselValueAtPos(`${data.waves.toFixed(1)}m`);
+                            else if (data.overlay === 'temp') setVesselValueAtPos(`${Math.round(data.temp - 273.15)}°C`);
+                            else setVesselValueAtPos('--');
+                        });
+                        picker.on('pickerClosed', () => setPickerData(null));
+                    });
+                } catch (e) {
+                    console.error("Windy Boot Error", e);
+                }
             }
-          }
         }, 200);
-      } catch (e) {}
-    };
-    initMap();
-  }, [toast]);
+    } catch (e) {}
+  }, [isWindyInitialized, map]);
 
-  // Optimisation Performance : Listeners Passifs (Anti-Violation)
+  const toggleViewMode = () => {
+    if (viewMode === 'osm') {
+        initWindyMap();
+    } else {
+        window.location.reload(); // Pour simplifier le déchargement total de Windy qui est intrusif
+    }
+  };
+
   useEffect(() => {
-    const el = mapContainerRef.current;
-    if (!el) return;
-    const opt = { passive: true };
-    const noop = () => {};
-    el.addEventListener('wheel', noop, opt);
-    el.addEventListener('touchstart', noop, opt);
-    return () => {
-        el.removeEventListener('wheel', noop);
-        el.removeEventListener('touchstart', noop);
-    };
-  }, [isInitialized]);
+    if (typeof window === 'undefined') return;
+    if (!document.getElementById('leaflet-js')) {
+        const s = document.createElement('script');
+        s.id = 'leaflet-js';
+        s.src = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js';
+        s.async = true;
+        document.head.appendChild(s);
+        s.onload = () => initOsmMap();
+    } else {
+        initOsmMap();
+    }
+  }, [initOsmMap]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) return;
@@ -480,7 +406,7 @@ export default function VesselTrackerPage() {
         
         if (!vessel.isSharing || isOffline) {
             if (mapMarkersRef.current[vessel.id]) {
-                map.removeLayer(mapMarkersRef.current[vessel.id].marker);
+                map.removeLayer(mapMarkersRef.current[vessel.id]);
                 delete mapMarkersRef.current[vessel.id];
             }
             return;
@@ -505,11 +431,11 @@ export default function VesselTrackerPage() {
 
         if (!mapMarkersRef.current[vessel.id]) {
             const marker = L.marker(pos, { icon: L.divIcon({ html: iconHtml, className: '', iconSize: [60, 80], iconAnchor: [30, 80] }) }).addTo(map);
-            mapMarkersRef.current[vessel.id] = { marker };
+            mapMarkersRef.current[vessel.id] = marker;
         } else {
-            const entry = mapMarkersRef.current[vessel.id];
-            entry.marker.setLatLng(pos);
-            entry.marker.setIcon(L.divIcon({ html: iconHtml, className: '', iconSize: [60, 80], iconAnchor: [30, 80] }));
+            const marker = mapMarkersRef.current[vessel.id];
+            marker.setLatLng(pos);
+            marker.setIcon(L.divIcon({ html: iconHtml, className: '', iconSize: [60, 80], iconAnchor: [30, 80] }));
         }
 
         const lastStatus = lastStatusesRef.current[vessel.id];
@@ -530,7 +456,6 @@ export default function VesselTrackerPage() {
   const handleManualStatusSet = (st: VesselStatus['status'], label: string) => {
     setVesselStatus(st);
     updateVesselInFirestore({ status: st, eventLabel: label });
-    playVesselSound('sonar');
     toast({ title: label });
   };
 
@@ -540,18 +465,12 @@ export default function VesselTrackerPage() {
     if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
   };
 
-  const toggleWakeLockInternal = async () => {
-    if (!('wakeLock' in navigator)) return;
-    if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
-    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); lock.addEventListener('release', () => setWakeLock(null)); } catch (err) {} }
-  };
-
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       <header className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2"><Globe className="text-primary" /> Cockpit Navigation</h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Pilot Interface v22.4</p>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Pilot Interface v22.5</p>
         </div>
         <div className="flex bg-slate-900/10 p-1 rounded-xl border-2">
           <Button variant={mode === 'sender' ? 'default' : 'ghost'} size="sm" className="font-black uppercase text-[9px] h-8 px-3" onClick={() => setMode('sender')}>Émetteur (A)</Button>
@@ -578,7 +497,7 @@ export default function VesselTrackerPage() {
               <div className="flex items-center gap-6 border-l border-white/10 pl-6 h-full">
                   <div className="flex flex-col items-end">
                       <span className="text-[8px] font-black uppercase text-slate-500">Capteur Windy</span>
-                      <p className="text-sm font-black text-blue-400 uppercase">{activeOverlay} : {vesselValueAtPos}</p>
+                      <p className="text-sm font-black text-blue-400 uppercase">{viewMode === 'windy' ? `${activeOverlay} : ${vesselValueAtPos}` : 'Désactivé'}</p>
                   </div>
                   <Badge variant="outline" className="border-green-500/50 text-green-400 font-black text-[9px]">SIGNAL ACTIF</Badge>
               </div>
@@ -586,18 +505,20 @@ export default function VesselTrackerPage() {
       </div>
 
       <div ref={mapContainerRef} className={cn("relative w-full transition-all bg-slate-950 rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden", isFullscreen ? "fixed inset-0 z-[150] h-screen w-screen rounded-none" : "h-[600px]")}>
-        <div id="windy" className="w-full h-full"></div>
-        <div className={cn("absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 bg-slate-950 transition-opacity z-10", isInitialized ? "opacity-0 invisible pointer-events-none" : "opacity-100 visible")}>
+        <div id="map-container" className="absolute inset-0"></div>
+        <div id="windy" className={cn("absolute inset-0", viewMode !== 'windy' && "hidden")}></div>
+        
+        <div className={cn("absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 bg-slate-950 transition-opacity z-10", (map || isWindyInitialized) ? "opacity-0 invisible pointer-events-none" : "opacity-100 visible")}>
             <RefreshCw className="size-10 animate-spin text-primary/40" />
             <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Initialisation Système...</p>
         </div>
         
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-[160]">
-            <Button size="icon" className={cn("bg-slate-900/90 text-white backdrop-blur-md border-2 h-12 w-12 shadow-2xl transition-all", isLayersOpen ? "border-primary" : "border-white/10")} onClick={() => setIsLayersOpen(!isLayersOpen)}>
+            <Button size="icon" className={cn("bg-slate-900/90 text-white backdrop-blur-md border-2 h-12 w-12 shadow-2xl transition-all", isLayersOpen ? "border-primary" : "border-white/10", viewMode !== 'windy' && "opacity-40")} onClick={() => viewMode === 'windy' && setIsLayersOpen(!isLayersOpen)}>
                 <LayoutGrid className="size-6" />
             </Button>
             
-            {isLayersOpen && (
+            {isLayersOpen && viewMode === 'windy' && (
                 <div className="flex flex-col gap-2 animate-in slide-in-from-left-4 duration-300">
                     {WINDY_LAYERS.map(layer => (
                         <Button key={layer.id} size="icon" className={cn("size-12 rounded-full shadow-xl border-2 transition-all backdrop-blur-lg", activeOverlay === layer.id ? "bg-primary border-white scale-110" : "bg-slate-900/80 border-white/10")} onClick={() => handleLayerChange(layer.id)}>
@@ -610,24 +531,24 @@ export default function VesselTrackerPage() {
             <div className="mt-4 flex flex-col gap-2">
                 <Button size="icon" className="bg-white/90 border-2 h-10 w-10 shadow-xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5 text-primary" /> : <Expand className="size-5 text-primary" />}</Button>
                 
-                <Button size="icon" className={cn("bg-white border-2 h-10 w-10 shadow-xl", activeOverlay === 'satellite' ? "border-primary bg-primary/10" : "border-slate-200")} onClick={toggleSatellite}>
-                    <Globe className={cn("size-5", activeOverlay === 'satellite' ? "text-primary" : "text-slate-400")} />
-                </Button>
-
                 <Button size="icon" className={cn("bg-white border-2 h-10 w-10 shadow-xl", isFollowMode ? "border-blue-500 bg-blue-50" : "border-slate-200")} onClick={() => setIsFollowMode(!isFollowMode)}>
                     {isFollowMode ? <Lock className="size-5 text-blue-600" /> : <Unlock className="size-5 text-slate-400" />}
                 </Button>
                 
                 <Button onClick={handleRecenter} className="h-10 bg-primary text-white border-2 border-white/20 px-3 gap-2 shadow-xl font-black uppercase text-[9px]">RECENTRER <LocateFixed className="size-4" /></Button>
-                
-                <div className="flex flex-col gap-1 mt-2">
-                    <Button size="icon" className="bg-slate-900/80 text-white border-2 border-white/10 h-10 w-10 shadow-xl" onClick={handleZoomIn}><Plus className="size-5" /></Button>
-                    <Button size="icon" className="bg-slate-900/80 text-white border-2 border-white/10 h-10 w-10 shadow-xl" onClick={handleZoomOut}><Minus className="size-5" /></Button>
-                </div>
             </div>
         </div>
 
-        {pickerData && (
+        {/* SWITCH VUE BUTTON */}
+        <Button 
+            onClick={toggleViewMode}
+            className="absolute top-4 right-4 z-[170] bg-slate-900/80 backdrop-blur-md border-2 border-white/20 font-black uppercase text-[10px] h-12 px-4 shadow-2xl hover:bg-slate-800 transition-all rounded-xl gap-2"
+        >
+            <RefreshCw className={cn("size-4", viewMode === 'windy' && "text-primary")} />
+            SWITCH VUE ({viewMode === 'osm' ? 'WINDY' : 'OSM'})
+        </Button>
+
+        {pickerData && viewMode === 'windy' && (
             <div className="absolute bottom-6 left-6 right-6 z-[160] animate-in slide-in-from-bottom-4 duration-300">
                 <Card className="bg-slate-900/95 backdrop-blur-xl border-2 border-primary/30 text-white shadow-2xl overflow-hidden rounded-3xl">
                     <CardHeader className="p-4 border-b border-white/10 flex flex-row items-center justify-between space-y-0">
@@ -743,4 +664,68 @@ export default function VesselTrackerPage() {
       </Card>
     </div>
   );
+
+  async function handleSaveSmsSettings() {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            emergencyContact: emergencyContact,
+            vesselSmsMessage: vesselSmsMessage,
+            isEmergencyEnabled: isEmergencyEnabled,
+            isCustomMessageEnabled: isCustomMessageEnabled
+        });
+        toast({ title: "Paramètres SMS sauvegardés" });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur sauvegarde SMS" });
+    }
+  }
+
+  async function handleSaveVessel() {
+    if (!user || !firestore) return;
+    const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
+    if (!cleanId) return;
+    updateDoc(doc(firestore, 'users', user.uid), {
+        savedVesselIds: arrayUnion(cleanId),
+        lastVesselId: cleanId
+    }).then(() => {
+        setVesselIdToFollow('');
+        toast({ title: "Navire enregistré" });
+    });
+  }
+
+  async function handleRemoveSavedVessel(id: string) {
+    if (!user || !firestore) return;
+    updateDoc(doc(firestore, 'users', user.uid), {
+        savedVesselIds: arrayRemove(id)
+    });
+  }
+
+  function updateVesselInFirestore(data: Partial<VesselStatus>) {
+    if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
+    
+    const vesselRef = doc(firestore, 'vessels', sharingId);
+    const payload: any = {
+        id: sharingId,
+        userId: user.uid,
+        displayName: vesselNickname || user.displayName || 'Capitaine',
+        isSharing: data.isSharing ?? isSharing,
+        lastActive: serverTimestamp(),
+        status: data.status || vesselStatus,
+        ...data
+    };
+
+    if (payload.status !== lastSentStatusRef.current || data.eventLabel) {
+        payload.statusChangedAt = serverTimestamp();
+        lastSentStatusRef.current = payload.status;
+    }
+
+    setDoc(vesselRef, payload, { merge: true }).catch(() => {});
+    setSyncCountdown(60);
+  }
+
+  async function toggleWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
+    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); lock.addEventListener('release', () => setWakeLock(null)); } catch (err) {} }
+  }
 }
