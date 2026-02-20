@@ -163,6 +163,7 @@ export default function VesselTrackerPage() {
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
   const shouldPanOnNextFix = useRef(false);
   const watchIdRef = useRef<number | null>(null);
+  const lastSentStatusRef = useRef<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const userDocRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
@@ -190,11 +191,11 @@ export default function VesselTrackerPage() {
     if (!user || !firestore) return;
     setIsSharing(false);
     try {
-        await updateDoc(doc(firestore, 'vessels', sharingId), { 
+        await setDoc(doc(firestore, 'vessels', sharingId), { 
             isSharing: false, 
             lastActive: serverTimestamp(),
             statusChangedAt: serverTimestamp() 
-        });
+        }, { merge: true });
     } catch (e) { console.warn("Stop Sharing Error", e); }
 
     if (watchIdRef.current) {
@@ -203,6 +204,7 @@ export default function VesselTrackerPage() {
     }
     setCurrentPos(null);
     setAnchorPos(null);
+    lastSentStatusRef.current = null;
     toast({ title: "Partage arrêté" });
   }, [user, firestore, sharingId, toast]);
 
@@ -220,17 +222,36 @@ export default function VesselTrackerPage() {
   }, [user, firestore, emergencyContact, vesselSmsMessage, isEmergencyEnabled, isCustomMessageEnabled, toast]);
 
   const updateVesselInFirestore = useCallback((data: any) => {
-    if (!user || !firestore || !isSharing) return;
-    const vesselRef = doc(firestore, 'vessels', sharingId);
-    setDoc(vesselRef, {
-        id: sharingId,
-        userId: user.uid,
-        displayName: vesselNickname || user.displayName || 'Capitaine',
-        isSharing: true,
-        lastActive: serverTimestamp(),
-        status: vesselStatus,
-        ...data
-    }, { merge: true }).catch(e => console.warn("Firestore Update Warn", e));
+    if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
+    
+    const newStatus = data.status || vesselStatus;
+    const statusChanged = lastSentStatusRef.current !== newStatus;
+
+    const update = async () => {
+        let batteryInfo = {};
+        if ('getBattery' in navigator) {
+            const b: any = await (navigator as any).getBattery();
+            batteryInfo = { batteryLevel: Math.round(b.level * 100), isCharging: b.charging };
+        }
+
+        const updatePayload: any = { 
+            id: sharingId,
+            userId: user.uid, 
+            displayName: vesselNickname || user.displayName || 'Capitaine', 
+            isSharing: data.isSharing !== undefined ? data.isSharing : isSharing, 
+            lastActive: serverTimestamp(),
+            ...batteryInfo,
+            ...data 
+        };
+
+        if (statusChanged || lastSentStatusRef.current === null || data.eventLabel) {
+            updatePayload.statusChangedAt = serverTimestamp();
+            lastSentStatusRef.current = newStatus;
+        }
+
+        setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
+    };
+    update();
   }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
 
   const handleTacticalReport = async (type: string, photo?: string) => {
@@ -404,12 +425,6 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const sendEmergencySms = (type: string) => {
-    if (!emergencyContact) { toast({ variant: 'destructive', title: "Numéro manquant" }); return; }
-    const body = `${type} - ${smsPreview}`;
-    window.location.href = `sms:${emergencyContact}?body=${encodeURIComponent(body)}`;
-  };
-
   const handleSaveVessel = async () => {
     if (!user || !firestore) return;
     try {
@@ -422,6 +437,12 @@ export default function VesselTrackerPage() {
     if (!('wakeLock' in navigator)) return;
     if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
     else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); } catch (err) {} }
+  };
+
+  const sendEmergencySms = (type: string) => {
+    if (!emergencyContact) { toast({ variant: 'destructive', title: "Numéro manquant" }); return; }
+    const body = `${type} - ${smsPreview}`;
+    window.location.href = `sms:${emergencyContact}?body=${encodeURIComponent(body)}`;
   };
 
   return (
@@ -479,27 +500,38 @@ export default function VesselTrackerPage() {
                                     </div>
                                 </OverlayView>
                             )}
-                            {/* Rendu des Marqueurs Tactiques */}
-                            {v.huntingMarkers?.map(marker => (
-                                <OverlayView key={marker.id} position={{ lat: marker.lat, lng: marker.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                    <div 
-                                        style={{ transform: 'translate(-50%, -50%)' }} 
-                                        className="flex flex-col items-center group cursor-pointer"
-                                        onClick={() => marker.photoUrl && setSelectedMarkerPhoto(marker.photoUrl)}
-                                    >
-                                        <div className="p-1 rounded-full bg-white border-2 border-slate-900 shadow-xl scale-75 group-hover:scale-100 transition-all">
-                                            {marker.label === 'MARLIN' && <Fish className="size-4 text-blue-600" />}
-                                            {marker.label === 'THON' && <Fish className="size-4 text-red-600" />}
-                                            {marker.label === 'OISEAUX' && <Bird className="size-4 text-orange-600" />}
-                                            {marker.label === 'SARDINES' && <Waves className="size-4 text-cyan-600" />}
-                                            {marker.label === 'PRISE' && <Camera className="size-4 text-purple-600" />}
+                            {v.huntingMarkers?.map(marker => {
+                                let displayTime = '--:--';
+                                try {
+                                    if (marker.time) {
+                                        const d = new Date(marker.time);
+                                        if (!isNaN(d.getTime())) {
+                                            displayTime = format(d, 'HH:mm');
+                                        }
+                                    }
+                                } catch (e) {}
+                                
+                                return (
+                                    <OverlayView key={marker.id} position={{ lat: marker.lat, lng: marker.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                        <div 
+                                            style={{ transform: 'translate(-50%, -50%)' }} 
+                                            className="flex flex-col items-center group cursor-pointer"
+                                            onClick={() => marker.photoUrl && setSelectedMarkerPhoto(marker.photoUrl)}
+                                        >
+                                            <div className="p-1 rounded-full bg-white border-2 border-slate-900 shadow-xl scale-75 group-hover:scale-100 transition-all">
+                                                {marker.label === 'MARLIN' && <Fish className="size-4 text-blue-600" />}
+                                                {marker.label === 'THON' && <Fish className="size-4 text-red-600" />}
+                                                {marker.label === 'OISEAUX' && <Bird className="size-4 text-orange-600" />}
+                                                {marker.label === 'SARDINES' && <Waves className="size-4 text-cyan-600" />}
+                                                {marker.label === 'PRISE' && <Camera className="size-4 text-purple-600" />}
+                                            </div>
+                                            <Badge variant="outline" className="bg-slate-900/80 text-white text-[7px] border-none font-black h-3 px-1 mt-0.5 opacity-0 group-hover:opacity-100 whitespace-nowrap">
+                                                {displayTime}
+                                            </Badge>
                                         </div>
-                                        <Badge variant="outline" className="bg-slate-900/80 text-white text-[7px] border-none font-black h-3 px-1 mt-0.5 opacity-0 group-hover:opacity-100 whitespace-nowrap">
-                                            {format(new Date(marker.time), 'HH:mm')}
-                                        </Badge>
-                                    </div>
-                                </OverlayView>
-                            ))}
+                                    </OverlayView>
+                                )
+                            })}
                         </React.Fragment>
                     ))}
                 </GoogleMap>
