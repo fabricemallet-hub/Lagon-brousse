@@ -57,8 +57,7 @@ import {
   Thermometer,
   Gauge,
   ArrowUp,
-  Wind,
-  Terminal
+  Wind
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -71,7 +70,6 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 import { locations } from '@/lib/locations';
 
-// CLÉ CARTOGRAPHIQUE STRICTE (MAP FORECAST)
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -138,11 +136,9 @@ export default function VesselTrackerPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const [authError, setAuthError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentModel, setCurrentModel] = useState('ecmwf');
   const [currentOverlay, setCurrentOverlay] = useState('wind');
-  const [isTestingApi, setIsTestingApi] = useState(false);
   
   const [mapClickResult, setMapClickResult] = useState<any>(null);
   const [pointTides, setPointTides] = useState<any[] | null>(null);
@@ -155,6 +151,13 @@ export default function VesselTrackerPage() {
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || isInitializingRef.current) return;
     isInitializingRef.current = true;
+
+    // FORCER LA POLITIQUE DE REFERRER POUR L'URL LONGUE DU CLUSTER
+    try {
+        (document as any).referrerPolicy = "no-referrer-when-downgrade";
+    } catch (e) {
+        console.warn("Could not set Referrer Policy manually:", e);
+    }
 
     const loadScript = (id: string, src: string): Promise<void> => {
         return new Promise((resolve, reject) => {
@@ -190,20 +193,15 @@ export default function VesselTrackerPage() {
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
-                verbose: true,
+                verbose: false,
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
 
-            console.log("--- INITIALISATION WINDY ---");
-            console.log("Clé (Ligne 204):", cleanKey);
-            console.log("Hôte (Referer):", window.location.host);
-            console.log("Document Referrer:", document.referrer);
-
             try {
                 (window as any).windyInit(options, (windyAPI: any) => {
                     if (!windyAPI) { 
-                        setAuthError(window.location.host); 
+                        console.error("Échec de l'initialisation de l'API Windy");
                         return; 
                     }
                     const { map, store, broadcast, picker } = windyAPI;
@@ -232,24 +230,19 @@ export default function VesselTrackerPage() {
                 });
             } catch (authE) {
                 console.error("Windy Auth Exception:", authE);
-                setAuthError(window.location.host);
             }
         } catch (e: any) {
             console.error("Windy init error:", e);
-            setAuthError(window.location.host);
             isInitializingRef.current = false;
         }
     };
 
     attemptInit();
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
-    const timer = setTimeout(initWindy, 3000);
-    const diagTimer = setTimeout(() => {
-        if (!mapRef.current) setAuthError(window.location.host);
-    }, 8000);
-    return () => { clearTimeout(timer); clearTimeout(diagTimer); };
+    const timer = setTimeout(initWindy, 2000);
+    return () => { clearTimeout(timer); };
   }, [initWindy]);
 
   const handleRecenter = () => {
@@ -259,87 +252,9 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const testApiComm = async () => {
-    setIsTestingApi(true);
-    console.log("--- TEST MANUEL API WINDY ---");
-    console.log("Origin:", window.location.origin);
-    console.log("Host:", window.location.host);
-    console.log("Key:", MAP_FORECAST_KEY.trim());
-    
-    try {
-      const response = await fetch('https://api.windy.com/api/map-forecast/v2/auth', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          key: MAP_FORECAST_KEY.trim(),
-          lat: INITIAL_CENTER.lat,
-          lon: INITIAL_CENTER.lng,
-        })
-      });
-      
-      console.log("Status de réponse:", response.status);
-      const data = await response.json();
-      console.log("Réponse JSON:", data);
-      
-      if (response.status === 200) {
-        toast({ title: "TEST RÉUSSI", description: "L'API a validé la clé et le domaine." });
-      } else {
-        toast({ variant: "destructive", title: `ERREUR ${response.status}`, description: data.error || "Non autorisé" });
-      }
-    } catch (e: any) {
-      console.error("Test Error:", e);
-      toast({ variant: "destructive", title: "ERREUR RÉSEAU", description: e.message });
-    } finally {
-      setIsTestingApi(false);
-    }
-  };
-
-  const copyHost = () => {
-    if (typeof window !== 'undefined') {
-        const host = window.location.host;
-        navigator.clipboard.writeText(host);
-        toast({ title: "HÔTE COPIÉ !", description: host });
-    }
-  };
-
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       <meta name="referrer" content="no-referrer-when-downgrade" />
-
-      {authError && (
-        <Alert variant="destructive" className="bg-red-50 border-red-600 rounded-2xl border-2 shadow-xl animate-in slide-in-from-top-4">
-            <ShieldAlert className="size-6" />
-            <AlertTitle className="font-black uppercase text-sm mb-2">DIAGNOSTIC AUTHENTIFICATION (401)</AlertTitle>
-            <AlertDescription className="space-y-4">
-                <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Hôte exact détecté par le navigateur :</p>
-                    <div className="flex items-center gap-2">
-                        <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{authError}</code>
-                        <Button size="icon" variant="ghost" onClick={copyHost} className="h-10 w-10 hover:bg-red-200">
-                            <Copy className="size-4" />
-                        </Button>
-                    </div>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-2">
-                    <Button onClick={testApiComm} disabled={isTestingApi} variant="outline" className="bg-white h-12 font-black uppercase text-[10px] gap-2 border-2">
-                        {isTestingApi ? <RefreshCw className="size-4 animate-spin" /> : <Terminal className="size-4" />}
-                        Tester la communication avec l'API
-                    </Button>
-                    <p className="text-[8px] text-center font-bold text-red-900 uppercase">Consultez les logs console (F12) après le test</p>
-                </div>
-
-                <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2 leading-relaxed border border-red-200">
-                    <p>1. Allez sur <strong>api.windy.com/keys</strong></p>
-                    <p>2. Modifiez la clé Map Forecast (<strong>1gGm...</strong>)</p>
-                    <p>3. Supprimez tout joker `*` et collez l'hôte complet copié ci-dessus.</p>
-                    <p>4. Séparez les domaines par une <strong>virgule seule</strong>, sans espace.</p>
-                </div>
-            </AlertDescription>
-        </Alert>
-      )}
 
       <Card className="border-2 shadow-sm overflow-hidden">
         <CardContent className="p-4 space-y-4">
