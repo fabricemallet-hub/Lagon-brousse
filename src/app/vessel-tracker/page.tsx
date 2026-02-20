@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
@@ -28,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Accordion, 
   AccordionContent, 
@@ -88,11 +88,7 @@ import {
   Fish,
   Camera,
   Ghost,
-  Users,
-  Timer,
-  Wind,
-  Thermometer,
-  CloudRain
+  Users
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -105,7 +101,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { fetchWindyWeather } from '@/lib/windy-api';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
-const IMMOBILITY_THRESHOLD_METERS = 20;
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
@@ -134,7 +129,7 @@ export default function VesselTrackerPage() {
   const [anchorPos, setAnchorPos] = useState<{ lat: number, lng: number } | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   
-  // REFS POUR ÉVITER LES BOUCLES INFINIES
+  // REFS POUR ÉVITER LES BOUCLES INFINIES (v26.4 Stabilisation)
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
   const isSharingRef = useRef(false);
   const anchorPosRef = useRef<{ lat: number, lng: number } | null>(null);
@@ -176,7 +171,7 @@ export default function VesselTrackerPage() {
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isAnyAudioPlaying, setIsAnyAudioPlaying] = useState(false);
 
-  // Mise à jour des refs quand le state change pour les callbacks
+  // Mise à jour des refs quand le state change pour les callbacks statiques
   useEffect(() => { vesselNicknameRef.current = vesselNickname; }, [vesselNickname]);
   useEffect(() => { isGhostModeRef.current = isGhostMode; }, [isGhostMode]);
   useEffect(() => { mooringRadiusRef.current = mooringRadius; }, [mooringRadius]);
@@ -208,7 +203,7 @@ export default function VesselTrackerPage() {
 
   const memoizedSavedVesselIds = useMemo(() => profile?.savedVesselIds || [], [profile?.savedVesselIds]);
   
-  // Real-time followed vessels
+  // Suivi temps réel des navires
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     if (mode === 'fleet' && fleetId) {
@@ -450,7 +445,7 @@ export default function VesselTrackerPage() {
     } catch (e) {}
   };
 
-  // --- TRACKING CORE ---
+  // --- TRACKING CORE (v26.4 Stabilisé) ---
   useEffect(() => {
     if (!isSharing || !navigator.geolocation) return;
     
