@@ -64,6 +64,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
+import { locations } from '@/lib/locations';
 
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
@@ -75,6 +76,16 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
   if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
   if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
   return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
+};
+
+const getClosestCommune = (lat: number, lng: number) => {
+    let closestName = 'Nouméa';
+    let minDistance = Infinity;
+    Object.entries(locations).forEach(([name, coords]) => {
+        const dist = getDistance(lat, lng, coords.lat, coords.lon);
+        if (dist < minDistance) { closestName = name; minDistance = dist; }
+    });
+    return closestName;
 };
 
 const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClose: () => void, isLoading: boolean, tides: any[] | null }) => {
@@ -267,7 +278,7 @@ export default function VesselTrackerPage() {
                 <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
                     <p>1. Allez sur <strong>api.windy.com/keys</strong></p>
                     <p>2. Modifiez la clé Map Forecast (1gGm...)</p>
-                    <p>3. Dans "Restrictions de domaine", mettez des <strong>VIRGULES</strong>.</p>
+                    <p>3. Dans "Restrictions de domaine", utilisez des <strong>VIRGULES</strong>.</p>
                     <p className="font-black text-xs text-red-600">⚠️ Pas d'espaces entre les domaines.</p>
                 </div>
             </AlertDescription>
@@ -329,13 +340,3 @@ export default function VesselTrackerPage() {
     </div>
   );
 }
-
-const getClosestCommune = (lat: number, lng: number) => {
-    let closestName = 'Nouméa';
-    let minDistance = Infinity;
-    Object.entries(locations).forEach(([name, coords]) => {
-        const dist = getDistance(lat, lng, coords.lat, coords.lon);
-        if (dist < minDistance) { closestName = name; minDistance = dist; }
-    });
-    return closestName;
-};
