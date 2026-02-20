@@ -60,7 +60,7 @@ import {
   Wind
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, SoundLibraryEntry } from '@/lib/types';
+import type { VesselStatus, SoundLibraryEntry, UserAccount } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -70,7 +70,6 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 import { locations } from '@/lib/locations';
 
-// CLÉ "PRÉVISIONS CARTOGRAPHIQUES" (Souveraine pour la carte)
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -134,6 +133,7 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
 
 export default function VesselTrackerPage() {
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -149,13 +149,14 @@ export default function VesselTrackerPage() {
   const mapRef = useRef<any>(null);
   const pickerTimerRef = useRef<any>(null);
 
-  // 1. FORCER LA POLITIQUE DE REFERRER POUR L'AUTH
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    document.querySelector('meta[name="referrer"]')?.setAttribute("content", "no-referrer-when-downgrade");
+    const meta = document.createElement('meta');
+    meta.name = "referrer";
+    meta.content = "no-referrer-when-downgrade";
+    document.head.appendChild(meta);
   }, []);
 
-  // 2. LANCEMENT STABILISÉ DE LA CARTE
   const initWindyMap = useCallback(() => {
     if (typeof window === 'undefined' || isInitializing || hasLaunched) return;
     setIsInitializing(true);
@@ -188,9 +189,8 @@ export default function VesselTrackerPage() {
 
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
-            const key = MAP_FORECAST_KEY.trim();
             const options = {
-                key: key,
+                key: MAP_FORECAST_KEY.trim(),
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
