@@ -13,19 +13,21 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
   try {
-    // Récupération dynamique du Referer pour supporter localhost et la prod
     const headersList = await headers();
-    const currentReferer = headersList.get('referer') || 'https://studio.firebase.google.com/project/studio-2943478321-f746e';
+    // On priorise l'URL de production configurée par l'utilisateur pour le referer
+    const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app';
+    const currentReferer = headersList.get('referer') || `${PRODUCTION_URL}/`;
 
     // FORMATAGE CRITIQUE : Windy exige des types Number (pas de String)
-    const cleanLat = Number(lat);
-    const cleanLon = Number(lon);
+    const cleanLat = Number(Number(lat).toFixed(6));
+    const cleanLon = Number(Number(lon).toFixed(6));
 
     if (isNaN(cleanLat) || isNaN(cleanLon)) {
         throw new Error("Coordonnées GPS invalides (NaN)");
     }
 
-    // Payload STRICT pour Windy V2
+    // Payload STRICT pour Windy V2 Point Forecast
+    // Note: 'windDir' et 'waves' sont supportés par le modèle GFS
     const requestBody = {
       lat: cleanLat,
       lon: cleanLon,
@@ -34,15 +36,15 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       levels: ['surface']
     };
 
-    console.log(`[Windy Debug] Envoi vers ${url} avec Referer: ${currentReferer}`);
+    console.log(`[Windy V2] Envoi vers ${url} avec Referer: ${PRODUCTION_URL}`);
     
     const response = await fetch(url, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'x-windy-api-key': API_KEY,
-        'Referer': currentReferer,
-        'Origin': new URL(currentReferer).origin
+        'Referer': `${PRODUCTION_URL}/`,
+        'Origin': PRODUCTION_URL
       },
       body: JSON.stringify(requestBody)
     });
