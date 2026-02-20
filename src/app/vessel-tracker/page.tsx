@@ -16,7 +16,7 @@ import {
   where, 
   getDoc
 } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -176,6 +176,7 @@ export default function VesselTrackerPage() {
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
   const watchIdRef = useRef<number | null>(null);
+  const shouldPanOnNextFix = useRef(false);
   const mapMarkersRef = useRef<Record<string, any>>({});
   const lastSentStatusRef = useRef<string | null>(null);
   const lastStatusesRef = useRef<Record<string, string>>({});
@@ -223,39 +224,57 @@ export default function VesselTrackerPage() {
                         else setVesselValueAtPos('--');
                     });
                 });
-            } catch (e) { console.error("Windy Init Error", e); }
+            } catch (e) { console.warn("Windy Init Error", e); }
         }
     }, 200);
   }, [isWindyLoaded]);
 
   // LOGIQUE DE CHANGEMENT DE CALQUE WINDY
-  const handleLayerChange = (layerId: string) => {
+  const handleLayerChange = useCallback((layerId: string) => {
     if (!isWindyLoaded || !(window as any).W) return;
-    requestAnimationFrame(() => {
-        const store = (window as any).W.store;
+    
+    const applyChange = () => {
         try {
+            const store = (window as any).W.store;
+            if (!store) throw new Error("Store non prêt");
+
             switch(layerId) {
-                case 'gust': store.set('overlay', 'wind'); store.set('product', 'gust'); break;
-                case 'radar': store.set('overlay', 'radar'); break;
-                case 'waves': store.set('overlay', 'waves'); break;
-                default: store.set('overlay', layerId);
+                case 'gust': 
+                    store.set('overlay', 'wind'); 
+                    store.set('product', 'gust'); 
+                    break;
+                case 'radar': 
+                    store.set('overlay', 'radar'); 
+                    break;
+                case 'waves': 
+                    store.set('overlay', 'waves'); 
+                    break;
+                default: 
+                    store.set('overlay', layerId);
             }
             setActiveOverlay(layerId);
             toast({ title: `Calque : ${layerId.toUpperCase()}` });
-        } catch (e) {}
-    });
-  };
+        } catch (e) {
+            console.warn("Retrying layer change...", e);
+            setTimeout(applyChange, 500);
+        }
+    };
+
+    requestAnimationFrame(applyChange);
+  }, [isWindyLoaded, toast]);
 
   // SYNCHRONISATION DES CARTES
   useEffect(() => {
-    if (!googleMap || !windyMap || !isOverlayActive || viewMode !== 'google') return;
+    if (!googleMap || !windyMap || (!isOverlayActive && viewMode !== 'windy')) return;
 
     const syncMaps = () => {
-        const center = googleMap.getCenter();
-        const zoom = googleMap.getZoom();
-        if (center && zoom) {
-            windyMap.setView([center.lat(), center.lng()], zoom, { animate: false });
-        }
+        try {
+            const center = googleMap.getCenter();
+            const zoom = googleMap.getZoom();
+            if (center && zoom) {
+                windyMap.setView([center.lat(), center.lng()], zoom, { animate: false });
+            }
+        } catch (e) { console.warn("Sync Maps Error", e); }
     };
 
     const listener = googleMap.addListener('bounds_changed', () => {
@@ -319,7 +338,7 @@ export default function VesselTrackerPage() {
     });
   }, [followedVessels]);
 
-  const updateVesselInFirestore = (data: any) => {
+  const updateVesselInFirestore = useCallback((data: any) => {
     if (!user || !firestore || !isSharing) return;
     const vesselRef = doc(firestore, 'vessels', sharingId);
     setDoc(vesselRef, {
@@ -330,8 +349,8 @@ export default function VesselTrackerPage() {
         lastActive: serverTimestamp(),
         status: vesselStatus,
         ...data
-    }, { merge: true });
-  };
+    }, { merge: true }).catch(e => console.warn("Firestore Update Warn", e));
+  }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
 
   const sendTacticalSignal = async (type: string) => {
     if (!currentPos || !user) return;
@@ -348,6 +367,25 @@ export default function VesselTrackerPage() {
         googleMap.panTo(currentPos);
     } else {
         shouldPanOnNextFix.current = true;
+        if (!isSharing) {
+            setIsSharing(true);
+            toast({ title: "GPS Activé", description: "Recherche de votre position..." });
+        }
+    }
+  };
+
+  const handleSaveSmsSettings = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            emergencyContact,
+            vesselSmsMessage,
+            isEmergencyEnabled,
+            isCustomMessageEnabled
+        });
+        toast({ title: "Paramètres SMS sauvegardés" });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur sauvegarde" });
     }
   };
 
@@ -416,7 +454,7 @@ export default function VesselTrackerPage() {
             className={cn(
                 "absolute inset-0 transition-opacity duration-500", 
                 (viewMode === 'windy' || isOverlayActive) ? "opacity-100 visible" : "opacity-0 invisible",
-                isOverlayActive && viewMode === 'google' ? "opacity-60 pointer-events-none" : "opacity-100 pointer-events-auto"
+                isOverlayActive && viewMode === 'google' ? "opacity-50 pointer-events-none" : "opacity-100 pointer-events-auto"
             )}
         />
 
@@ -439,7 +477,7 @@ export default function VesselTrackerPage() {
                 className={cn("h-12 px-4 border-2 font-black uppercase text-[10px] shadow-2xl rounded-xl gap-2 backdrop-blur-md", isOverlayActive ? "bg-primary text-white border-white" : "bg-slate-900/80 text-white border-white/20")}
             >
                 <Layers className={cn("size-4", isOverlayActive && "animate-pulse")} />
-                SUPERPOSITION MÉTÉO
+                {isOverlayActive ? 'DÉSACTIVER SUPERPOSITION' : 'SUPERPOSITION MÉTÉO'}
             </Button>
             <Button 
                 onClick={() => {
@@ -450,7 +488,7 @@ export default function VesselTrackerPage() {
                 className={cn("h-12 px-4 border-2 font-black uppercase text-[10px] shadow-2xl rounded-xl gap-2 backdrop-blur-md", viewMode === 'windy' ? "bg-blue-600 text-white border-white" : "bg-slate-900/80 text-white border-white/20")}
             >
                 <Globe className="size-4" />
-                VUE WINDY TOTALE
+                {viewMode === 'windy' ? 'RETOUR GOOGLE MAPS' : 'VUE WINDY TOTALE'}
             </Button>
         </div>
 
@@ -499,7 +537,7 @@ export default function VesselTrackerPage() {
             {mode === 'sender' ? (
                 <div className="space-y-4">
                     {isSharing ? (
-                        <Button variant="destructive" className="w-full h-16 font-black uppercase shadow-xl rounded-2xl border-4 border-white/20 gap-3" onClick={() => setIsSharing(false)}>
+                        <Button variant="destructive" className="w-full h-16 font-black uppercase shadow-xl rounded-2xl border-4 border-white/20 gap-3" onClick={() => handleStopSharing()}>
                             <X className="size-6" /> ARRÊTER LE PARTAGE
                         </Button>
                     ) : (
@@ -552,33 +590,111 @@ export default function VesselTrackerPage() {
               <AccordionContent className="pt-4 space-y-4">
                   <div className="p-4 bg-white border-2 rounded-2xl space-y-4 shadow-inner">
                       <div className="space-y-1.5"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">Contact Terre</Label><Input placeholder="Ex: 77 12 34" value={emergencyContact} onChange={e => setEmergencyContact(e.target.value)} className="h-12 border-2 font-black text-lg" /></div>
-                      <div className="space-y-1.5"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">Message SOS</Label><Textarea value={vesselSmsMessage} onChange={e => setVesselSmsMessage(e.target.value)} className="min-h-[80px] border-2" /></div>
+                      <div className="space-y-1.5"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">Message SOS personnalisé</Label><Textarea value={vesselSmsMessage} onChange={e => setVesselSmsMessage(e.target.value)} className="min-h-[80px] border-2" /></div>
                       <div className="p-3 bg-muted/30 rounded-xl border-2 border-dashed text-[10px] italic">Aperçu : {smsPreview}</div>
-                      <Button onClick={handleSaveSmsSettings} className="w-full h-12 font-black uppercase text-[10px] gap-2 shadow-lg"><Save className="size-4" /> Sauvegarder Paramètres</Button>
+                      <Button onClick={handleSaveSmsSettings} className="w-full h-12 font-black uppercase text-[10px] gap-2 shadow-lg"><Save className="size-4" /> Enregistrer réglages SMS</Button>
                   </div>
               </AccordionContent>
           </AccordionItem>
       </Accordion>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Button variant="destructive" className="h-16 font-black uppercase shadow-2xl rounded-2xl text-xs gap-3">MAYDAY SMS</Button>
-          <Button variant="secondary" className="h-16 font-black uppercase shadow-2xl rounded-2xl text-xs border-2 border-primary/20 gap-3">PAN PAN SMS</Button>
+          <Button variant="destructive" className="h-16 font-black uppercase shadow-2xl rounded-2xl text-xs gap-3" onClick={() => sendEmergencySms('MAYDAY')}>MAYDAY SMS</Button>
+          <Button variant="secondary" className="h-16 font-black uppercase shadow-2xl rounded-2xl text-xs border-2 border-primary/20 gap-3" onClick={() => sendEmergencySms('PAN PAN')}>PAN PAN SMS</Button>
       </div>
+
+      <Card className="border-2 bg-muted/10 shadow-none rounded-2xl overflow-hidden">
+        <CardHeader className="p-4 pb-2 border-b bg-muted/5">
+            <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-muted-foreground">
+                <Phone className="size-4 text-primary" /> Annuaire Maritime NC
+            </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-red-600 flex items-center gap-2 border-b pb-1">
+              <ShieldAlert className="size-3" /> Urgences
+            </h4>
+            <div className="space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">COSS NC (Mer)</span>
+                <a href="tel:16" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 16
+                </a>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">SAMU (Terre)</span>
+                <a href="tel:15" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 15
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-2 border-b pb-1">
+              <Waves className="size-3" /> Services
+            </h4>
+            <div className="space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Météo Marine</span>
+                <a href="tel:366736" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 36 67 36
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-2 border-b pb-1">
+              <Ship className="size-3" /> Ports & Marinas
+            </h4>
+            <div className="space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Port Autonome (VHF 12)</span>
+                <a href="tel:255000" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 25 50 00
+                </a>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 
-  async function handleSaveSmsSettings() {
+  async function handleStopSharing() {
     if (!user || !firestore) return;
+    setIsSharing(false);
     try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            emergencyContact,
-            vesselSmsMessage,
-            isEmergencyEnabled,
-            isCustomMessageEnabled
+        await updateDoc(doc(firestore, 'vessels', sharingId), { 
+            isSharing: false, 
+            lastActive: serverTimestamp(),
+            statusChangedAt: serverTimestamp() 
         });
-        toast({ title: "Paramètres SMS sauvegardés" });
+        if (watchIdRef.current) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+        }
+        setCurrentPos(null);
+        setAnchorPos(null);
+        lastSentStatusRef.current = null;
+        toast({ title: "Partage arrêté" });
     } catch (e) {
-        toast({ variant: 'destructive', title: "Erreur sauvegarde" });
+        console.warn("Stop Sharing Error", e);
     }
+  }
+
+  function sendEmergencySms(type: 'SOS' | 'MAYDAY' | 'PAN PAN') {
+    if (!isEmergencyEnabled || !emergencyContact) {
+        toast({ variant: "destructive", title: "Réglages requis", description: "Vérifiez votre contact d'urgence." });
+        return;
+    }
+    
+    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
+    const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
+    const posUrl = currentPos ? `https://www.google.com/maps?q=${currentPos.lat.toFixed(6)},${currentPos.lng.toFixed(6)}` : "[GPS INCONNU]";
+    const body = `${nicknamePrefix}${customText} [${type}] Position : ${posUrl}`;
+    
+    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   }
 }
