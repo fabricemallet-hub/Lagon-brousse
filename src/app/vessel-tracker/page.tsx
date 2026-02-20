@@ -4,7 +4,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where } from 'firebase/firestore';
-import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,21 +29,23 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 const MAP_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 
 export default function VesselTrackerPage() {
+  const { toast } = useToast();
+
   // --- ÉTAPE 1 : DÉFINITION PRIORITAIRE DES FONCTIONS (Fix ReferenceError) ---
   const handleRecenter = useCallback(() => {
     console.log('Action: Recenter triggered');
     toast({ title: "Recentrer", description: "Fonctionnalité en cours de déploiement." });
-  }, []);
+  }, [toast]);
 
   const handleSearch = useCallback(() => {
     console.log('Action: Search triggered');
     toast({ title: "Recherche", description: "Fonctionnalité en cours de déploiement." });
-  }, []);
+  }, [toast]);
 
   const handleFilter = useCallback(() => {
     console.log('Action: Filter triggered');
     toast({ title: "Filtres", description: "Fonctionnalité en cours de déploiement." });
-  }, []);
+  }, [toast]);
 
   // --- ÉTAPE 2 : ÉTATS ET INITIALISATION ---
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +53,6 @@ export default function VesselTrackerPage() {
   const [origin, setOrigin] = useState('');
   const [referrer, setReferrer] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -86,18 +86,18 @@ export default function VesselTrackerPage() {
         const originalConsoleError = console.error;
         console.error = (...args) => {
           if (args[0] && typeof args[0] === 'string' && (args[0].includes('Windy API key') || args[0].includes('authorize'))) {
-            setError("401 Unauthorized - La clé a été rejetée.");
+            setError("401 Unauthorized - La clé a été rejetée par Windy.");
             return;
           }
           originalConsoleError.apply(console, args);
         };
 
-        // Chargement séquentiel
+        // Chargement séquentiel des dépendances Windy
         await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
         (window as any).W = { apiKey: MAP_KEY };
         await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
 
-        // Attendre que l'objet soit disponible
+        // Attendre que l'objet windyInit soit injecté par libBoot
         let attempts = 0;
         const checkInit = setInterval(() => {
             attempts++;
@@ -130,7 +130,7 @@ export default function VesselTrackerPage() {
       }
     };
 
-    // Petit délai pour laisser le DOM et les politiques de sécurité s'installer
+    // Petit délai de sécurité pour l'environnement Cloud
     const timer = setTimeout(init, 1000);
     return () => clearTimeout(timer);
   }, []);
@@ -159,7 +159,7 @@ export default function VesselTrackerPage() {
         )}
       </div>
 
-      {/* BOUTONS DE NAVIGATION (Fix ReferenceError Check) */}
+      {/* BOUTONS DE NAVIGATION */}
       <div className="flex gap-2">
         <Button variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase border-2 gap-2" onClick={handleRecenter}>
             <LocateFixed className="size-3" /> Recentrer
@@ -180,20 +180,21 @@ export default function VesselTrackerPage() {
             <AlertTitle className="font-black uppercase text-sm mb-4">Erreur d'accès à la carte (401)</AlertTitle>
             <AlertDescription className="space-y-4 text-foreground">
               <p className="text-xs font-medium text-slate-700 leading-relaxed">
-                Windy rejette la clé car l'URL parente ou l'hôte de l'application n'est pas autorisé.
+                Windy rejette la clé car l'URL parente ou l'hôte de l'application n'est pas autorisé. 
+                Veuillez ajouter ces valeurs exactes dans votre console Windy :
               </p>
               
               <div className="grid gap-3">
                 <div className="p-3 bg-red-50 rounded-xl border border-red-100 flex items-center justify-between">
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[8px] font-black uppercase opacity-60">Referrer (Parent Iframe)</span>
+                    <span className="text-[8px] font-black uppercase opacity-60">Referrer (Studio Iframe)</span>
                     <code className="text-[10px] font-black truncate select-all">{referrer}</code>
                   </div>
                   <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => copyToClipboard(referrer)}><Copy className="size-3" /></Button>
                 </div>
                 <div className="p-3 bg-red-50 rounded-xl border border-red-100 flex items-center justify-between">
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[8px] font-black uppercase opacity-60">Hôte de l'app</span>
+                    <span className="text-[8px] font-black uppercase opacity-60">Hôte de l'app (Hosted)</span>
                     <code className="text-[10px] font-black truncate select-all">{host}</code>
                   </div>
                   <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => copyToClipboard(host)}><Copy className="size-3" /></Button>
@@ -202,11 +203,10 @@ export default function VesselTrackerPage() {
 
               <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-3">
                 <p className="text-[10px] font-black uppercase text-blue-800 flex items-center gap-2">
-                  <CheckCircle2 className="size-3" /> Action Requise :
+                  <CheckCircle2 className="size-3" /> Solution :
                 </p>
                 <p className="text-[11px] leading-relaxed text-slate-700">
-                  Allez sur <a href="https://api.windy.com/keys" target="_blank" className="underline font-black text-blue-600">votre console Windy</a> et ajoutez <strong>les deux valeurs ci-dessus</strong> séparément. 
-                  Si vous êtes dans le Studio Firebase, c'est souvent <strong>studio.firebase.google.com</strong> qui doit être ajouté.
+                  Allez sur <a href="https://api.windy.com/keys" target="_blank" className="underline font-black text-blue-600">api.windy.com/keys</a> et ajoutez <strong>les deux valeurs ci-dessus</strong> dans les restrictions de votre clé.
                 </p>
               </div>
             </AlertDescription>
@@ -224,7 +224,7 @@ export default function VesselTrackerPage() {
           )}
         ></div>
         
-        {/* LOADER FRÈRE DU NŒUD WINDY (Empêche React de casser le DOM de Leaflet) */}
+        {/* LOADER INDÉPENDANT (Sibling du div windy pour éviter le crash NotFoundError) */}
         {!isInitialized && !error && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 z-10">
                 <RefreshCw className="size-10 animate-spin text-primary/40" />
