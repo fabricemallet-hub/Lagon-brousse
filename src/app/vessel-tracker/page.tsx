@@ -132,15 +132,14 @@ export default function VesselTrackerPage() {
   const isWindyInitializing = useRef(false);
   const windyRetryCount = useRef(0);
 
-  // REFS FOR STABILITY (FIX v30.1)
-  const shouldPanOnNextFix = useRef(false); // DEFINITION MANQUANTE CORRIGÉE
+  // REFS FOR STABILITY
+  const shouldPanOnNextFix = useRef(false); 
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
   const isSharingRef = useRef(false);
   const anchorPosRef = useRef<{ lat: number, lng: number } | null>(null);
   const startTimeRef = useRef<Date | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
-  const lastUpdatePosRef = useRef<{ lat: number, lng: number } | null>(null);
   const lowSpeedStartTime = useRef<number | null>(null);
   const isFollowModeRef = useRef(true);
 
@@ -156,11 +155,6 @@ export default function VesselTrackerPage() {
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
   const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
 
-  // JOURNALS & LOGS
-  const [techLogs, setTechLogs] = useState<any[]>([]);
-  const [tacticalLogs, setTacticalLogs] = useState<any[]>([]);
-  const logsDebounceTimer = useRef<NodeJS.Timeout | null>(null);
-  
   // AUDIO
   const [vesselPrefs, setVesselPrefs] = useState({
     isNotifyEnabled: true,
@@ -205,7 +199,7 @@ export default function VesselTrackerPage() {
     return dbSounds.map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
-  // --- LOGIQUE WINDY & RENDU (Fix Carte Grise) ---
+  // --- LOGIQUE WINDY & RENDU ---
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || viewMode === 'alpha' || isWindyInitializing.current) return;
 
@@ -234,7 +228,6 @@ export default function VesselTrackerPage() {
                     isWindyInitializing.current = false;
                     windyRetryCount.current = 0;
                     
-                    // Forcer le rendu pour éviter la carte grise
                     setTimeout(() => map.invalidateSize(), 800);
 
                     googleMap?.addListener('idle', () => {
@@ -245,9 +238,10 @@ export default function VesselTrackerPage() {
                     });
                 });
             } catch (err) {
+                console.error("Windy Init Error:", err);
+                isWindyInitializing.current = false;
                 if (windyRetryCount.current < 3) {
                     windyRetryCount.current++;
-                    isWindyInitializing.current = false;
                     setTimeout(initWindy, 2000 * windyRetryCount.current);
                 }
             }
@@ -286,6 +280,16 @@ export default function VesselTrackerPage() {
     }
   }, [windyLayer, isWindyLoaded]);
 
+  // Forcer le redimensionnement de Google Maps lors du retour en mode Alpha
+  useEffect(() => {
+    if (viewMode === 'alpha' && googleMap) {
+        const timer = setTimeout(() => {
+            google.maps.event.trigger(googleMap, 'resize');
+        }, 300);
+        return () => clearTimeout(timer);
+    }
+  }, [viewMode, googleMap]);
+
   // --- TRACKING CORE ---
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharingRef.current && data.isSharing !== false)) return;
@@ -310,23 +314,6 @@ export default function VesselTrackerPage() {
         };
 
         setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
-        
-        // Log Technique automatique (Debounced)
-        if (data.status || data.location) {
-            clearTimeout(logsDebounceTimer.current!);
-            logsDebounceTimer.current = setTimeout(async () => {
-                const duration = startTimeRef.current ? differenceInMinutes(new Date(), startTimeRef.current) : 0;
-                const logData = {
-                    vesselId: sharingId,
-                    status: data.status || vesselStatusRef.current,
-                    battery: (batteryInfo as any).batteryLevel,
-                    accuracy: data.accuracy,
-                    duration: `ACTIF ${duration} MIN`,
-                    timestamp: serverTimestamp()
-                };
-                addDoc(collection(firestore, 'logs_technique'), logData);
-            }, 500);
-        }
     };
     update();
   }, [user, firestore, sharingId, customFleetId, vesselNickname, isGhostMode]);
@@ -364,7 +351,6 @@ export default function VesselTrackerPage() {
             setCurrentSpeed(Math.round(knotSpeed));
             setCurrentHeading(heading || 0);
             
-            // Follow Mode UI
             if (isFollowModeRef.current && googleMap) {
                 googleMap.panTo(newPos);
                 if (shouldPanOnNextFix.current) {
@@ -373,7 +359,6 @@ export default function VesselTrackerPage() {
                 }
             }
 
-            // Détection automatique de dérive
             let nextStatus: VesselStatus['status'] = 'moving';
             if (knotSpeed < 0.2) nextStatus = 'stationary';
             else if (knotSpeed > 0.5 && anchorPosRef.current) {
@@ -390,29 +375,6 @@ export default function VesselTrackerPage() {
         if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     };
   }, [isSharing, toast, updateVesselInFirestore, googleMap]);
-
-  // --- ACTIONS TACTIQUES ---
-  const handleTacticalClick = async (label: string) => {
-    if (!currentPos || !firestore || !user) return;
-    
-    toast({ title: `Signalement : ${label}` });
-    
-    try {
-        const weather = await fetchWindyWeather(currentPos.lat, currentPos.lng);
-        const logData = {
-            vesselId: sharingId,
-            fleetId: customFleetId || null,
-            type: label,
-            location: { latitude: currentPos.lat, longitude: currentPos.lng },
-            wind: weather.success ? `${weather.windSpeed} ND` : 'N/A',
-            temp: weather.success ? `${weather.temp}°C` : 'N/A',
-            timestamp: serverTimestamp()
-        };
-        await addDoc(collection(firestore, 'logs_tactique'), logData);
-    } catch (e) {
-        console.error("Tactical Log Error:", e);
-    }
-  };
 
   const handleRecenter = () => {
     setIsFollowMode(true);
@@ -441,7 +403,14 @@ export default function VesselTrackerPage() {
         className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100", isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}
         style={{ height: isFullscreen ? '100dvh' : '500px' }}
       >
-        <div id="windy" className={cn("absolute inset-0 z-10 transition-opacity", viewMode === 'alpha' ? "opacity-0 pointer-events-none" : "")} style={{ opacity: viewMode === 'beta' ? 0.6 : 1, width: '100%', height: '100%' }} />
+        <div 
+            id="windy" 
+            className={cn(
+                "absolute inset-0 z-10 transition-opacity duration-500", 
+                viewMode === 'alpha' ? "hidden opacity-0 pointer-events-none" : "block"
+            )} 
+            style={{ opacity: viewMode === 'beta' ? 0.6 : 1, width: '100%', height: '100%' }} 
+        />
         
         <GoogleMap
             mapContainerClassName="w-full h-full"
@@ -471,8 +440,8 @@ export default function VesselTrackerPage() {
             ))}
         </GoogleMap>
         
-        {/* BOUTONS FLOTTANTS MAP */}
-        <div className="absolute top-4 left-4 flex flex-col gap-2 z-[160]">
+        {/* BOUTONS FLOTTANTS MAP - Z-INDEX SUPÉRIEUR POUR GARANTIR LE CLIC */}
+        <div className="absolute top-4 left-4 flex flex-col gap-2 z-[200]">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 shadow-xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
             <div className="flex flex-col gap-1 bg-white/90 backdrop-blur-md p-1 rounded-xl border-2 shadow-xl">
                 <Button variant={viewMode === 'alpha' ? "default" : "ghost"} size="sm" className="h-8 text-[8px] font-black uppercase" onClick={() => setViewMode('alpha')}>Alpha</Button>
@@ -481,7 +450,7 @@ export default function VesselTrackerPage() {
             </div>
         </div>
 
-        <div className="absolute top-4 right-4 flex flex-col gap-2 z-[160]">
+        <div className="absolute top-4 right-4 flex flex-col gap-2 z-[200]">
             <Button 
                 onClick={() => setIsFollowMode(!isFollowMode)} 
                 className={cn("h-10 w-10 border-2 shadow-xl p-0", isFollowMode ? "bg-primary text-white" : "bg-white/90 text-slate-400")}
@@ -517,12 +486,11 @@ export default function VesselTrackerPage() {
               
               <TabsContent value="tactical" className="p-4 space-y-4">
                   <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalClick('MARLIN')}><Fish className="size-4 text-blue-600" /> MARLIN</Button>
-                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalClick('THON')}><Fish className="size-4 text-red-600" /> THON</Button>
-                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalClick('TAZARD')}><Fish className="size-4 text-emerald-600" /> TAZARD</Button>
-                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalClick('OISEAUX')}><Bird className="size-4 text-slate-600" /> OISEAUX</Button>
+                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => { toast({ title: "MARLIN signalé" }); updateVesselInFirestore({ eventLabel: "MARLIN" }); }}><Fish className="size-4 text-blue-600" /> MARLIN</Button>
+                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => { toast({ title: "THON signalé" }); updateVesselInFirestore({ eventLabel: "THON" }); }}><Fish className="size-4 text-red-600" /> THON</Button>
+                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => { toast({ title: "TAZARD signalé" }); updateVesselInFirestore({ eventLabel: "TAZARD" }); }}><Fish className="size-4 text-emerald-600" /> TAZARD</Button>
+                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => { toast({ title: "OISEAUX signalés" }); updateVesselInFirestore({ eventLabel: "OISEAUX" }); }}><Bird className="size-4 text-slate-600" /> OISEAUX</Button>
                   </div>
-                  <div className="text-[9px] font-bold uppercase opacity-40 text-center italic py-4">Les signalements capturent le vent & la température via Windy.</div>
               </TabsContent>
 
               <TabsContent value="tech" className="p-4 space-y-4">
