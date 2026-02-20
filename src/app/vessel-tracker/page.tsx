@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -144,11 +143,13 @@ export default function VesselTrackerPage() {
     }
   }, [userProfile, isSharing]);
 
+  /**
+   * Mise à jour Firestore avec Throttling de 5 secondes (Performance Pillar)
+   */
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
     if (!user || !firestore || !sharingId) return;
     
     const now = Date.now();
-    // THROTTLING CRITIQUE : 5 secondes minimum entre deux écritures
     if (!force && (now - lastUpdateTimestampRef.current < 5000)) return;
     lastUpdateTimestampRef.current = now;
 
@@ -265,9 +266,15 @@ export default function VesselTrackerPage() {
     toast({ title: label });
   };
 
+  /**
+   * Moteur GPS principal avec Cycle de Vie contrôlé (clearWatch)
+   */
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
-      if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+      if (watchIdRef.current !== null) { 
+        navigator.geolocation.clearWatch(watchIdRef.current); 
+        watchIdRef.current = null; 
+      }
       return;
     }
 
@@ -278,6 +285,7 @@ export default function VesselTrackerPage() {
         const { latitude, longitude, accuracy } = position.coords;
         const newPos = { lat: latitude, lng: longitude };
         
+        // THROTTLING MATÉRIEL : On ne traite pas si moins de 5s.
         const now = Date.now();
         if (now - lastUpdateTimestampRef.current < 5000) return;
 

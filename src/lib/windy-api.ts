@@ -1,29 +1,27 @@
-
 'use server';
-
-import { headers } from 'next/headers';
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Résolution exclusive de l'Erreur 400 par mise en conformité stricte du Payload.
- * @param lat Latitude du point (doit être un nombre)
- * @param lon Longitude du point (doit être un nombre)
+ * Résolution exclusive de l'Erreur 400 (v4.7).
+ * @param lat Latitude du point
+ * @param lon Longitude du point
  */
 export async function fetchWindyWeather(lat: number, lon: number) {
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
-  const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app';
+  const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app/'; // Avec slash final pour conformité Referer
   
   try {
-    // 1. DATA INTEGRITY : Conversion explicite en Number pur (sans guillemets)
-    const cleanLat = Number(lat);
-    const cleanLon = Number(lon);
+    // 1. DATA INTEGRITY : Conversion forcée en Number pur (sans guillemets dans le JSON)
+    const cleanLat = Number(parseFloat(lat.toString()).toFixed(6));
+    const cleanLon = Number(parseFloat(lon.toString()).toFixed(6));
 
     if (isNaN(cleanLat) || isNaN(cleanLon)) {
         throw new Error("Coordonnées GPS invalides");
     }
 
-    // 2. KEY MAPPING & STRUCTURE : Clé dans le JSON, 'lon' utilisé, paramètres restreints selon doc V2
+    // 2. KEY MAPPING & STRUCTURE : Clé dans le JSON, 'lon' utilisé, paramètres restreints
+    // Windy V2 rejette les paramètres inconnus.
     const requestBody = {
       lat: cleanLat,
       lon: cleanLon,
@@ -33,13 +31,13 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       key: API_KEY
     };
 
-    // LOG DE DIAGNOSTIC : Permet de vérifier la structure exacte envoyée dans la console serveur
-    console.log("[Windy API] Payload JSON envoyé :", JSON.stringify(requestBody));
+    // LOG DE DIAGNOSTIC : Structure exacte envoyée
+    console.log("[Windy API] Payload JSON :", JSON.stringify(requestBody));
     
     const response = await fetch(url, {
       method: 'POST',
       headers: { 
-        // 3. HEADER VALIDATION : Content-Type indispensable pour le parsing serveur Windy
+        // 3. HEADER VALIDATION : Content-Type indispensable
         'Content-Type': 'application/json',
         // 4. NETWORK ORIGIN : Correspondance avec l'URL de production enregistrée
         'Referer': PRODUCTION_URL,
@@ -60,10 +58,12 @@ export async function fetchWindyWeather(lat: number, lon: number) {
 
     const data = await response.json();
     
-    // 5. EXTRACTION : Conversion m/s en Noeuds (nds)
     // Windy renvoie des tableaux de prévisions horaires, on prend l'index 0 (actuel)
+    // Conversion m/s en Noeuds (nds) : 1 m/s = 1.94384 nds
     return {
       windSpeed: data.wind?.[0] !== undefined ? Math.round(data.wind[0] * 1.94384) : 0,
+      windDir: data['wind-dir']?.[0] || 0,
+      wavesHeight: data.waves?.[0] || 0,
       success: true,
       status: 200
     };
