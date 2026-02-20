@@ -2,17 +2,15 @@
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Résolution exclusive de l'Erreur 400 (v4.7).
- * @param lat Latitude du point
- * @param lon Longitude du point
+ * Version 4.8 : Résolution de l'Erreur 400 par conformité JSON stricte.
  */
 export async function fetchWindyWeather(lat: number, lon: number) {
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
-  const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app/'; // Avec slash final pour conformité Referer
+  const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app/'; 
   
   try {
-    // 1. DATA INTEGRITY : Conversion forcée en Number pur (sans guillemets dans le JSON)
+    // 1. DATA INTEGRITY : Conversion forcée en Number pur
     const cleanLat = Number(parseFloat(lat.toString()).toFixed(6));
     const cleanLon = Number(parseFloat(lon.toString()).toFixed(6));
 
@@ -20,8 +18,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
         throw new Error("Coordonnées GPS invalides");
     }
 
-    // 2. KEY MAPPING & STRUCTURE : Clé dans le JSON, 'lon' utilisé, paramètres restreints
-    // Windy V2 rejette les paramètres inconnus.
+    // 2. STRUCTURE JSON V2 : La clé API doit être dans le corps du JSON
     const requestBody = {
       lat: cleanLat,
       lon: cleanLon,
@@ -31,29 +28,32 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       key: API_KEY
     };
 
-    // LOG DE DIAGNOSTIC : Structure exacte envoyée
-    console.log("[Windy API] Payload JSON :", JSON.stringify(requestBody));
+    // LOG DE DIAGNOSTIC : Visualisation de la structure exacte envoyée
+    console.log("[Windy API v4.8] Payload JSON :", JSON.stringify(requestBody));
     
     const response = await fetch(url, {
       method: 'POST',
       headers: { 
-        // 3. HEADER VALIDATION : Content-Type indispensable
         'Content-Type': 'application/json',
-        // 4. NETWORK ORIGIN : Correspondance avec l'URL de production enregistrée
         'Referer': PRODUCTION_URL,
         'Origin': PRODUCTION_URL
       },
       body: JSON.stringify(requestBody)
     });
 
-    if (!response.ok) {
+    // 3. GESTION DES RÉPONSES
+    if (response.status === 400) {
         const errorText = await response.text();
-        console.error(`[Windy Error] Status: ${response.status}`, errorText);
-        return { 
-            success: false, 
-            error: `Erreur ${response.status}`, 
-            status: response.status
-        };
+        console.error("[Windy 400] Rejet structurelle :", errorText);
+        return { success: false, error: "Requête mal formée (400)", status: 400 };
+    }
+
+    if (response.status === 204) {
+        return { success: false, error: "Aucune donnée pour ce point (204)", status: 204 };
+    }
+
+    if (!response.ok) {
+        return { success: false, error: `Erreur ${response.status}`, status: response.status };
     }
 
     const data = await response.json();
@@ -68,7 +68,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       status: 200
     };
   } catch (error: any) {
-    console.error("[Windy Critical] Fetch failure:", error);
+    console.error("[Windy Critical] Failure:", error);
     return { success: false, error: error.message || "Network Error", status: 500 };
   }
 }

@@ -102,6 +102,7 @@ export default function VesselTrackerPage() {
   const statusRef = useRef<VesselStatus['status'] | 'offline'>('moving');
   const watchIdRef = useRef<number | null>(null);
   const lastUpdateTimestampRef = useRef<number>(0);
+  const lastMapClickTimeRef = useRef<number>(0);
   const [isForcingWindy, setIsForcingWindy] = useState(false);
 
   const [technicalLog, setTechnicalLog] = useState<{ label: string, startTime: Date, lastUpdate: Date, duration: number }[]>([]);
@@ -143,9 +144,6 @@ export default function VesselTrackerPage() {
     }
   }, [userProfile, isSharing]);
 
-  /**
-   * Mise à jour Firestore avec Throttling de 5 secondes (Performance Pillar)
-   */
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
     if (!user || !firestore || !sharingId) return;
     
@@ -223,14 +221,45 @@ export default function VesselTrackerPage() {
                 wavesHeight: weather.wavesHeight,
                 lastWeatherUpdate: serverTimestamp()
             }, true);
-            toast({ title: `Windy Succès`, description: `Vent: ${weather.windSpeed}nd | Vagues: ${weather.wavesHeight}m` });
+            toast({ title: `Diagnostic Windy : Succès (200)`, description: `Vent: ${weather.windSpeed}nd | Vagues: ${weather.wavesHeight}m` });
         } else {
-            toast({ variant: "destructive", title: `Windy Erreur`, description: `Code: ${weather.status}` });
+            toast({ variant: "destructive", title: `Diagnostic Windy : Échec`, description: `Code: ${weather.status}` });
         }
     } catch (e) {
         toast({ variant: "destructive", title: "Échec API", description: "Communication impossible." });
     } finally {
         setIsForcingWindy(false);
+    }
+  };
+
+  /**
+   * Consultation météo au clic sur la carte (Debounce 2s)
+   */
+  const handleMapClick = async (e: google.maps.MapMouseEvent) => {
+    if (!e.latLng) return;
+    
+    const now = Date.now();
+    if (now - lastMapClickTimeRef.current < 2000) return; // Debounce 2s
+    lastMapClickTimeRef.current = now;
+
+    const lat = e.latLng.lat();
+    const lon = e.latLng.lng();
+
+    toast({ description: "Interrogation Windy..." });
+    
+    try {
+        const weather = await fetchWindyWeather(lat, lon);
+        if (weather.success) {
+            toast({ 
+                title: "Météo au point cliqué", 
+                description: `Vent : ${weather.windSpeed} ND`,
+                duration: 5000
+            });
+        } else {
+            toast({ variant: "destructive", title: "Erreur Windy", description: weather.error });
+        }
+    } catch (err) {
+        toast({ variant: "destructive", title: "Erreur", description: "Impossible de contacter Windy." });
     }
   };
 
@@ -266,9 +295,6 @@ export default function VesselTrackerPage() {
     toast({ title: label });
   };
 
-  /**
-   * Moteur GPS principal avec Cycle de Vie contrôlé (clearWatch)
-   */
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) { 
@@ -285,7 +311,6 @@ export default function VesselTrackerPage() {
         const { latitude, longitude, accuracy } = position.coords;
         const newPos = { lat: latitude, lng: longitude };
         
-        // THROTTLING MATÉRIEL : On ne traite pas si moins de 5s.
         const now = Date.now();
         if (now - lastUpdateTimestampRef.current < 5000) return;
 
@@ -546,6 +571,7 @@ export default function VesselTrackerPage() {
               defaultCenter={INITIAL_CENTER} 
               defaultZoom={10} 
               onLoad={(m) => setMap(m)} 
+              onClick={handleMapClick}
               options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
             >
                   {followedVessels?.filter(v => v.isSharing && v.location).map(vessel => {
