@@ -93,13 +93,11 @@ export default function VesselTrackerPage() {
   const [customSharingId, setCustomSharingId] = useState('');
   const [mooringRadius, setMooringRadius] = useState(20);
 
-  // ÉTAT LOCAL POUR LE GPS
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
   const [anchorPos, setAnchorPos] = useState<{ lat: number; lng: number } | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status'] | 'offline'>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
-  // REFS POUR ÉVITER LES BOUCLES INFINIES
   const currentPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const anchorPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const statusRef = useRef<VesselStatus['status'] | 'offline'>('moving');
@@ -108,7 +106,6 @@ export default function VesselTrackerPage() {
   const driftStartTime = useRef<number | null>(null);
   const lastWeatherUpdateRef = useRef<number>(0);
 
-  // Journal Technique Intelligent (Fusion)
   const [technicalLog, setTechnicalLog] = useState<{ label: string, startTime: Date, lastUpdate: Date, duration: number }[]>([]);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
@@ -140,7 +137,6 @@ export default function VesselTrackerPage() {
     return `ACTIF ${mins} MIN`;
   }, [currentVesselData]);
 
-  // Chargement des préférences initiales
   useEffect(() => {
     if (userProfile && !isSharing) {
         if (userProfile.vesselNickname) setVesselNickname(userProfile.vesselNickname);
@@ -149,7 +145,6 @@ export default function VesselTrackerPage() {
     }
   }, [userProfile, isSharing]);
 
-  // FONCTION DE MISE À JOUR FIRESTORE STABILISÉE
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>) => {
     if (!user || !firestore || !sharingId) return;
     
@@ -184,7 +179,6 @@ export default function VesselTrackerPage() {
         updatePayload.anchorLocation = null;
     }
 
-    // GESTION WINDY
     const now = Date.now();
     if ((now - lastWeatherUpdateRef.current > 3 * 3600 * 1000) && pos) {
         try {
@@ -201,7 +195,6 @@ export default function VesselTrackerPage() {
 
     await setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true });
     
-    // Mémorisation automatique sur le profil
     updateDoc(doc(firestore, 'users', user.uid), {
         vesselNickname: vesselNickname || user.displayName,
         lastVesselId: sharingId,
@@ -299,7 +292,6 @@ export default function VesselTrackerPage() {
     toast({ title: label });
   };
 
-  // GPS WATCH LOOP - TOLÉRANCE 500M
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
