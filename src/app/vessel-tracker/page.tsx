@@ -47,7 +47,7 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getDataForDate } from '@/lib/data';
 
-// CLÉ "MAP FORECAST" (VÉRIFIÉE : 1gGm...)
+// CLÉ "MAP FORECAST" (POUR LA CARTE) - VÉRIFIÉE
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -125,7 +125,6 @@ export default function VesselTrackerPage() {
   
   const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
   const [isSharing, setIsSharing] = useState(false);
-  const [vesselNickname, setVesselNickname] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentModel, setCurrentModel] = useState('ecmwf');
   const [currentOverlay, setCurrentOverlay] = useState('wind');
@@ -168,7 +167,8 @@ export default function VesselTrackerPage() {
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
-    // Délai prolongé pour stabiliser le thread React avant l'init
+    isMapInitializedRef.current = true; // Empêcher les doubles appels immédiats
+
     setTimeout(() => {
         const options = {
           key: MAP_FORECAST_KEY,
@@ -176,7 +176,7 @@ export default function VesselTrackerPage() {
           lon: INITIAL_CENTER.lng,
           zoom: 10,
           verbose: true,
-          externalAllowedOrigins: ["cloudworkstations.dev", "web.app"],
+          externalAllowedOrigins: [window.location.host, "cloudworkstations.dev", "web.app"],
           overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell', 'currents'],
           product: 'ecmwf',
         };
@@ -184,14 +184,14 @@ export default function VesselTrackerPage() {
         try {
             window.windyInit(options, (windyAPI: any) => {
               if (!windyAPI) {
-                  setAuthError(`Erreur 401 : ${window.location.host}`);
+                  setAuthError(window.location.host);
+                  isMapInitializedRef.current = false;
                   return;
               }
 
               const { map, store, picker, broadcast } = windyAPI;
               mapRef.current = map;
               windyMapInstance.current = windyAPI;
-              isMapInitializedRef.current = true;
 
               store.set('overlay', 'wind');
               store.set('product', 'ecmwf');
@@ -219,7 +219,6 @@ export default function VesselTrackerPage() {
                 picker.open({ lat: e.latlng.lat, lon: e.latlng.lng });
               });
 
-              // Correction du redessin pour éviter l'écran gris
               setTimeout(() => { 
                 map.invalidateSize(); 
                 window.dispatchEvent(new Event('resize')); 
@@ -227,6 +226,7 @@ export default function VesselTrackerPage() {
             });
         } catch (e: any) {
             setAuthError(window.location.host);
+            isMapInitializedRef.current = false;
         }
     }, 800);
   }, []);
@@ -235,7 +235,6 @@ export default function VesselTrackerPage() {
     if (isLeafletLoaded && isWindyLoaded) initWindy();
   }, [isLeafletLoaded, isWindyLoaded, initWindy]);
 
-  // Rendu Canvas pour éliminer les violations de performance
   useEffect(() => {
     if (!mapRef.current || !followedVessels || !window.L) return;
     const L = window.L;
@@ -285,13 +284,12 @@ export default function VesselTrackerPage() {
         setDoc(doc(firestore, 'vessels', sharingId), { 
             id: sharingId,
             userId: user.uid, 
-            displayName: vesselNickname || profile?.displayName || 'Capitaine', 
             location: { latitude, longitude },
             isSharing: true, 
             lastActive: serverTimestamp()
         }, { merge: true }).catch(() => {});
     }
-  }, [user, firestore, isSharing, sharingId, vesselNickname, profile?.displayName]);
+  }, [user, firestore, isSharing, sharingId]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -309,18 +307,6 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const handleSetModel = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const model = e.target.value;
-    setCurrentModel(model);
-    if (window.windyStore) window.windyStore.set('product', model);
-  };
-
-  const handleSetOverlay = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const overlay = e.target.value;
-    setCurrentOverlay(overlay);
-    if (window.windyStore) window.windyStore.set('overlay', overlay);
-  };
-
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       <Script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" strategy="afterInteractive" onLoad={() => setIsLeafletLoaded(true)} />
@@ -331,17 +317,17 @@ export default function VesselTrackerPage() {
       {authError && (
         <Alert variant="destructive" className="bg-red-50 border-red-600 rounded-2xl border-2 shadow-xl animate-in slide-in-from-top-4">
             <ShieldAlert className="size-6" />
-            <AlertTitle className="font-black uppercase text-sm mb-2">Accès Cartographique Refusé (401)</AlertTitle>
+            <AlertTitle className="font-black uppercase text-sm mb-2">ERREUR 401 : MAUVAISE CLÉ OU RESTRICTION</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cette URL EXACTE dans api.windy.com :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Attention : Vous avez configuré la clé Point Forecast (ggM4k...). Pour la carte, vous devez configurer la clé Map Forecast (1gGm...) avec cette URL :</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{currentOrigin}</code>
                         <Button size="icon" variant="ghost" onClick={() => { navigator.clipboard.writeText(currentOrigin); toast({ title: "Copié !" }); }}><Copy className="size-4" /></Button>
                     </div>
                 </div>
                 <div className="bg-white/50 p-3 rounded-lg text-[9px] font-bold leading-relaxed italic text-red-900">
-                    {"L'URL dans vos restrictions Windy doit correspondre exactement à l'hôte ci-dessus (sans https://)."}
+                    {"Veuillez cliquer sur la clé commençant par 1gGm dans votre console Windy et ajouter l'URL ci-dessus dans les restrictions de domaine."}
                 </div>
             </AlertDescription>
         </Alert>
@@ -364,7 +350,7 @@ export default function VesselTrackerPage() {
                   <div className="relative">
                       <select 
                         value={currentModel}
-                        onChange={handleSetModel}
+                        onChange={(e) => { setCurrentModel(e.target.value); if(window.windyStore) window.windyStore.set('product', e.target.value); }}
                         className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none focus:border-primary"
                       >
                           <option value="ecmwf">ECMWF (9km)</option>
@@ -379,7 +365,7 @@ export default function VesselTrackerPage() {
                   <div className="relative">
                       <select 
                         value={currentOverlay}
-                        onChange={handleSetOverlay}
+                        onChange={(e) => { setCurrentOverlay(e.target.value); if(window.windyStore) window.windyStore.set('overlay', e.target.value); }}
                         className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none focus:border-primary"
                       >
                           <option value="wind">Vent & Rafales</option>
