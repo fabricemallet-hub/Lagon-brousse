@@ -129,7 +129,7 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
                         {tides.slice(0, 2).map((t, i) => (
                             <div key={i} className="bg-white/5 rounded p-1.5 text-center">
                                 <p className={cn("text-[7px] font-black uppercase", t.type === 'haute' ? 'text-primary' : 'text-orange-400')}>Mer {t.type}</p>
-                                <p className="text-10px font-black">{t.time} • {t.height.toFixed(2)}m</p>
+                                <p className="text-[10px] font-black">{t.time} • {t.height.toFixed(2)}m</p>
                             </div>
                         ))}
                     </div>
