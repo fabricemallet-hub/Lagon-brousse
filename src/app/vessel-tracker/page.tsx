@@ -94,8 +94,8 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import type { UserAccount, VesselStatus, SoundLibraryEntry } from '@/lib/types';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import type { UserAccount, VesselStatus, SoundLibraryEntry } from '@/lib/types';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -290,8 +290,9 @@ export default function VesselTrackerPage() {
     const msg = emetteur.vesselSmsMessage || 'Requiert assistance immédiate.';
     const time = format(new Date(), 'HH:mm');
     const acc = emetteur.accuracy || 0;
-    const posUrl = emetteur.currentPos 
-        ? `https://www.google.com/maps?q=${emetteur.currentPos.lat.toFixed(6)},${emetteur.currentPos.lng.toFixed(6)}` 
+    const pos = emetteur.currentPos;
+    const posUrl = pos 
+        ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` 
         : "https://www.google.com/maps?q=-22.27,166.44";
     
     return `[${nick.toUpperCase()}] ${msg} [MAYDAY] à ${time}. Position (+/- ${acc}m) : ${posUrl}`;
@@ -313,8 +314,12 @@ export default function VesselTrackerPage() {
     emetteur.startSharing();
   };
 
+  // Liste des alertes acquittées pour affichage visuel
+  const ackList = Object.entries(recepteur.acknowledgedAlerts);
+
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
+      {/* KILL SWITCH AUDIO - FLOTTANT HAUT */}
       {recepteur.isAlarmActive && (
         <Button 
             className="fixed top-2 left-1/2 -translate-x-1/2 z-[10008] h-14 bg-red-600 hover:bg-red-700 text-white font-black uppercase shadow-2xl animate-bounce gap-3 px-8 rounded-full border-4 border-white transition-all active:scale-95"
@@ -322,6 +327,14 @@ export default function VesselTrackerPage() {
         >
             <Volume2 className="size-6 animate-pulse" /> ARRÊTER LE SON
         </Button>
+      )}
+
+      {/* BANDEAU ALERTES ACQUITTÉES (VISUEL SEUL) */}
+      {ackList.length > 0 && !recepteur.isAlarmActive && (
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[10008] w-max px-4 py-2 bg-slate-900/90 text-white rounded-full border border-white/20 shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+            <ShieldAlert className="size-3 text-orange-500" />
+            <span className="text-[9px] font-black uppercase tracking-widest">⚠️ ALERTE ACQUITTEE - Surveillance active</span>
+        </div>
       )}
 
       {simulator.isActive && (
@@ -904,7 +917,7 @@ export default function VesselTrackerPage() {
                                   </div>
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v63.0 prêt - Audio Débloqué</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v64.0 prêt - Acquittement OK</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className="p-2 border rounded-lg bg-white flex justify-between items-center text-[9px] shadow-sm cursor-pointer hover:bg-slate-100" onClick={() => log.pos && mapCore.handleRecenter(log.pos)}>
                                                   <span className="font-black uppercase">{log.label}</span>

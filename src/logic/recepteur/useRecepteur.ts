@@ -8,8 +8,9 @@ import { useAudioEngine } from '@/hooks/useAudioEngine';
 import type { UserAccount, SoundLibraryEntry, VesselStatus, VesselPrefs } from '@/lib/types';
 
 /**
- * LOGIQUE RÉCEPTEUR (B) v63.0
- * Gère la surveillance de flotte et le système de notifications synchronisées (Sons + Toasts).
+ * LOGIQUE RÉCEPTEUR (B) v64.0
+ * Gère la surveillance de flotte et le système d'acquittement (Acknowledge).
+ * Empêche le harcèlement sonore si une alerte est déjà validée par l'utilisateur.
  */
 export function useRecepteur(vesselId?: string) {
   const { user } = useUser();
@@ -20,6 +21,9 @@ export function useRecepteur(vesselId?: string) {
   const [isSaving, setIsSaving] = useState(false);
   const lastAlarmTriggerRef = useRef<Record<string, { status: string, time: number }>>({});
   
+  // État des alertes acquittées (vesselId -> alertType)
+  const [acknowledgedAlerts, setAcknowledgedAlerts] = useState<Record<string, string>>({});
+
   const defaultPrefs: VesselPrefs = {
     volume: 0.8,
     isNotifyEnabled: true,
@@ -64,7 +68,12 @@ export function useRecepteur(vesselId?: string) {
   /**
    * Système de déclenchement synchronisé Alerte + Son
    */
-  const triggerAlert = useCallback((type: keyof VesselPrefs['alerts'], vesselName: string, forceMaxVolume: boolean = false) => {
+  const triggerAlert = useCallback((type: keyof VesselPrefs['alerts'], vesselName: string, forceMaxVolume: boolean = false, vesselId: string) => {
+    // CONDITION CRITIQUE : Ne pas déclencher si déjà acquittée
+    if (acknowledgedAlerts[vesselId] === type) {
+        return;
+    }
+
     if (!vesselPrefs.isNotifyEnabled || !dbSounds || !audioEngine.isUnlocked) return;
 
     const config = vesselPrefs.alerts[type];
@@ -103,11 +112,16 @@ export function useRecepteur(vesselId?: string) {
             break;
     }
 
-    toast({ title, description: message, variant, duration: config.loop ? 10000 : 4000 });
-  }, [vesselPrefs, dbSounds, audioEngine, toast]);
+    toast({ 
+        title, 
+        description: message, 
+        variant, 
+        duration: config.loop ? 15000 : 4000 
+    });
+  }, [vesselPrefs, dbSounds, audioEngine, toast, acknowledgedAlerts]);
 
   /**
-   * Moteur de surveillance de flotte
+   * Moteur de surveillance de flotte v64.0
    */
   const processVesselAlerts = useCallback((followedVessels: VesselStatus[]) => {
     if (!vesselPrefs.isNotifyEnabled || !audioEngine.isUnlocked) return;
@@ -123,6 +137,19 @@ export function useRecepteur(vesselId?: string) {
         let typeToTrigger: keyof VesselPrefs['alerts'] | null = null;
         let forceMaxVolume = false;
 
+        // LOGIQUE DE RÉINITIALISATION D'ACQUITTEMENT
+        // Si le statut redevient calme, on autorise à nouveau l'alerte pour le futur
+        if (vessel.status === 'moving' || vessel.status === 'stationary' || vessel.status === 'landed') {
+            if (acknowledgedAlerts[vesselId]) {
+                setAcknowledgedAlerts(prev => {
+                    const next = { ...prev };
+                    delete next[vesselId];
+                    return next;
+                });
+            }
+        }
+
+        // DÉTECTION DES DANGERS
         if (vessel.status === 'emergency' || vessel.eventLabel === 'MAYDAY' || vessel.eventLabel === 'PAN PAN') {
             typeToTrigger = 'assistance';
             forceMaxVolume = true;
@@ -135,17 +162,17 @@ export function useRecepteur(vesselId?: string) {
         }
 
         if (typeToTrigger && lastTrigger?.status !== typeToTrigger) {
-            triggerAlert(typeToTrigger, vessel.displayName || vesselId, forceMaxVolume);
+            triggerAlert(typeToTrigger, vessel.displayName || vesselId, forceMaxVolume, vesselId);
             lastAlarmTriggerRef.current[vesselId] = { status: typeToTrigger, time: Date.now() };
         }
 
-        // Reset
-        if (vessel.status === 'moving' && lastTrigger?.status === 'stationary') {
+        // Reset local trigger if status normalizes
+        if ((vessel.status === 'moving' || vessel.status === 'stationary') && lastTrigger?.status === 'stationary') {
             audioEngine.stop('stationary');
             delete lastAlarmTriggerRef.current[vesselId];
         }
     });
-  }, [vesselPrefs, audioEngine, triggerAlert]);
+  }, [vesselPrefs, audioEngine, triggerAlert, acknowledgedAlerts]);
 
   const initAudio = useCallback(() => {
     audioEngine.unlockAudio();
@@ -153,8 +180,20 @@ export function useRecepteur(vesselId?: string) {
 
   const stopAllAlarms = useCallback(() => {
     audioEngine.stopAll();
-    lastAlarmTriggerRef.current = {};
-  }, [audioEngine]);
+    
+    // ACQUITTEMENT : On marque toutes les alertes en cours comme acquittées
+    const newAcks: Record<string, string> = { ...acknowledgedAlerts };
+    Object.entries(lastAlarmTriggerRef.current).forEach(([vId, data]) => {
+        newAcks[vId] = data.status;
+    });
+    setAcknowledgedAlerts(newAcks);
+
+    toast({ 
+        title: "SONS COUPÉS", 
+        description: "Alertes acquittées. La surveillance visuelle reste active.",
+        duration: 3000
+    });
+  }, [audioEngine, acknowledgedAlerts, toast]);
 
   const updateLocalPrefs = useCallback((updates: Partial<VesselPrefs>) => {
     setVesselPrefs(prev => ({ ...prev, ...updates }));
@@ -187,6 +226,7 @@ export function useRecepteur(vesselId?: string) {
     stopAllAlarms,
     isAlarmActive: audioEngine.isAlarmActive,
     initAudio,
-    processVesselAlerts
-  }), [vesselPrefs, updateLocalPrefs, savePrefsToFirestore, isSaving, dbSounds, initAudio, stopAllAlarms, audioEngine.isAlarmActive, audioEngine.play, audioEngine.stop, processVesselAlerts]);
+    processVesselAlerts,
+    acknowledgedAlerts
+  }), [vesselPrefs, updateLocalPrefs, savePrefsToFirestore, isSaving, dbSounds, initAudio, stopAllAlarms, audioEngine.isAlarmActive, audioEngine.play, audioEngine.stop, processVesselAlerts, acknowledgedAlerts]);
 }
