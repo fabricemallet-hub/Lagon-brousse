@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
@@ -16,7 +17,9 @@ import {
   deleteDoc,
   limit,
   getDocs,
-  writeBatch
+  writeBatch,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,7 +84,8 @@ import {
   Unlock,
   Waves,
   History,
-  Phone
+  Phone,
+  AlertCircle
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -90,16 +94,6 @@ import { fr } from 'date-fns/locale';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { fetchWindyWeather } from '@/lib/windy-api';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 const WINDY_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
@@ -191,18 +185,8 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // JOURNAUX TECHNIQUE & TACTIQUE
-  const techLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !sharingId) return null;
-    return query(collection(firestore, 'vessels', sharingId, 'logs_technique'), orderBy('createdAt', 'desc'), limit(30));
-  }, [firestore, sharingId]);
-  const { data: techLogs } = useCollection<any>(techLogsQuery);
-
-  const tactiqueLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !sharingId) return null;
-    return query(collection(firestore, 'vessels', sharingId, 'logs_tactique'), orderBy('createdAt', 'desc'), limit(30));
-  }, [firestore, sharingId]);
-  const { data: tacticalLogs } = useCollection<any>(tactiqueLogsQuery);
+  const [techHistory, setTechHistory] = useState<{ status: string, battery: number, accuracy: number, time: Date, duration: string }[]>([]);
+  const [tacticalHistory, setTacticalHistory] = useState<{ type: string, lat: number, lng: number, time: Date, wind: number, temp: number }[]>([]);
 
   const soundsQuery = useMemoFirebase(() => (firestore) ? query(collection(firestore, 'sound_library'), orderBy('label', 'asc')) : null, [firestore]);
   const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
@@ -310,13 +294,26 @@ export default function VesselTrackerPage() {
         const now = Date.now();
         if (now - lastTechLogTime.current > 60000) {
             const duration = startTimeRef.current ? differenceInMinutes(new Date(), startTimeRef.current) : 0;
-            addDoc(collection(firestore, 'vessels', sharingId, 'logs_technique'), {
-                status: data.status || vesselStatusRef.current,
+            const statusLabel = data.status || vesselStatusRef.current;
+            
+            const newLog = {
+                status: statusLabel,
                 battery: batteryInfo.batteryLevel,
                 accuracy: data.accuracy || 0,
                 durationText: `ACTIF ${duration} MIN`,
                 createdAt: serverTimestamp()
-            }).catch(() => {});
+            };
+
+            addDoc(collection(firestore, 'vessels', sharingId, 'logs_technique'), newLog).catch(() => {});
+            
+            setTechHistory(prev => [{
+                status: statusLabel,
+                battery: batteryInfo.batteryLevel,
+                accuracy: data.accuracy || 0,
+                time: new Date(),
+                duration: `ACTIF ${duration} MIN`
+            }, ...prev].slice(0, 50));
+
             lastTechLogTime.current = now;
         }
     };
@@ -336,13 +333,24 @@ export default function VesselTrackerPage() {
         }
     } catch (e) {}
 
-    addDoc(collection(firestore, 'vessels', sharingId, 'logs_tactique'), {
+    const newTacticalLog = {
         type: label,
         location: { latitude: currentPos.lat, longitude: currentPos.lng },
         wind: weatherInfo.wind,
         temp: weatherInfo.temp,
         createdAt: serverTimestamp()
-    });
+    };
+
+    addDoc(collection(firestore, 'vessels', sharingId, 'logs_tactique'), newTacticalLog);
+    
+    setTacticalHistory(prev => [{
+        type: label,
+        lat: currentPos.lat,
+        lng: currentPos.lng,
+        time: new Date(),
+        wind: weatherInfo.wind,
+        temp: weatherInfo.temp
+    }, ...prev].slice(0, 50));
 
     updateVesselInFirestore({ eventLabel: label });
   };
@@ -354,6 +362,10 @@ export default function VesselTrackerPage() {
     const batch = writeBatch(firestore);
     snap.forEach(d => batch.delete(d.ref));
     await batch.commit();
+    
+    if (type === 'tech') setTechHistory([]);
+    else setTacticalHistory([]);
+    
     toast({ title: `Journal ${type === 'tech' ? 'Technique' : 'Tactique'} effacé` });
   };
 
@@ -434,14 +446,21 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const handleRemoveSavedVessel = async (id: string) => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            savedVesselIds: arrayRemove(id)
-        });
-        toast({ title: "Retiré de la liste" });
-    } catch (e) {}
+  const handleManualStatus = (st: VesselStatus['status'], label?: string) => {
+    setVesselStatus(st);
+    vesselStatusRef.current = st;
+    updateVesselInFirestore({ status: st, eventLabel: label || null });
+    toast({ title: label || (st === 'returning' ? 'Retour Maison' : st === 'landed' ? 'À terre' : 'Statut mis à jour') });
+  };
+
+  const sendEmergencySms = (type: 'SOS' | 'MAYDAY' | 'PAN PAN') => {
+    if (!emergencyContact) { toast({ variant: "destructive", title: "Numéro requis" }); return; }
+    const pos = currentPos;
+    const posUrl = pos ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
+    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
+    const customText = vesselSmsMessage ? vesselSmsMessage : "Requiert assistance immédiate.";
+    const body = `${nicknamePrefix}${customText} [${type}] Position : ${posUrl}`;
+    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
   const saveVesselPrefs = async (newPrefs: typeof vesselPrefs) => {
@@ -528,20 +547,74 @@ export default function VesselTrackerPage() {
       {mode === 'sender' && (
           <div className="flex flex-col gap-3">
               {isSharing ? (
-                  <Button variant="destructive" className="w-full h-16 font-black uppercase shadow-xl rounded-2xl border-4 border-white/20 gap-3" onClick={handleStopSharing}>
-                      <X className="size-6" /> ARRÊTER LE PARTAGE
-                  </Button>
+                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                      <div className="space-y-3 bg-white p-1 rounded-2xl">
+                          <Button 
+                              variant="destructive" 
+                              className="w-full h-16 font-black uppercase text-xs shadow-lg rounded-xl gap-3 border-2 border-white/20 touch-manipulation bg-red-500 hover:bg-red-600" 
+                              onClick={() => {
+                                  handleManualStatus('emergency', 'DEMANDE ASSISTANCE');
+                                  sendEmergencySms('SOS');
+                              }}
+                          >
+                              <AlertCircle className="size-5" /> DEMANDE ASSISTANCE (PROBLÈME)
+                          </Button>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                              <Button 
+                                  variant="outline" 
+                                  className="h-20 flex items-center justify-center px-4 rounded-xl border-2 bg-slate-50 hover:bg-slate-100 transition-all touch-manipulation border-slate-200" 
+                                  onClick={() => handleManualStatus('returning')}
+                                  disabled={vesselStatus === 'returning'}
+                              >
+                                  <Navigation className="size-5 text-blue-600 mr-4" />
+                                  <div className="flex flex-col text-left">
+                                      <span className="text-[10px] font-black uppercase text-slate-800 leading-tight tracking-tight">Retour</span>
+                                      <span className="text-[10px] font-black uppercase text-slate-800 leading-tight tracking-tight">Maison</span>
+                                  </div>
+                              </Button>
+                              <Button 
+                                  variant="outline" 
+                                  className="h-20 flex items-center justify-center px-4 rounded-xl border-2 bg-slate-50 hover:bg-slate-100 transition-all touch-manipulation border-slate-200" 
+                                  onClick={() => handleManualStatus('landed')}
+                                  disabled={vesselStatus === 'landed'}
+                              >
+                                  <Home className="size-5 text-green-600 mr-3" />
+                                  <span className="text-[10px] font-black uppercase text-slate-800 leading-tight tracking-tight">Home (À terre)</span>
+                              </Button>
+                          </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation" onClick={() => handleTacticalEvent('MARLIN')}><Fish className="size-4 text-blue-600" /> MARLIN</Button>
+                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation" onClick={() => handleTacticalEvent('THON')}><Fish className="size-4 text-red-600" /> THON</Button>
+                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation" onClick={() => handleTacticalEvent('TAZARD')}><Fish className="size-4 text-emerald-600" /> TAZARD</Button>
+                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation" onClick={() => handleTacticalEvent('OISEAUX')}><Bird className="size-4 text-slate-600" /> OISEAUX</Button>
+                      </div>
+
+                      <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3 border-2 border-white/20 touch-manipulation" onClick={handleStopSharing}>
+                          <X className="size-5" /> ARRÊTER LE PARTAGE
+                      </Button>
+                  </div>
               ) : (
-                  <Button className="w-full h-16 text-sm font-black uppercase tracking-widest shadow-xl rounded-2xl gap-3" onClick={() => setIsSharing(true)}>
-                      <Navigation className="size-6" /> LANCER LE PARTAGE
-                  </Button>
-              )}
-              {isSharing && (
-                  <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-bottom-2">
-                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalEvent('MARLIN')}><Fish className="size-4 text-blue-600" /> MARLIN</Button>
-                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalEvent('THON')}><Fish className="size-4 text-red-600" /> THON</Button>
-                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalEvent('TAZARD')}><Fish className="size-4 text-emerald-600" /> TAZARD</Button>
-                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalEvent('OISEAUX')}><Bird className="size-4 text-slate-600" /> OISEAUX</Button>
+                  <div className="space-y-4">
+                      <Button className="w-full h-16 text-sm font-black uppercase tracking-widest shadow-xl rounded-2xl gap-3" onClick={() => setIsSharing(true)}>
+                          <Navigation className="size-6" /> LANCER LE PARTAGE
+                      </Button>
+                      <div className="p-4 bg-muted/20 rounded-2xl border-2 space-y-4">
+                          <div className="space-y-1">
+                              <Label className="text-[9px] font-black uppercase opacity-60 ml-1">ID du navire</Label>
+                              <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest" />
+                          </div>
+                          <div className="space-y-1">
+                              <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Surnom du capitaine</Label>
+                              <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold text-center h-12 border-2 uppercase" />
+                          </div>
+                          <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] border-2 gap-2" onClick={toggleWakeLock}>
+                              <Zap className={cn("size-4", wakeLock && "fill-primary")} />
+                              {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
+                          </Button>
+                      </div>
                   </div>
               )}
           </div>
@@ -551,7 +624,7 @@ export default function VesselTrackerPage() {
           <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="logs" className="border-none">
                   <AccordionTrigger className="flex items-center justify-between px-4 h-12 bg-white hover:no-underline">
-                      <div className="flex items-center gap-2 font-black uppercase text-[10px]"><HistoryIcon className="size-3" /> Journaux de Bord</div>
+                      <div className="flex items-center gap-2 font-black uppercase text-[10px]"><HistoryIcon className="size-3" /> Journal de Bord</div>
                   </AccordionTrigger>
                   <AccordionContent className="p-0 border-t border-dashed">
                       <Tabs defaultValue="technique">
@@ -561,24 +634,24 @@ export default function VesselTrackerPage() {
                           </TabsList>
                           <TabsContent value="technique" className="p-3 space-y-2 max-h-60 overflow-y-auto scrollbar-hide">
                               <div className="flex justify-end mb-2"><Button variant="ghost" size="sm" className="h-6 text-[8px] font-black text-destructive gap-1" onClick={() => handleClearLogs('tech')}><Trash2 className="size-2.5" /> Effacer</Button></div>
-                              {techLogs?.map((log: any) => (
-                                  <div key={log.id} className="flex justify-between items-center p-3 bg-white rounded-xl border-2 text-[9px] font-bold shadow-sm">
+                              {techHistory.map((log, i) => (
+                                  <div key={i} className="flex justify-between items-center p-3 bg-white rounded-xl border-2 text-[9px] font-bold shadow-sm">
                                       <div className="flex items-center gap-3">
                                           <Badge variant="outline" className="text-[8px] h-4 font-black uppercase">{log.status}</Badge>
-                                          <span className="text-primary">{log.durationText}</span>
+                                          <span className="text-primary">{log.duration}</span>
                                       </div>
                                       <div className="flex items-center gap-3 text-muted-foreground">
                                           <span>BAT: {log.battery}%</span>
                                           <span>+/- {log.accuracy}m</span>
-                                          <span>{log.createdAt ? format(log.createdAt.toDate(), 'HH:mm') : '...'}</span>
+                                          <span>{format(log.time, 'HH:mm')}</span>
                                       </div>
                                   </div>
                               ))}
                           </TabsContent>
                           <TabsContent value="tactique" className="p-3 space-y-2 max-h-60 overflow-y-auto scrollbar-hide">
                               <div className="flex justify-end mb-2"><Button variant="ghost" size="sm" className="h-6 text-[8px] font-black text-destructive gap-1" onClick={() => handleClearLogs('tactique')}><Trash2 className="size-2.5" /> Effacer</Button></div>
-                              {tacticalLogs?.map((log: any) => (
-                                  <div key={log.id} onClick={() => { if(googleMap) { googleMap.panTo({ lat: log.location.latitude, lng: log.location.longitude }); googleMap.setZoom(16); } }} className="flex justify-between items-center p-3 bg-white rounded-xl border-2 text-[9px] font-black shadow-sm cursor-pointer active:scale-95 transition-all">
+                              {tacticalHistory.map((log, i) => (
+                                  <div key={i} onClick={() => { if(googleMap) { googleMap.panTo({ lat: log.lat, lng: log.lng }); googleMap.setZoom(16); } }} className="flex justify-between items-center p-3 bg-white rounded-xl border-2 text-[9px] font-black shadow-sm cursor-pointer active:scale-95 transition-all">
                                       <div className="flex items-center gap-3">
                                           <div className="size-2 rounded-full bg-primary" />
                                           <span className="uppercase">{log.type}</span>
@@ -586,7 +659,7 @@ export default function VesselTrackerPage() {
                                       <div className="flex items-center gap-3 text-muted-foreground">
                                           <span className="flex items-center gap-1"><Waves className="size-3"/> {log.wind} ND</span>
                                           <span>{log.temp}°C</span>
-                                          <span>{log.createdAt ? format(log.createdAt.toDate(), 'HH:mm') : '...'}</span>
+                                          <span>{format(log.time, 'HH:mm')}</span>
                                       </div>
                                   </div>
                               ))}
