@@ -133,7 +133,7 @@ export default function VesselTrackerPage() {
     return () => unsub();
   }, [emetteur.isSharing, emetteur.sharingId, mapCore]);
 
-  // LED Clignotante
+  // LED Clignotante Transmission
   const [isLedActive, setIsLedActive] = useState(false);
   useEffect(() => {
     if (emetteur.lastSyncTime > 0) {
@@ -260,33 +260,91 @@ export default function VesselTrackerPage() {
       {/* PANNEAUX DE CONTROLE */}
       <div className="grid grid-cols-1 gap-4">
           {appMode === 'sender' && (
-              <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
-                  <CardHeader className="bg-primary/5 p-4 border-b flex flex-row justify-between items-center">
-                      <CardTitle className="text-xs font-black uppercase flex items-center gap-2"><Navigation className="size-4 text-primary" /> Identité & Partage</CardTitle>
-                      {emetteur.isSharing && <div className={cn("size-3 rounded-full bg-green-500", isLedActive ? "animate-ping" : "opacity-30")} />}
+              <Card className="border-2 shadow-lg rounded-3xl overflow-hidden border-primary/20">
+                  <CardHeader className="bg-primary/5 p-5 border-b flex flex-row justify-between items-center">
+                      <div>
+                        <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-primary">
+                            <Navigation className="size-4 text-primary" /> Identité &amp; Partage
+                        </CardTitle>
+                        <CardDescription className="text-[9px] font-bold uppercase mt-0.5">Configuration de votre signal Live</CardDescription>
+                      </div>
+                      {emetteur.isSharing && (
+                        <div className="flex items-center gap-2">
+                            <div className={cn("size-3 rounded-full bg-green-500 shadow-sm transition-all", isLedActive ? "scale-125 glow" : "opacity-30")} />
+                            <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 font-black text-[8px] uppercase h-5">LIVE</Badge>
+                        </div>
+                      )}
                   </CardHeader>
-                  <CardContent className="p-4 space-y-4">
+                  <CardContent className="p-5 space-y-5">
                       {!emetteur.isSharing ? (
-                          <div className="space-y-4">
-                              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">Surnom</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-11 border-2 font-black" /></div>
-                              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ID UNIQUE" className="h-11 border-2 font-black text-center" /></div>
-                              <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl" onClick={emetteur.startSharing}>Lancer le Partage GPS</Button>
+                          <div className="space-y-5">
+                              <div className="space-y-1.5">
+                                  <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Mon Surnom</Label>
+                                  <Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg shadow-inner" />
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Navire</Label>
+                                    <Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase tracking-widest bg-slate-50" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-[10px] font-black uppercase opacity-60 ml-1 text-indigo-600">ID Flotte C</Label>
+                                    <Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase tracking-widest bg-indigo-50/30" />
+                                </div>
+                              </div>
+
+                              {emetteur.idsHistory.length > 0 && (
+                                <div className="space-y-2">
+                                    <p className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-2 ml-1">
+                                        <HistoryIcon className="size-3" /> Historique des IDs
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {emetteur.idsHistory.map((h, i) => (
+                                            <div key={i} className="flex items-center bg-white border-2 rounded-xl overflow-hidden shadow-sm">
+                                                <button 
+                                                    onClick={() => emetteur.loadFromHistory(h.vId, h.fId)}
+                                                    className="px-3 py-2 text-[9px] font-black uppercase hover:bg-primary/5 transition-colors border-r"
+                                                >
+                                                    {h.vId} {h.fId && <span className="text-indigo-600">| {h.fId}</span>}
+                                                </button>
+                                                <button 
+                                                    onClick={() => emetteur.removeFromHistory(h.vId)}
+                                                    className="px-2 py-2 text-destructive/40 hover:text-destructive hover:bg-red-50 transition-colors"
+                                                >
+                                                    <X className="size-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                              )}
+
+                              <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl gap-3 group transition-all active:scale-95" onClick={emetteur.startSharing}>
+                                  <Zap className="size-5 fill-white group-hover:animate-pulse" /> Lancer le Partage GPS
+                              </Button>
                           </div>
                       ) : (
                           <div className="space-y-4">
-                              <div className="p-4 bg-primary/10 rounded-xl border-2 border-primary/20 text-center">
-                                  <p className="text-[10px] font-black uppercase text-primary">Navire : {emetteur.sharingId}</p>
-                                  <Badge variant="outline" className="bg-green-500 text-white border-none animate-pulse mt-1">LIVE</Badge>
+                              <div className="p-5 bg-primary/5 rounded-2xl border-2 border-primary/20 text-center relative overflow-hidden">
+                                  <Navigation className="absolute -right-2 -bottom-2 size-12 opacity-5 rotate-12" />
+                                  <p className="text-[10px] font-black uppercase text-primary tracking-[0.2em] mb-1">Identité Active</p>
+                                  <h4 className="text-2xl font-black uppercase tracking-tighter text-slate-800">{emetteur.sharingId}</h4>
+                                  <p className="text-[9px] font-bold text-muted-foreground uppercase mt-1 italic">
+                                    Capitaine : {emetteur.vesselNickname || 'Inconnu'} • {emetteur.customFleetId ? `Flotte: ${emetteur.customFleetId.toUpperCase()}` : 'Pas de groupe'}
+                                  </p>
                               </div>
                               <div className="grid grid-cols-2 gap-2">
-                                  <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2" onClick={() => emetteur.triggerEmergency('ASSISTANCE')}>
-                                      <Zap className="size-4 mr-2" /> Assistance
+                                  <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => emetteur.triggerEmergency('ASSISTANCE')}>
+                                      <RefreshCw className="size-4 text-primary" /> Assistance
                                   </Button>
-                                  <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2", emetteur.vesselStatus === 'stationary' && "bg-orange-500 text-white")} onClick={emetteur.toggleAnchor}>
-                                      <Anchor className="size-4 mr-2" /> Mouillage
+                                  <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2 bg-background gap-2", emetteur.vesselStatus === 'stationary' && "bg-orange-500 text-white border-orange-600 shadow-inner")} onClick={emetteur.setAnchorPos ? () => { if (emetteur.anchorPos) emetteur.setAnchorPos(null); else emetteur.setAnchorPos(emetteur.currentPos); } : undefined}>
+                                      <Anchor className={cn("size-4", emetteur.vesselStatus === 'stationary' ? "text-white" : "text-orange-600")} /> Mouillage
                                   </Button>
                               </div>
-                              <Button variant="destructive" className="w-full h-16 font-black uppercase rounded-xl border-2" onClick={emetteur.stopSharing}>Arrêter le partage</Button>
+                              <Button variant="destructive" className="w-full h-16 font-black uppercase rounded-2xl border-2 shadow-lg gap-3 transition-all active:scale-95" onClick={emetteur.stopSharing}>
+                                  <X className="size-5" /> Arrêter le partage
+                              </Button>
                           </div>
                       )}
                   </CardContent>
@@ -302,11 +360,11 @@ export default function VesselTrackerPage() {
                   <AccordionContent className="pt-4 space-y-4">
                       <div className="p-4 border-2 rounded-2xl bg-white space-y-4 shadow-inner">
                           <div className="space-y-1.5">
-                              <Label className="text-[10px] font-black uppercase opacity-60">Numéro du contact à terre</Label>
+                              <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Numéro du contact à terre</Label>
                               <Input value={emetteur.emergencyContact} onChange={e => emetteur.setEmergencyContact(e.target.value)} placeholder="ex: 742929" className="h-12 border-2 font-black text-lg" />
                           </div>
                           <div className="space-y-1.5">
-                              <Label className="text-[10px] font-black uppercase opacity-60">Message personnalisé</Label>
+                              <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Message personnalisé</Label>
                               <Textarea value={emetteur.vesselSmsMessage} onChange={e => emetteur.setVesselSmsMessage(e.target.value)} placeholder="Détails du problème..." className="border-2 font-medium" />
                           </div>
                           <div className="space-y-2 pt-2 border-t border-dashed">
@@ -333,7 +391,7 @@ export default function VesselTrackerPage() {
               {emetteur.isSharing && (
                   <div className="flex gap-2 mb-2 p-2 bg-slate-900/10 backdrop-blur-md rounded-2xl border-2 border-white/20 z-[10002] relative">
                       <Button 
-                        variant={emetteur.vesselStatus === 'emergency' && emetteur.lastSyncTime ? 'default' : 'destructive'} 
+                        variant={emetteur.vesselStatus === 'emergency' ? 'default' : 'destructive'} 
                         className={cn("flex-1 h-16 font-black uppercase text-xs shadow-2xl border-2 transition-all active:scale-95", 
                             emetteur.vesselStatus === 'emergency' ? "bg-red-600 animate-pulse border-white" : "bg-red-700 border-red-400")}
                         onClick={() => emetteur.triggerEmergency('MAYDAY')}
@@ -363,7 +421,7 @@ export default function VesselTrackerPage() {
                       <AccordionTrigger className="h-12 px-6 hover:no-underline">
                           <div className="flex items-center gap-3">
                               <ClipboardList className="size-5 text-primary" />
-                              <span className="text-sm font-black uppercase tracking-tighter">Cockpit & Journaux</span>
+                              <span className="text-sm font-black uppercase tracking-tighter">Cockpit &amp; Journaux</span>
                               <Badge variant="outline" className="bg-primary/5 border-primary/20 text-[8px] font-black">LIVE</Badge>
                           </div>
                       </AccordionTrigger>

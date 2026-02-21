@@ -2,15 +2,13 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { doc, setDoc, serverTimestamp, deleteDoc, collection, addDoc, query, orderBy, getDoc, updateDoc } from 'firebase/firestore';
-import type { VesselStatus, UserAccount } from '@/lib/types';
+import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, getDoc } from 'firebase/firestore';
+import type { VesselStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { getDistance } from '@/lib/utils';
-import { fetchWindyWeather } from '@/lib/windy-api';
 
 /**
- * LOGIQUE ÉMETTEUR (A) : Envoi GPS, Gestion IDs, Historique, Journaux Technique & Tactique.
- * v51.1 : Ajout Logic de Détresse avec Toggle d'Annulation et SMS.
+ * LOGIQUE ÉMETTEUR (A) : "Le Cerveau"
+ * Gère l'identité, le partage Firestore, l'historique et la persistance.
  */
 export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => void, onStopCleanup?: () => void) {
   const { user } = useUser();
@@ -27,7 +25,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
   const [vesselNickname, setVesselNickname] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
   const [customFleetId, setCustomFleetId] = useState('');
-  const [vesselHistory, setVesselHistory] = useState<string[]>([]);
+  const [idsHistory, setIdsHistory] = useState<{ vId: string, fId: string }[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
   // SMS & Urgence Settings
@@ -41,20 +39,25 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
   
   const watchIdRef = useRef<number | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
-  const lastLoggedBattery = useRef<number>(100);
 
+  // CHARGEMENT PERSISTANCE LOCALE
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedNickname = localStorage.getItem('lb_vessel_nickname');
       const savedVesselId = localStorage.getItem('lb_vessel_id');
       const savedFleetId = localStorage.getItem('lb_fleet_id');
+      const savedHistory = localStorage.getItem('lb_ids_history');
+
       if (savedNickname) setVesselNickname(savedNickname);
       if (savedVesselId) setCustomSharingId(savedVesselId);
       if (savedFleetId) setCustomFleetId(savedFleetId);
-      try {
-        const vh = JSON.parse(localStorage.getItem('lb_vessel_history') || '[]');
-        setVesselHistory(vh);
-      } catch (e) {}
+      if (savedHistory) {
+        try {
+          setIdsHistory(JSON.parse(savedHistory));
+        } catch (e) {
+          console.error("Erreur historique IDs", e);
+        }
+      }
     }
   }, []);
 
@@ -102,54 +105,29 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
       .catch(() => {});
   }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId]);
 
-  const triggerEmergency = useCallback((type: 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE') => {
-    if (!isSharing) {
-        toast({ variant: "destructive", title: "Partage requis", description: "Activez le partage GPS avant de signaler une détresse." });
-        return;
-    }
-
-    const isCurrentlyActive = vesselStatus === 'emergency' && lastSentStatusRef.current === type;
-
-    if (isCurrentlyActive) {
-        // ANNULATION (Toggle)
-        const nextStatus = anchorPos ? 'stationary' : 'moving';
-        setVesselStatus(nextStatus);
-        updateVesselInFirestore({ status: nextStatus, eventLabel: null });
-        addTechLog('ANNULATION', `Alerte ${type} levée par l'utilisateur`);
-        
-        // Nettoyage historique local pour l'annulation
-        setTacticalLogs(prev => prev.filter(log => log.type !== type));
-        
-        toast({ title: "ALERTE ANNULÉE", description: "Statut normal rétabli." });
-    } else {
-        // DÉCLENCHEMENT
-        setVesselStatus('emergency');
-        updateVesselInFirestore({ status: 'emergency', eventLabel: type });
-        addTechLog('URGENCE', `${type} DÉCLENCHÉ`);
-        
-        // Envoi SMS si configuré
-        if (isEmergencyEnabled && emergencyContact) {
-            const posUrl = currentPos ? `https://www.google.com/maps?q=${currentPos.lat.toFixed(6)},${currentPos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
-            const nickname = (vesselNickname || 'Navire').toUpperCase();
-            const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Demande assistance immédiate.";
-            const body = `[${nickname}] ${customText} [${type}] Position : ${posUrl}`;
-            
-            window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
-        }
-
-        toast({ variant: "destructive", title: `ALERTE ${type}`, description: "Position d'urgence transmise à la flotte." });
-    }
-  }, [isSharing, vesselStatus, lastSentStatusRef, anchorPos, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, currentPos, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, toast]);
-
   const startSharing = () => {
     if (!navigator.geolocation || !user || !firestore) return;
     
+    const vId = customSharingId.trim().toUpperCase();
+    const fId = customFleetId.trim().toUpperCase();
+
+    // SAUVEGARDE PERSISTANCE
     localStorage.setItem('lb_vessel_nickname', vesselNickname);
-    localStorage.setItem('lb_vessel_id', customSharingId);
-    localStorage.setItem('lb_fleet_id', customFleetId);
+    localStorage.setItem('lb_vessel_id', vId);
+    localStorage.setItem('lb_fleet_id', fId);
+
+    // MISE À JOUR HISTORIQUE (LIMIT 5)
+    if (vId) {
+        setIdsHistory(prev => {
+            const filtered = prev.filter(h => h.vId !== vId);
+            const newHistory = [{ vId, fId }, ...filtered].slice(0, 5);
+            localStorage.setItem('lb_ids_history', JSON.stringify(newHistory));
+            return newHistory;
+        });
+    }
 
     setIsSharing(true);
-    addTechLog('DÉMARRAGE', `ID: ${sharingId}`);
+    addTechLog('DÉMARRAGE', `ID: ${sharingId} | FLOTTE: ${fId || 'AUCUNE'}`);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
@@ -164,9 +142,20 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
         if (vesselStatus !== 'emergency' && vesselStatus !== 'returning' && vesselStatus !== 'landed') {
             const nextStatus = knotSpeed < 0.2 ? 'stationary' : 'moving';
             setVesselStatus(nextStatus);
-            updateVesselInFirestore({ location: { latitude, longitude }, status: nextStatus, speed: Math.round(knotSpeed), heading: heading || 0 });
+            updateVesselInFirestore({ 
+                location: { latitude, longitude }, 
+                status: nextStatus, 
+                speed: Math.round(knotSpeed), 
+                heading: heading || 0,
+                fleetId: fId || null
+            });
         } else {
-            updateVesselInFirestore({ location: { latitude, longitude }, speed: Math.round(knotSpeed), heading: heading || 0 });
+            updateVesselInFirestore({ 
+                location: { latitude, longitude }, 
+                speed: Math.round(knotSpeed), 
+                heading: heading || 0,
+                fleetId: fId || null
+            });
         }
       },
       () => toast({ variant: 'destructive', title: "Signal GPS perdu" }),
@@ -179,12 +168,57 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     watchIdRef.current = null;
     setIsSharing(false);
     if (firestore && sharingId) {
-      await updateDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp() });
+      // Pour l'émetteur A, on peut soit passer isSharing: false, soit supprimer (votre prompt demandait supprimer)
+      // On opte pour la suppression pour "zéro trace" comme demandé au point 2 du prompt précédent
+      const ref = doc(firestore, 'vessels', sharingId);
+      setDoc(ref, { isSharing: false, lastActive: serverTimestamp() }, { merge: true });
     }
     setCurrentPos(null);
     setAnchorPos(null);
     onStopCleanup?.();
     toast({ title: "Partage arrêté" });
+  };
+
+  const triggerEmergency = useCallback((type: 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE') => {
+    if (!isSharing) {
+        toast({ variant: "destructive", title: "Partage requis", description: "Activez le partage GPS avant de signaler une détresse." });
+        return;
+    }
+
+    const isCurrentlyActive = vesselStatus === 'emergency' && lastSentStatusRef.current === type;
+
+    if (isCurrentlyActive) {
+        const nextStatus = anchorPos ? 'stationary' : 'moving';
+        setVesselStatus(nextStatus);
+        updateVesselInFirestore({ status: nextStatus, eventLabel: null });
+        addTechLog('ANNULATION', `Alerte ${type} levée`);
+        toast({ title: "ALERTE ANNULÉE" });
+    } else {
+        setVesselStatus('emergency');
+        updateVesselInFirestore({ status: 'emergency', eventLabel: type });
+        addTechLog('URGENCE', `${type} DÉCLENCHÉ`);
+        
+        if (isEmergencyEnabled && emergencyContact) {
+            const posUrl = currentPos ? `https://www.google.com/maps?q=${currentPos.lat.toFixed(6)},${currentPos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
+            const body = `[${vesselNickname.toUpperCase()}] ${isCustomMessageEnabled ? vesselSmsMessage : "Besoin assistance."} [${type}] Position : ${posUrl}`;
+            window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+        }
+        toast({ variant: "destructive", title: `ALERTE ${type}` });
+    }
+  }, [isSharing, vesselStatus, anchorPos, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, currentPos, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, toast]);
+
+  const loadFromHistory = (vId: string, fId: string) => {
+    setCustomSharingId(vId);
+    setCustomFleetId(fId);
+    toast({ title: "ID Chargé", description: `Navire: ${vId}` });
+  };
+
+  const removeFromHistory = (vId: string) => {
+    setIdsHistory(prev => {
+        const newHistory = prev.filter(h => h.vId !== vId);
+        localStorage.setItem('lb_ids_history', JSON.stringify(newHistory));
+        return newHistory;
+    });
   };
 
   const addTacticalLog = useCallback(async (type: string, photoUrl?: string) => {
@@ -213,7 +247,9 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     customFleetId,
     setCustomFleetId,
     sharingId,
-    vesselHistory,
+    idsHistory,
+    loadFromHistory,
+    removeFromHistory,
     lastSyncTime,
     techLogs,
     tacticalLogs,
