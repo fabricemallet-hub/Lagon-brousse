@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
@@ -20,7 +19,7 @@ import {
   arrayUnion,
   arrayRemove
 } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -86,13 +85,16 @@ import {
   Waves,
   History,
   Clock,
-  Battery
+  Battery,
+  Lock,
+  Unlock,
+  ShieldCheck
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { format, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { GoogleMap, OverlayView, Circle, Polyline } from '@react-google-maps/api';
+import { GoogleMap, OverlayView, Polyline, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { fetchWindyWeather } from '@/lib/windy-api';
 
@@ -115,7 +117,6 @@ export default function VesselTrackerPage() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
 
   // MODES & NAVIGATION
-  const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
   const [viewMode, setViewMode] = useState<'alpha' | 'beta' | 'gamma'>('alpha');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [googleMap, setGoogleMap] = useState<google.maps.Map | null>(null);
@@ -143,7 +144,7 @@ export default function VesselTrackerPage() {
   const isSharingRef = useRef(false);
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
   const startTimeRef = useRef<Date | null>(null);
-  const watchIdRef = useRef<number | null>(watchIdRef.current || null);
+  const watchIdRef = useRef<number | null>(null);
   const lastPosRef = useRef<{ lat: number, lng: number } | null>(null);
   const lastTechLogTime = useRef<number>(0);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -298,7 +299,10 @@ export default function VesselTrackerPage() {
 
   // GPS WATCHER
   useEffect(() => {
-    if (!isSharing || !navigator.geolocation) return;
+    if (!isSharing || !navigator.geolocation) {
+        if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+        return;
+    }
     
     setIsInitializing(true);
     shouldPanOnNextFix.current = true;
@@ -315,7 +319,6 @@ export default function VesselTrackerPage() {
             setCurrentSpeed(Math.round(knotSpeed));
             setCurrentHeading(heading || 0);
             
-            // Breadcrumbs (Trace 30 min)
             const now = Date.now();
             const lastBreadcrumb = lastPosRef.current;
             const distMoved = lastBreadcrumb ? getDistance(latitude, longitude, lastBreadcrumb.lat, lastBreadcrumb.lng) : 10;
@@ -340,7 +343,6 @@ export default function VesselTrackerPage() {
                 }
             }
 
-            // Journal Technique (Auto 60s)
             if (now - lastTechLogTime.current > 60000 || nextStatus !== vesselStatusRef.current) {
                 const elapsedMin = startTimeRef.current ? differenceInMinutes(new Date(), startTimeRef.current) : 0;
                 const hours = Math.floor(elapsedMin / 60);
@@ -348,7 +350,7 @@ export default function VesselTrackerPage() {
                 
                 setTechHistory(prev => [{
                     status: nextStatus.toUpperCase(),
-                    battery: 100, // Placeholder
+                    battery: 100, 
                     accuracy: Math.round(accuracy),
                     time: new Date(),
                     duration: `ACTIF ${hours}H ${mins}MIN`
@@ -360,7 +362,6 @@ export default function VesselTrackerPage() {
             vesselStatusRef.current = nextStatus;
             setVesselStatus(nextStatus);
             
-            // Sync Firestore
             const updatePayload: Partial<VesselStatus> = { 
                 location: { latitude, longitude }, 
                 status: nextStatus, 
@@ -388,7 +389,8 @@ export default function VesselTrackerPage() {
     if (user && firestore) {
         await updateDoc(doc(firestore, 'users', user.uid), {
             vesselIdHistory: arrayUnion(sharingId),
-            fleetIdHistory: customFleetId ? arrayUnion(customFleetId) : fleetIdHistory
+            fleetIdHistory: customFleetId ? arrayUnion(customFleetId) : fleetIdHistory,
+            lastVesselId: sharingId
         });
     }
     
@@ -412,7 +414,7 @@ export default function VesselTrackerPage() {
     }
     setCurrentPos(null);
     setAnchorPos(null);
-    toast({ title: "Partage arrêté", description: "Flux Firestore désactivé." });
+    toast({ title: "Partage arrêté" });
   };
 
   const handleManualStatus = (st: VesselStatus['status'], label?: string) => {
@@ -435,6 +437,10 @@ export default function VesselTrackerPage() {
     if (!currentPos) return;
     
     const weather = await fetchWindyWeather(currentPos.lat, currentPos.lng);
+    const elapsedMin = startTimeRef.current ? differenceInMinutes(new Date(), startTimeRef.current) : 0;
+    const hours = Math.floor(elapsedMin / 60);
+    const mins = elapsedMin % 60;
+
     const marker = {
         type,
         lat: currentPos.lat,
@@ -442,7 +448,8 @@ export default function VesselTrackerPage() {
         time: new Date(),
         wind: weather.windSpeed || 0,
         temp: weather.temp || 0,
-        photoUrl
+        photoUrl,
+        duration: `ACTIF ${hours}H ${mins}M`
     };
 
     setTacticalHistory(prev => [marker, ...prev].slice(0, 50));
@@ -505,7 +512,7 @@ export default function VesselTrackerPage() {
             )}
             {currentPos && (
                 <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                    <div style={{ transform: 'translate(-50%, -50%) rotate('+currentHeading+'deg)' }} className="relative">
+                    <div style={{ transform: `translate(-50%, -50%) rotate(${currentHeading}deg)` }} className="relative">
                         <div className="size-10 bg-blue-500/20 rounded-full animate-ping absolute inset-0" />
                         <div className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg flex items-center justify-center">
                             <Navigation className="size-3 text-white fill-white" />
@@ -722,17 +729,5 @@ export default function VesselTrackerPage() {
           </Card>
       </div>
     </div>
-  );
-}
-
-function Lock({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-  );
-}
-
-function Unlock({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
   );
 }
