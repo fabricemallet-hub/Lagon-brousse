@@ -50,7 +50,8 @@ import {
   Battery,
   MessageSquare,
   CheckCircle2,
-  Trash2
+  Trash2,
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -78,6 +79,13 @@ export default function VesselTrackerPage() {
     }
   }, [emetteur.lastSyncTime]);
 
+  const handleRecenterTo = (pos: { lat: number, lng: number }) => {
+      mapCore.handleRecenter(pos);
+      if (mapCore.isFullscreen) {
+          toast({ title: "Position centrée" });
+      }
+  };
+
   return (
     <div className="w-full space-y-4 pb-32 px-1">
       {/* SÉLECTEUR DE MODE GLOBAL */}
@@ -92,7 +100,7 @@ export default function VesselTrackerPage() {
           <Button 
             variant={appMode === 'receiver' ? 'default' : 'ghost'} 
             className="flex-1 font-black uppercase text-[9px] sm:text-[10px] h-12 px-1" 
-            onClick={() => setAppMode('receiver')}
+            onClick={() => setMode('receiver')}
           >
             Récepteur (B)
           </Button>
@@ -222,14 +230,28 @@ export default function VesselTrackerPage() {
                                       </Button>
                                   </div>
 
+                                  <div className="grid grid-cols-2 gap-2">
+                                      <Button 
+                                        variant={emetteur.vesselStatus === 'stationary' ? 'default' : 'outline'} 
+                                        className={cn("h-14 font-black uppercase text-[10px] border-2", emetteur.vesselStatus === 'stationary' ? "bg-orange-500 text-white border-orange-600" : "bg-white text-orange-600 border-orange-200")} 
+                                        onClick={emetteur.toggleAnchor}
+                                      >
+                                        <Anchor className="size-4 mr-2" /> {emetteur.vesselStatus === 'stationary' ? 'Mouillage Actif' : 'Activer Mouillage'}
+                                      </Button>
+                                      <div className="p-2 border-2 rounded-xl bg-muted/10 space-y-1">
+                                          <Label className="text-[8px] font-black uppercase opacity-60">Rayon Dérive: {emetteur.mooringRadius}m</Label>
+                                          <Slider value={[emetteur.mooringRadius]} min={10} max={200} step={10} onValueChange={v => emetteur.setMooringRadius(v[0])} />
+                                      </div>
+                                  </div>
+
                                   <div className="grid grid-cols-4 gap-2">
-                                      <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => flotte.addTacticalLog('THON', emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0)}>
+                                      <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => emetteur.addTacticalLog('THON')}>
                                         <Target className="size-4 text-red-600"/> THON
                                       </Button>
-                                      <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => flotte.addTacticalLog('TAZARD', emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0)}>
+                                      <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => emetteur.addTacticalLog('TAZARD')}>
                                         <Fish className="size-4 text-emerald-600"/> TAZARD
                                       </Button>
-                                      <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => flotte.addTacticalLog('OISEAUX', emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0)}>
+                                      <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => emetteur.addTacticalLog('OISEAUX')}>
                                         <Bird className="size-4 text-slate-500"/> OISEAUX
                                       </Button>
                                       <Button variant="secondary" className="h-12 flex-col gap-1 font-black text-[8px] border-2 shadow-sm" onClick={() => photoInputRef.current?.click()}>
@@ -243,6 +265,67 @@ export default function VesselTrackerPage() {
                               </div>
                           )}
                       </CardContent>
+                  </Card>
+
+                  {/* JOURNAL DE BORD ÉMETTEUR */}
+                  <Card className="border-2 shadow-lg rounded-2xl overflow-hidden bg-white z-30 relative">
+                      <CardHeader className="bg-slate-100 p-4 border-b">
+                          <CardTitle className="text-xs font-black uppercase flex items-center justify-between">
+                              <div className="flex items-center gap-2"><HistoryIcon className="size-4 text-primary" /> Journal de Bord</div>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/40 hover:text-destructive" onClick={emetteur.clearLogs}><Trash2 className="size-3" /></Button>
+                          </CardTitle>
+                      </CardHeader>
+                      <Tabs defaultValue="tech">
+                          <TabsList className="grid grid-cols-2 h-10 border-b bg-muted/20">
+                              <TabsTrigger value="tech" className="text-[10px] font-black uppercase">Technique</TabsTrigger>
+                              <TabsTrigger value="tact" className="text-[10px] font-black uppercase">Tactique</TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="tech" className="p-0">
+                              <ScrollArea className="h-48">
+                                  <div className="p-3 space-y-2">
+                                      {emetteur.techLogs.length > 0 ? emetteur.techLogs.map((log, i) => (
+                                          <div key={i} className="p-2 bg-slate-50 border-2 rounded-xl flex items-center justify-between shadow-sm text-[9px] font-bold">
+                                              <div className="flex flex-col">
+                                                  <span className="text-primary font-black uppercase">{log.label}</span>
+                                                  <span className="text-[8px] opacity-60 uppercase">{log.details}</span>
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                  <span className="opacity-40">{format(new Date(log.time), 'HH:mm:ss')}</span>
+                                                  <div className="flex items-center gap-1 bg-white px-1.5 rounded border shadow-inner">
+                                                      <Battery className="size-2.5" /> {log.battery}%
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      )) : <p className="py-10 text-center text-[10px] font-black uppercase opacity-20 italic tracking-widest">Boîte noire vide</p>}
+                                  </div>
+                              </ScrollArea>
+                          </TabsContent>
+                          <TabsContent value="tact" className="p-0">
+                              <ScrollArea className="h-48">
+                                  <div className="p-3 space-y-2">
+                                      {emetteur.tacticalLogs.length > 0 ? emetteur.tacticalLogs.map((log, i) => (
+                                          <div 
+                                            key={i} 
+                                            onClick={() => handleRecenterTo(log.pos)}
+                                            className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm cursor-pointer active:scale-95 transition-all"
+                                          >
+                                              <div className="flex items-center gap-3">
+                                                  <div className="p-1.5 bg-primary/10 rounded-lg"><Target className="size-3.5 text-primary" /></div>
+                                                  <div className="flex flex-col">
+                                                      <span className="font-black text-[10px] uppercase text-slate-800">{log.type}</span>
+                                                      <span className="text-[8px] opacity-40 uppercase">{format(new Date(log.time), 'HH:mm')} • GPS OK</span>
+                                                  </div>
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                  {log.photoUrl && <div className="size-8 rounded border overflow-hidden shadow-sm"><img src={log.photoUrl} className="w-full h-full object-cover" /></div>}
+                                                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full border-2"><ChevronDown className="size-3 -rotate-90" /></Button>
+                                              </div>
+                                          </div>
+                                      )) : <p className="py-10 text-center text-[10px] font-black uppercase opacity-20 italic tracking-widest">Aucune prise enregistrée</p>}
+                                  </div>
+                              </ScrollArea>
+                          </TabsContent>
+                      </Tabs>
                   </Card>
 
                   <Accordion type="single" collapsible className="w-full">
@@ -260,7 +343,7 @@ export default function VesselTrackerPage() {
                                           <code className="text-xs font-black text-primary">{id}</code>
                                           <div className="flex gap-1">
                                               <Button variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase" onClick={() => emetteur.setCustomSharingId(id)}>Utiliser</Button>
-                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => emetteur.deleteFromHistory('vessel', id)}><Trash2 className="size-3" /></Button>
+                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => emetteur.deleteFromHistory(id)}><Trash2 className="size-3" /></Button>
                                           </div>
                                       </div>
                                   ))}
@@ -351,7 +434,7 @@ export default function VesselTrackerPage() {
           const file = e.target.files?.[0];
           if (file) {
               const reader = new FileReader();
-              reader.onload = (ev) => flotte.addTacticalLog('PHOTO', emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0, ev.target?.result as string);
+              reader.onload = (ev) => emetteur.addTacticalLog('PHOTO', ev.target?.result as string);
               reader.readAsDataURL(file);
           }
       }} />
