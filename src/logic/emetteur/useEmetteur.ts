@@ -11,8 +11,8 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v73.0 : "Heartbeat & Journal Temporel"
- * Gère le cycle de 30s, le calcul des durées par statut et les alertes critiques.
+ * LOGIQUE ÉMETTEUR (A) v73.1 : "Initialisation Forcée"
+ * Répare le bug de visibilité au lancement en forçant le premier sync Firestore.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -112,10 +112,6 @@ export function useEmetteur(
     }
   }, []);
 
-  /**
-   * Ajoute ou met à jour une entrée dans le journal technique.
-   * Optimisé pour grouper par statut.
-   */
   const addTechLog = useCallback(async (label: string, details?: string, statusOverride?: string) => {
     if (!firestore || !sharingId) return;
     
@@ -128,7 +124,6 @@ export function useEmetteur(
         const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE';
 
         if (!statusChanged && label === 'AUTO') {
-            // Mise à jour de la durée sur la ligne existante
             const duration = differenceInMinutes(now, lastLog.time);
             const updatedLog = {
                 ...lastLog,
@@ -140,7 +135,6 @@ export function useEmetteur(
             return [updatedLog, ...prev.slice(1)];
         }
 
-        // Nouvelle ligne
         const logEntry: TechLogEntry = {
             label: label.toUpperCase(),
             details: details || '',
@@ -158,13 +152,14 @@ export function useEmetteur(
   }, [firestore, sharingId, vesselStatus, battery, accuracy]);
 
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
-    if (!user || !firestore || (!isSharing && !force)) return;
+    if (!user || !firestore) return;
+    // Si on n'est pas en partage ET que ce n'est pas un appel forcé (initialisation), on sort
+    if (!isSharing && !force) return;
     if (simulator?.isComCut) return; 
     
     const batteryLevel = Math.round(battery.level * 100);
     const isCharging = battery.charging;
 
-    // Alerte batterie critique (Seul le premier passage sous 10% déclenche le log)
     if (batteryLevel < 10 && !isBatteryAlertSentRef.current) {
         isBatteryAlertSentRef.current = true;
         addTechLog('ALERTE ÉNERGIE', `Batterie critique: ${batteryLevel}%`, 'emergency');
@@ -181,13 +176,14 @@ export function useEmetteur(
         isBatteryAlertSentRef.current = false;
     }
 
-    const statusChanged = lastSentStatusRef.current !== (data.status || vesselStatus);
+    const currentActualStatus = data.status || vesselStatus;
+    const statusChanged = lastSentStatusRef.current !== currentActualStatus;
 
     const payload: any = {
       ...data,
       id: sharingId,
       userId: user.uid,
-      displayName: vesselNickname || 'Capitaine',
+      displayName: vesselNickname || user.displayName || 'Capitaine',
       isSharing: force ? true : isSharing,
       lastActive: serverTimestamp(),
       fleetId: customFleetId.trim().toUpperCase() || null,
@@ -198,7 +194,7 @@ export function useEmetteur(
 
     if (statusChanged) {
         payload.statusChangedAt = serverTimestamp();
-        lastSentStatusRef.current = data.status || vesselStatus;
+        lastSentStatusRef.current = currentActualStatus;
         lastStatusChangeRef.current = new Date();
     }
 
@@ -276,7 +272,6 @@ export function useEmetteur(
     });
   }, [vesselStatus, anchorPos, mooringRadius, addTechLog, updateVesselInFirestore]);
 
-  // CYCLE DE MISE À JOUR 30S (Heartbeat)
   useEffect(() => {
     if (isSharing) {
         heartbeatIntervalRef.current = setInterval(() => {
@@ -303,6 +298,17 @@ export function useEmetteur(
     navigator.geolocation.getCurrentPosition((pos) => {
         const { latitude, longitude } = pos.coords;
         setCurrentPos({ lat: latitude, lng: longitude });
+        
+        // FORCE SYNC : On force l'écriture Firestore immédiatement avec le statut 'moving' par défaut
+        // Cela garantit que le marqueur apparaît instantanément sur la carte pour tout le monde.
+        updateVesselInFirestore({
+            location: { latitude, longitude },
+            status: 'moving',
+            accuracy: Math.round(pos.coords.accuracy),
+            speed: Math.round((pos.coords.speed || 0) * 1.94384),
+            heading: pos.coords.heading || 0
+        }, true);
+
         handlePositionLogic(latitude, longitude, pos.coords.speed || 0, pos.coords.heading || 0, pos.coords.accuracy);
     });
 
@@ -314,7 +320,7 @@ export function useEmetteur(
       () => toast({ variant: 'destructive', title: "Signal GPS perdu" }),
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
-  }, [user, firestore, simulator?.isActive, addTechLog, handlePositionLogic, toast]);
+  }, [user, firestore, simulator?.isActive, addTechLog, handlePositionLogic, updateVesselInFirestore, toast]);
 
   const stopSharing = useCallback(async () => {
     if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);

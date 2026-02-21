@@ -382,6 +382,21 @@ export default function VesselTrackerPage() {
                             <VesselMarker vessel={vessel} />
                         </OverlayView>
                     ))}
+                    {/* RENDU LOCAL PRIORITAIRE : On affiche le bateau local immédiatement depuis l'état GPS local si Firestore n'a pas encore réagi */}
+                    {emetteur.isSharing && emetteur.currentPos && !followedVessels?.find(v => v.id === emetteur.sharingId && v.isSharing) && (
+                        <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                            <VesselMarker vessel={{ 
+                                id: emetteur.sharingId, 
+                                displayName: emetteur.vesselNickname || 'Moi', 
+                                status: emetteur.vesselStatus, 
+                                location: { latitude: emetteur.currentPos.lat, longitude: emetteur.currentPos.lng },
+                                batteryLevel: Math.round(emetteur.battery.level * 100),
+                                isCharging: emetteur.battery.charging,
+                                isSharing: true,
+                                lastActive: new Date()
+                            } as any} />
+                        </OverlayView>
+                    )}
                 </GoogleMap>
             </div>
         ) : <Skeleton className="h-full w-full" />}
@@ -514,7 +529,7 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v73.0 prêt - Surveillance Temporelle OK</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v73.1 prêt - Initialisation Immédiate OK</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-2 border rounded-lg bg-white flex justify-between items-center text-[9px] shadow-sm cursor-pointer", log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') ? 'border-red-200 bg-red-50' : '')} onClick={() => handleCopyLogEntry(log)}>
                                                   <div className="flex flex-col gap-0.5">
