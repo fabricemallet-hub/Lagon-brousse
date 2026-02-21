@@ -12,7 +12,7 @@ import type { UserAccount, SoundLibraryEntry, VesselStatus, VesselPrefs } from '
  * Gère la surveillance de flotte, la détection de dérive et le moteur d'alarmes.
  */
 export function useRecepteur(vesselId?: string) {
-  const { user } = user ? useUser() : { user: null };
+  const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const audioEngine = useAudioEngine();
