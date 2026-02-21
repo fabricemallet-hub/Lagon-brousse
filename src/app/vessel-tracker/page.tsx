@@ -79,9 +79,11 @@ import {
   Bell,
   Eye,
   EyeOff,
-  ClipboardList
+  ClipboardList,
+  Lock,
+  Unlock
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getDistance } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -268,7 +270,7 @@ export default function VesselTrackerPage() {
     const acc = emetteur.accuracy || 0;
     const posUrl = emetteur.currentPos 
         ? `https://www.google.com/maps?q=${emetteur.currentPos.lat.toFixed(6)},${emetteur.currentPos.lng.toFixed(6)}` 
-        : "https://www.google.com/maps?q=-22.27,166.45";
+        : "https://www.google.com/maps?q=-22.27,166.44";
     
     return `[${nick.toUpperCase()}] ${msg} [MAYDAY] à ${time}. Position (+/- ${acc}m) : ${posUrl}`;
   }, [emetteur.vesselNickname, emetteur.vesselSmsMessage, emetteur.accuracy, emetteur.currentPos]);
@@ -529,17 +531,17 @@ export default function VesselTrackerPage() {
                               <div className="space-y-5">
                                   <div className="space-y-1.5">
                                       <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Mon Surnom</Label>
-                                      <Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg shadow-inner" />
+                                      <Input value={vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg shadow-inner" />
                                   </div>
                                   
                                   <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
                                         <Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Navire</Label>
-                                        <Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase tracking-widest bg-slate-50" />
+                                        <Input value={customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase tracking-widest bg-slate-50" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-[10px] font-black uppercase opacity-60 ml-1 text-indigo-600">ID Flotte C</Label>
-                                        <Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase tracking-widest bg-indigo-50/30" />
+                                        <Input value={customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase tracking-widest bg-indigo-50/30" />
                                     </div>
                                   </div>
 
