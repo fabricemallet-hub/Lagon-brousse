@@ -60,10 +60,19 @@ export interface VesselPrefs {
   alerts: {
     moving: VesselAlertConfig;
     stationary: VesselAlertConfig;
+    drifting: VesselAlertConfig;
     offline: VesselAlertConfig;
     assistance: VesselAlertConfig;
     tactical: VesselAlertConfig;
     battery: VesselAlertConfig;
+  };
+  huntingSoundEnabled?: boolean;
+  huntingVolume?: number;
+  huntingSoundSettings?: {
+    position: string;
+    battue: string;
+    gibier: string;
+    safety: string;
   };
 }
 

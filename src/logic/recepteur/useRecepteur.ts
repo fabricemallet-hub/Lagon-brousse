@@ -10,8 +10,9 @@ import type { UserAccount, SoundLibraryEntry, VesselStatus, VesselPrefs } from '
 import { differenceInMinutes } from 'date-fns';
 
 /**
- * LOGIQUE RÉCEPTEUR (B) v73.0
- * Surveillance temporelle : Gère la perte de signal, l'immobilité prolongée et la batterie.
+ * LOGIQUE RÉCEPTEUR (B) v79.0
+ * Surveillance temporelle complète : Gère la perte de signal, l'immobilité prolongée et la batterie.
+ * Intégration de la granularité des sons par statut.
  */
 export function useRecepteur(vesselId?: string) {
   const { user } = useUser();
@@ -33,8 +34,9 @@ export function useRecepteur(vesselId?: string) {
     isWatchEnabled: false,
     alerts: {
       moving: { enabled: true, sound: 'sonar', loop: false },
-      stationary: { enabled: true, sound: 'sonar', loop: true },
-      offline: { enabled: true, sound: 'la-cucaracha', loop: true },
+      stationary: { enabled: true, sound: 'bell', loop: true },
+      drifting: { enabled: true, sound: 'alerte', loop: true },
+      offline: { enabled: true, sound: 'alerte', loop: true },
       assistance: { enabled: true, sound: 'military-sms', loop: true },
       tactical: { enabled: true, sound: 'sonar', loop: false },
       battery: { enabled: true, sound: 'alerte urgence', loop: false },
@@ -59,12 +61,12 @@ export function useRecepteur(vesselId?: string) {
     }
   }, [profile?.vesselPrefs]);
 
-  const triggerAlert = useCallback((type: keyof VesselPrefs['alerts'], vesselName: string, forceMaxVolume: boolean = false, vesselId: string) => {
-    if (acknowledgedAlerts[vesselId] === type) return;
+  const triggerAlert = useCallback((type: keyof VesselPrefs['alerts'], vesselName: string, forceMaxVolume: boolean = false, vId: string) => {
+    if (acknowledgedAlerts[vId] === type) return;
     if (!vesselPrefs.isNotifyEnabled || !dbSounds || !audioEngine.isUnlocked) return;
 
     const config = vesselPrefs.alerts[type];
-    if (!config.enabled) return;
+    if (!config || !config.enabled) return;
 
     const sound = dbSounds.find(s => s.label.toLowerCase() === config.sound.toLowerCase() || s.id === config.sound);
     if (!sound) return;
@@ -81,10 +83,15 @@ export function useRecepteur(vesselId?: string) {
             message = `Alerte [MAYDAY/PANPAN] activée sur ${vesselName} !`;
             variant = "destructive";
             break;
-        case 'stationary':
-            title = "🚨 DÉRIVE / IMMOBILITÉ";
-            message = `Vigilance : ${vesselName} hors zone ou immobile depuis trop longtemps.`;
+        case 'drifting':
+            title = "🚨 DÉRIVE DÉTECTÉE";
+            message = `Le navire ${vesselName} est sorti de sa zone de sécurité !`;
             variant = "destructive";
+            break;
+        case 'stationary':
+            title = "⚓ VEILLE IMMOBILITÉ";
+            message = `${vesselName} est stationnaire depuis ${vesselPrefs.watchDuration} min.`;
+            variant = "default";
             break;
         case 'offline':
             title = "📡 SIGNAL PERDU";
@@ -129,7 +136,9 @@ export function useRecepteur(vesselId?: string) {
             typeToTrigger = 'assistance';
         } else if (isOffline) {
             typeToTrigger = 'offline';
-        } else if (vessel.status === 'drifting' || isImmobileTooLong) {
+        } else if (vessel.status === 'drifting') {
+            typeToTrigger = 'drifting';
+        } else if (isImmobileTooLong) {
             typeToTrigger = 'stationary';
         } else if (isBatteryCritical && !vessel.isCharging) {
             typeToTrigger = 'battery';
