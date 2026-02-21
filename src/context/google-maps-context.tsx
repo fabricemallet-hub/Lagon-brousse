@@ -1,6 +1,6 @@
 'use client';
 
-import { useJsApiLoader } from '@react-google-maps/api';
+import { useJsApiLoader, type Libraries } from '@react-google-maps/api';
 import type { ReactNode } from 'react';
 import { createContext, useContext, useMemo } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -15,6 +15,9 @@ const GoogleMapsContext = createContext<GoogleMapsContextType | undefined>(
   undefined
 );
 
+// Librairies nécessaires pour les calculs tactiques
+const LIBRARIES: Libraries = ['geometry'];
+
 export function GoogleMapsProvider({ children }: { children: ReactNode }) {
   // CLÉ API VÉRIFIÉE
   const googleMapsApiKey = "AIzaSyDs6qQO274Ro2RD4lVkr8KztsZIecP-ZDk";
@@ -24,6 +27,7 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
     googleMapsApiKey: googleMapsApiKey,
     preventGoogleFontsLoading: true,
     version: 'weekly',
+    libraries: LIBRARIES,
   });
 
   const value = useMemo(() => ({

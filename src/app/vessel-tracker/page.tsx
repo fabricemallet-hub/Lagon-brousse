@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -88,7 +87,8 @@ import {
   Wind,
   Thermometer,
   CloudLightning,
-  Sun
+  Sun,
+  Move
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -204,8 +204,8 @@ export default function VesselTrackerPage() {
   const mapCore = useMapCore();
   const simulator = useSimulator();
 
-  const handlePositionUpdate = useCallback((lat: number, lng: number) => {
-    mapCore.updateBreadcrumbs(lat, lng);
+  const handlePositionUpdate = useCallback((lat: number, lng: number, status: string) => {
+    mapCore.updateBreadcrumbs(lat, lng, status);
     if (mapCore.isFollowMode && mapCore.googleMap) {
         mapCore.googleMap.panTo({ lat, lng });
     }
@@ -244,15 +244,12 @@ export default function VesselTrackerPage() {
 
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // RÉCUPÉRATION DE L'ANCRE UNIQUE (SINGLETON VISUEL)
   const activeAnchorVessel = useMemo(() => {
     if (!followedVessels || mapCore.isCirclesHidden) return null;
-    // On priorise notre propre navire si ancré, sinon le premier trouvé dans la flotte qui a une ancre valide
     return followedVessels.find(v => v.isSharing && v.id === emetteur.sharingId && v.anchorLocation) 
         || followedVessels.find(v => v.isSharing && v.anchorLocation);
   }, [followedVessels, emetteur.sharingId, mapCore.isCirclesHidden]);
 
-  // CONNEXION DU MOTEUR D'ALERTES SONORES
   useEffect(() => {
     if (followedVessels) {
         recepteur.processVesselAlerts(followedVessels);
@@ -449,7 +446,7 @@ export default function VesselTrackerPage() {
                     onDragStart={() => mapCore.setIsFollowMode(false)}
                     options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
                 >
-                    {/* RÈGLE DE L'ANCRE UNIQUE (SINGLETON VISUEL v68.0) */}
+                    {/* RÈGLE DE L'ANCRE UNIQUE ET LIGNE DE TENSION v69.0 */}
                     {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                         <React.Fragment key={`mooring-singleton-${activeAnchorVessel.id}`}>
                             <OverlayView 
@@ -476,16 +473,17 @@ export default function VesselTrackerPage() {
                                 }}
                             />
 
-                            {activeAnchorVessel.location && (
+                            {/* LIGNE DE TENSION ROUGE : Visualisation de l'écart au mouillage */}
+                            {activeAnchorVessel.location && (activeAnchorVessel.status === 'stationary' || activeAnchorVessel.status === 'drifting' || activeAnchorVessel.status === 'emergency') && (
                                 <Polyline
-                                    key={`line-${activeAnchorVessel.id}`}
+                                    key={`tension-line-${activeAnchorVessel.id}`}
                                     path={[
                                         { lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude },
                                         { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }
                                     ]}
                                     options={{
-                                        strokeColor: activeAnchorVessel.status === 'drifting' ? (mapCore.isFlashOn ? '#ef4444' : '#3b82f6') : '#3b82f6',
-                                        strokeOpacity: 0.8,
+                                        strokeColor: activeAnchorVessel.status === 'drifting' ? (mapCore.isFlashOn ? '#ef4444' : '#3b82f6') : '#ef4444',
+                                        strokeOpacity: 1.0,
                                         strokeWeight: 3,
                                         zIndex: 2
                                     }}
@@ -689,6 +687,23 @@ export default function VesselTrackerPage() {
                                           <div className="flex justify-between text-[8px] font-black uppercase opacity-40 mt-1">
                                               <span>10m</span>
                                               <span>200m</span>
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-4 border-t pt-4 border-dashed border-primary/10">
+                                      <div className="flex items-center gap-3">
+                                          <div className="p-2 bg-blue-50 rounded-lg"><Move className="size-4 text-blue-600" /></div>
+                                          <div>
+                                              <p className="text-[8px] font-black uppercase text-muted-foreground">Vitesse</p>
+                                              <p className="text-sm font-black text-slate-800">{emetteur.currentSpeed} nds</p>
+                                          </div>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                          <div className="p-2 bg-slate-50 rounded-lg"><LocateFixed className="size-4 text-slate-600" /></div>
+                                          <div>
+                                              <p className="text-[8px] font-black uppercase text-muted-foreground">Précision</p>
+                                              <p className={cn("text-sm font-black", emetteur.accuracy > 25 ? "text-orange-600" : "text-green-600")}>+/- {emetteur.accuracy}m</p>
                                           </div>
                                       </div>
                                   </div>
@@ -959,7 +974,7 @@ export default function VesselTrackerPage() {
                                   </div>
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v64.0 prêt - Acquittement OK</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v69.0 prêt - Surveillance Auto OK</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className="p-2 border rounded-lg bg-white flex justify-between items-center text-[9px] shadow-sm cursor-pointer hover:bg-slate-100" onClick={() => log.pos && mapCore.handleRecenter(log.pos)}>
                                                   <span className="font-black uppercase">{log.label}</span>

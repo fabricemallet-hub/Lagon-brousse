@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -7,14 +6,15 @@ import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, getDoc } f
 import type { VesselStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v68.0 : "Le Cerveau"
- * Correction du nettoyage de l'ancre et des doublons Firestore.
+ * LOGIQUE ÉMETTEUR (A) v69.0 : "Moteur Autonome"
+ * Gère les transitions automatiques Mouvement/Mouillage basées sur la vitesse.
  */
 export function useEmetteur(
-    handlePositionUpdate?: (lat: number, lng: number) => void, 
+    handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
     handleStopCleanup?: () => void,
     simulator?: any
 ) {
@@ -29,6 +29,7 @@ export function useEmetteur(
   const [mooringRadius, setMooringRadius] = useState(100);
   const [accuracy, setAccuracy] = useState<number>(0);
   const [currentHeading, setCurrentHeading] = useState<number>(0);
+  const [currentSpeed, setCurrentSpeed] = useState<number>(0);
   
   const [vesselNickname, setVesselNickname] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
@@ -58,7 +59,6 @@ export function useEmetteur(
   useEffect(() => { handlePositionUpdateRef.current = handlePositionUpdate; }, [handlePositionUpdate]);
   useEffect(() => { handleStopCleanupRef.current = handleStopCleanup; }, [handleStopCleanup]);
 
-  // CHARGEMENT PERSISTANCE LOCALE
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedNickname = localStorage.getItem('lb_vessel_nickname');
@@ -138,10 +138,7 @@ export function useEmetteur(
   }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId, mooringRadius, simulator?.isComCut]);
 
   const triggerEmergency = useCallback((type: 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE' | 'DÉRIVE') => {
-    if (!isSharing) {
-        toast({ variant: "destructive", title: "Partage requis", description: "Activez le partage GPS avant de signaler une détresse." });
-        return;
-    }
+    if (!isSharing) return;
 
     setVesselStatus('emergency');
     updateVesselInFirestore({ status: 'emergency', eventLabel: type });
@@ -162,76 +159,76 @@ export function useEmetteur(
     toast({ variant: "destructive", title: `ALERTE ${type}` });
   }, [isSharing, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, accuracy, toast]);
 
-  // LOGIQUE DE DÉTECTION DE DÉRIVE v68.0 (AVEC FILTRE PRÉCISION)
-  useEffect(() => {
-    if (!isSharing || !currentPos || !anchorPos || (vesselStatus !== 'stationary' && vesselStatus !== 'drifting' && vesselStatus !== 'emergency')) return;
+  const handlePositionLogic = useCallback((lat: number, lng: number, speed: number, heading: number, acc: number) => {
+    const knotSpeed = speed * 1.94384;
+    let nextStatus = vesselStatus;
 
-    const dist = getDistance(currentPos.lat, currentPos.lng, anchorPos.lat, anchorPos.lng);
-    const radius = mooringRadius;
-    const acc = accuracy || 0;
+    // 1. DÉTECTION AUTOMATIQUE DU MOUVEMENT (> 5nd)
+    if (knotSpeed > 5) {
+        if (vesselStatus !== 'moving') {
+            nextStatus = 'moving';
+            setAnchorPos(null);
+            addTechLog('AUTO', 'Navigation détectée (>5 nds)');
+            isEmergencySmsSentRef.current = false;
+        }
+    } 
+    // 2. DÉTECTION AUTOMATIQUE DU MOUILLAGE (< 2nd après mouvement)
+    else if (knotSpeed < 2 && vesselStatus === 'moving') {
+        nextStatus = 'stationary';
+        const newAnchor = { lat, lng };
+        setAnchorPos(newAnchor);
+        addTechLog('AUTO', 'Mouillage stabilisé (<2 nds)');
+    }
 
-    if (dist > radius) {
-        if (acc <= 20) {
-            if (vesselStatus !== 'drifting' && vesselStatus !== 'emergency') {
-                setVesselStatus('drifting');
-                updateVesselInFirestore({ status: 'drifting', eventLabel: 'DÉRIVE DÉTECTÉE' });
-                addTechLog('ALERTE', `Dérive immédiate (Dist: ${Math.round(dist)}m | Acc: ${acc}m)`);
-                triggerEmergency('DÉRIVE');
-            }
-        } else {
-            consecutiveDriftCountRef.current++;
-            if (consecutiveDriftCountRef.current >= 3) {
+    // 3. SURVEILLANCE DE DÉRIVE (Si ancre active)
+    if ((nextStatus === 'stationary' || nextStatus === 'drifting') && anchorPos) {
+        const dist = getDistance(lat, lng, anchorPos.lat, anchorPos.lng);
+        if (dist > mooringRadius) {
+            if (acc <= 25) {
+                nextStatus = 'drifting';
                 if (vesselStatus !== 'drifting' && vesselStatus !== 'emergency') {
-                    setVesselStatus('drifting');
-                    updateVesselInFirestore({ status: 'drifting', eventLabel: 'DÉRIVE CONFIRMÉE' });
-                    addTechLog('ALERTE', `Dérive confirmée après 3 relevés (Acc: ${acc}m)`);
+                    addTechLog('ALERTE', `Sortie de zone (${Math.round(dist)}m)`);
                     triggerEmergency('DÉRIVE');
                 }
             }
-        }
-    } else {
-        consecutiveDriftCountRef.current = 0;
-        if (vesselStatus === 'drifting') {
-            setVesselStatus('stationary');
-            updateVesselInFirestore({ status: 'stationary', eventLabel: 'RETOUR DANS LE CERCLE' });
-            addTechLog('INFO', 'Navire revenu dans sa zone de sécurité');
+        } else if (nextStatus === 'drifting') {
+            nextStatus = 'stationary';
+            addTechLog('INFO', 'Retour en zone de sécurité');
             isEmergencySmsSentRef.current = false;
         }
     }
-  }, [isSharing, currentPos, anchorPos, mooringRadius, vesselStatus, updateVesselInFirestore, addTechLog, triggerEmergency, accuracy]);
 
-  // MODULE SIMULATION : Injection de données
+    setVesselStatus(nextStatus);
+    setCurrentPos({ lat, lng });
+    setCurrentHeading(heading);
+    setCurrentSpeed(Math.round(knotSpeed));
+    setAccuracy(Math.round(acc));
+
+    handlePositionUpdateRef.current?.(lat, lng, nextStatus);
+
+    updateVesselInFirestore({
+        location: { latitude: lat, longitude: lng },
+        status: nextStatus,
+        speed: Math.round(knotSpeed),
+        heading: heading,
+        accuracy: Math.round(acc),
+        anchorLocation: (nextStatus === 'stationary' || nextStatus === 'drifting' || nextStatus === 'emergency') && anchorPos 
+            ? { latitude: anchorPos.lat, longitude: anchorPos.lng } 
+            : null
+    });
+  }, [vesselStatus, anchorPos, mooringRadius, addTechLog, triggerEmergency, updateVesselInFirestore]);
+
+  // MODULE SIMULATION
   useEffect(() => {
     if (!simulator?.isActive || !simulator.simPos || !isSharing) return;
-
-    const { lat, lng } = simulator.simPos;
-    const speed = simulator.simSpeed;
-    const acc = simulator.isGpsCut ? 600 : simulator.simAccuracy;
-
-    setCurrentPos({ lat, lng });
-    setAccuracy(acc);
-    handlePositionUpdateRef.current?.(lat, lng);
-
-    if (simulator.isGpsCut && !lastGpsCutRef.current) {
-        addTechLog('ALERTE GPS', 'Signal dégradé (>500m)');
-        lastGpsCutRef.current = true;
-    } else if (!simulator.isGpsCut) {
-        lastGpsCutRef.current = false;
-    }
-
-    if (vesselStatus === 'moving') {
-        const nextStatus = speed < 0.2 ? 'stationary' : 'moving';
-        if (nextStatus !== vesselStatus) setVesselStatus(nextStatus);
-    }
-
-    updateVesselInFirestore({ 
-        location: { latitude: lat, longitude: lng }, 
-        accuracy: acc,
-        speed: Math.round(speed),
-        anchorLocation: anchorPos ? { latitude: anchorPos.lat, longitude: anchorPos.lng } : null
-    });
-
-  }, [simulator?.isActive, simulator?.simPos, simulator?.simSpeed, simulator?.simAccuracy, simulator?.isGpsCut, isSharing, anchorPos, mooringRadius, vesselStatus, addTechLog, updateVesselInFirestore]);
+    handlePositionLogic(
+        simulator.simPos.lat, 
+        simulator.simPos.lng, 
+        simulator.simSpeed / 1.94384, 
+        0, 
+        simulator.isGpsCut ? 600 : simulator.simAccuracy
+    );
+  }, [simulator?.isActive, simulator?.simPos, simulator?.simSpeed, simulator?.simAccuracy, simulator?.isGpsCut, isSharing, handlePositionLogic]);
 
   const startSharing = useCallback(() => {
     if (!navigator.geolocation || !user || !firestore) return;
@@ -243,43 +240,24 @@ export function useEmetteur(
     localStorage.setItem('lb_vessel_id', vId);
     localStorage.setItem('lb_fleet_id', fId);
 
-    if (vId) {
-        setIdsHistory(prev => {
-            const filtered = prev.filter(h => h.vId !== vId);
-            const newHistory = [{ vId, fId }, ...filtered].slice(0, 5);
-            localStorage.setItem('lb_ids_history', JSON.stringify(newHistory));
-            return newHistory;
-        });
-    }
-
     setIsSharing(true);
-    addTechLog('DÉMARRAGE', `ID: ${sharingId} | FLOTTE: ${fId || 'AUCUNE'}`);
+    addTechLog('DÉMARRAGE', `ID: ${sharingId}`);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        if (simulator?.isActive) return; 
-
-        const { latitude, longitude, speed, heading, accuracy: acc } = pos.coords;
-        const newPos = { lat: latitude, lng: longitude };
-        const knotSpeed = (speed || 0) * 1.94384;
-        
-        setAccuracy(Math.round(acc));
-        setCurrentPos(newPos);
-        setCurrentHeading(heading || 0);
-        handlePositionUpdateRef.current?.(latitude, longitude);
-
-        updateVesselInFirestore({ 
-            location: { latitude: latitude, longitude: longitude }, 
-            speed: Math.round(knotSpeed), 
-            heading: heading || 0,
-            fleetId: fId || null,
-            anchorLocation: anchorPos ? { latitude: anchorPos.lat, longitude: anchorPos.lng } : null
-        });
+        if (simulator?.isActive) return;
+        handlePositionLogic(
+            pos.coords.latitude, 
+            pos.coords.longitude, 
+            pos.coords.speed || 0, 
+            pos.coords.heading || 0, 
+            pos.coords.accuracy
+        );
       },
       () => toast({ variant: 'destructive', title: "Signal GPS perdu" }),
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
-  }, [user, firestore, sharingId, customSharingId, customFleetId, vesselNickname, anchorPos, mooringRadius, vesselStatus, simulator?.isActive, addTechLog, updateVesselInFirestore, toast]);
+  }, [user, firestore, sharingId, customSharingId, customFleetId, vesselNickname, simulator?.isActive, addTechLog, handlePositionLogic, toast]);
 
   const stopSharing = useCallback(async () => {
     if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
@@ -287,7 +265,6 @@ export function useEmetteur(
     setIsSharing(false);
     if (firestore && sharingId) {
       const ref = doc(firestore, 'vessels', sharingId);
-      // NETTOYAGE COMPLET DE L'ANCRE À L'ARRÊT
       setDoc(ref, { 
         isSharing: false, 
         lastActive: serverTimestamp(),
@@ -298,19 +275,15 @@ export function useEmetteur(
     setCurrentPos(null);
     setAnchorPos(null);
     isEmergencySmsSentRef.current = false;
-    consecutiveDriftCountRef.current = 0;
     handleStopCleanupRef.current?.(); 
     toast({ title: "Partage arrêté" });
   }, [firestore, sharingId, toast]);
 
   const changeManualStatus = useCallback((st: VesselStatus['status'], label?: string) => {
     setVesselStatus(st);
-    const isStationary = st === 'stationary';
-    
-    if (!isStationary) {
+    if (st === 'moving') {
         setAnchorPos(null);
         isEmergencySmsSentRef.current = false;
-        consecutiveDriftCountRef.current = 0;
     } else if (currentPosRef.current) {
         setAnchorPos(currentPosRef.current);
     }
@@ -318,7 +291,9 @@ export function useEmetteur(
     updateVesselInFirestore({ 
         status: st, 
         eventLabel: label || null,
-        anchorLocation: isStationary && currentPosRef.current ? { latitude: currentPosRef.current.lat, longitude: currentPosRef.current.lng } : null
+        anchorLocation: (st === 'stationary' || st === 'drifting') && currentPosRef.current 
+            ? { latitude: currentPosRef.current.lat, longitude: currentPosRef.current.lng } 
+            : null
     });
     toast({ title: label || `Statut : ${st}` });
   }, [updateVesselInFirestore, toast]);
@@ -366,6 +341,7 @@ export function useEmetteur(
     stopSharing,
     currentPos,
     currentHeading,
+    currentSpeed,
     vesselStatus,
     triggerEmergency,
     changeManualStatus,
@@ -399,7 +375,7 @@ export function useEmetteur(
     saveSmsSettings,
     clearLogs: () => { setTechLogs([]); setTacticalLogs([]); }
   }), [
-    isSharing, startSharing, stopSharing, currentPos, currentHeading, vesselStatus,
+    isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     triggerEmergency, changeManualStatus, anchorPos, mooringRadius, accuracy,
     vesselNickname, customSharingId, customFleetId, sharingId, idsHistory,
     loadFromHistory, removeFromHistory, lastSyncTime, techLogs, tacticalLogs,

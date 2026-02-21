@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -25,8 +24,8 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v68.0 : Gestion de la carte et du nettoyage visuel.
- * Correction de l'accumulation des cercles et optimisation du bouton EFFACER.
+ * HOOK PARTAGÉ v69.0 : Gestion de la carte et du tracé intelligent.
+ * Pause du tracé bleu en mode mouillage pour laisser place à la ligne de tension rouge.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
@@ -121,7 +120,10 @@ export function useMapCore() {
     return () => unsubscribers.forEach(unsub => unsub());
   }, [firestore]);
 
-  const updateBreadcrumbs = useCallback((lat: number, lng: number) => {
+  const updateBreadcrumbs = useCallback((lat: number, lng: number, status: string) => {
+    // RÈGLE v69.0 : Arrêter le tracé bleu si stationnaire ou dérive
+    if (status !== 'moving' && status !== 'returning') return;
+
     const now = Date.now();
     const distMoved = lastTracePosRef.current ? getDistance(lat, lng, lastTracePosRef.current.lat, lastTracePosRef.current.lng) : 10;
     
@@ -136,7 +138,7 @@ export function useMapCore() {
 
   const clearBreadcrumbs = useCallback(() => {
     setBreadcrumbs([]);
-    setIsCirclesHidden(true); // Masque RADICALEMENT les cercles et ancres
+    setIsCirclesHidden(true);
     lastTracePosRef.current = null;
   }, []);
 
