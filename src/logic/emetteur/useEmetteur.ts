@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -23,18 +22,15 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
   const [mooringRadius, setMooringRadius] = useState(100);
   const [accuracy, setAccuracy] = useState<number>(0);
   
-  // Références pour les objets cartographiques Google
   const anchorCircleRef = useRef<google.maps.Circle | null>(null);
   const anchorMarkerRef = useRef<google.maps.Marker | null>(null);
 
-  // Identité & IDs
   const [vesselNickname, setVesselNickname] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
   const [customFleetId, setCustomFleetId] = useState('');
   const [vesselHistory, setVesselHistory] = useState<string[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
-  // Journaux de bord
   const [techLogs, setTechLogs] = useState<any[]>([]);
   const [tacticalLogs, setTacticalLogs] = useState<any[]>([]);
   const lastLoggedBattery = useRef<number>(100);
@@ -42,7 +38,6 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
 
   const watchIdRef = useRef<number | null>(null);
 
-  // Initialisation LocalStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedNickname = localStorage.getItem('lb_vessel_nickname');
@@ -64,7 +59,6 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  // Fonctions de Log
   const addTechLog = useCallback(async (label: string, details?: string) => {
     if (!firestore || !sharingId) return;
     
@@ -94,6 +88,15 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
         time: serverTimestamp()
     }).catch(() => {});
   }, [firestore, sharingId, accuracy, currentPos]);
+
+  // HEARTBEAT EFFECT (Signal continu)
+  useEffect(() => {
+    if (!isSharing || !sharingId) return;
+    const interval = setInterval(() => {
+        addTechLog('HEARTBEAT', 'Signal actif');
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [isSharing, sharingId, addTechLog]);
 
   const addTacticalLog = useCallback(async (type: string, photoUrl?: string) => {
     if (!firestore || !sharingId || !currentPos) return;
@@ -161,7 +164,6 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     }
   }, []);
 
-  // Correction Double Cercle : Update dynamique quand le radius change
   useEffect(() => {
     if (anchorCircleRef.current) {
       anchorCircleRef.current.setRadius(mooringRadius);
@@ -258,7 +260,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
           clearMooring();
           addTechLog('ANCRE LEVÉE');
       } else {
-          clearMooring(); // Sécurité reset avant pose
+          clearMooring();
           setVesselStatus('stationary');
           setAnchorPos(currentPos);
           addTechLog('MOUILLAGE ACTIF', `Rayon: ${mooringRadius}m`);
@@ -283,7 +285,6 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
 
   const handleSelectFromHistory = (id: string) => {
     setCustomSharingId(id);
-    // On ne lance pas startSharing tout de suite pour laisser le choix à l'utilisateur
     toast({ title: `ID ${id} chargé`, description: "Cliquez sur Lancer le Partage pour activer." });
   };
 
