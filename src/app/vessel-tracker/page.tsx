@@ -219,10 +219,10 @@ const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
 };
 
 export default function VesselTrackerPage() {
+  const { isLoaded, loadError } = useGoogleMaps();
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { isLoaded, loadError } = useGoogleMaps();
   
   const [appMode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
@@ -335,16 +335,16 @@ export default function VesselTrackerPage() {
     return `https://embed.windy.com/embed2.html?lat=${centerLat}&lon=${centerLng}&zoom=${currentZoom}&level=surface&overlay=${layer}&menu=&message=&marker=&calendar=&pressure=&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1`;
   }, [mapCore.googleMap, mapCore.windyLayer]);
 
-  const handleStartSharingEnhanced = () => {
-    recepteur.initAudio(); 
-    emetteur.startSharing();
-  };
-
   const smsPreview = useMemo(() => {
     const nick = emetteur.vesselNickname || 'KOOLAPIK';
     const msg = emetteur.isCustomMessageEnabled && emetteur.vesselSmsMessage ? emetteur.vesselSmsMessage : "Requiert assistance immédiate.";
     return `[${nick.toUpperCase()}] ${msg} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
   }, [emetteur.vesselSmsMessage, emetteur.isCustomMessageEnabled, emetteur.vesselNickname]);
+
+  const handleStartSharingEnhanced = () => {
+    recepteur.initAudio(); 
+    emetteur.startSharing();
+  };
 
   if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
   if (!isLoaded || isProfileLoading) return <Skeleton className="h-96 w-full" />;
@@ -653,7 +653,7 @@ export default function VesselTrackerPage() {
                                       </div>
                                   </div>
                                   <div className="flex items-center gap-3">
-                                      <BatteryIconComp level={emetteur.battery.level * 100} charging={emetteur.battery.charging} className="size-5" />
+                                      <BatteryIconComp level={(emetteur.battery?.level ?? 1) * 100} charging={emetteur.battery?.charging ?? false} className="size-5" />
                                       <div className={cn("size-3 rounded-full bg-green-500 shadow-sm transition-all", isLedActive ? "scale-125 glow" : "opacity-30")} />
                                       <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 font-black text-[8px] uppercase h-5">LIVE</Badge>
                                   </div>
@@ -926,7 +926,7 @@ export default function VesselTrackerPage() {
                       <Button 
                         variant="secondary" 
                         className={cn("flex-1 h-16 font-black uppercase text-xs shadow-xl border-2 transition-all active:scale-95", 
-                            emetteur.vesselStatus === 'emergency' ? "bg-orange-500 text-white" : "bg-slate-700 text-white border-slate-500")}
+                            emetteur.vesselStatus === 'emergency' ? "bg-orange-50 text-white" : "bg-slate-700 text-white border-slate-500")}
                         onClick={() => emetteur.triggerEmergency('PAN PAN')}
                       >
                           <AlertTriangle className="size-5 mr-2" /> PAN PAN

@@ -10,7 +10,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v71.0 : "Moteur Tactique & Énergie"
+ * LOGIQUE ÉMETTEUR (A) v71.4 : "Moteur Tactique & Énergie"
  * Gère les transitions automatiques, la purge et la surveillance batterie.
  */
 export function useEmetteur(
@@ -37,6 +37,9 @@ export function useEmetteur(
   const [idsHistory, setIdsHistory] = useState<{ vId: string, fId: string }[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
+  // Énergie
+  const [battery, setBattery] = useState<{ level: number, charging: boolean }>({ level: 1, charging: false });
+
   const [emergencyContact, setEmergencyContact] = useState('');
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
@@ -56,6 +59,33 @@ export function useEmetteur(
   const handleStopCleanupRef = useRef(handleStopCleanup);
   useEffect(() => { handlePositionUpdateRef.current = handlePositionUpdate; }, [handlePositionUpdate]);
   useEffect(() => { handleStopCleanupRef.current = handleStopCleanup; }, [handleStopCleanup]);
+
+  // Surveillance Batterie
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('getBattery' in navigator)) return;
+    
+    let batteryObj: any = null;
+    
+    const updateBatteryState = () => {
+      if (batteryObj) {
+        setBattery({ level: batteryObj.level, charging: batteryObj.charging });
+      }
+    };
+
+    (navigator as any).getBattery().then((b: any) => {
+      batteryObj = b;
+      updateBatteryState();
+      b.addEventListener('levelchange', updateBatteryState);
+      b.addEventListener('chargingchange', updateBatteryState);
+    });
+
+    return () => {
+      if (batteryObj) {
+        batteryObj.removeEventListener('levelchange', updateBatteryState);
+        batteryObj.removeEventListener('chargingchange', updateBatteryState);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -107,30 +137,25 @@ export function useEmetteur(
     if (!user || !firestore || !isSharing) return;
     if (simulator?.isComCut) return; 
     
-    let batteryInfo = { batteryLevel: 100, isCharging: false };
-    if ('getBattery' in navigator) {
-      try {
-        const b: any = await (navigator as any).getBattery();
-        batteryInfo = { batteryLevel: Math.round(b.level * 100), isCharging: b.charging };
-        
-        // LOGIQUE SÉCURITÉ BATTERIE FAIBLE (< 10%)
-        if (batteryInfo.batteryLevel < 10 && !isBatteryAlertSentRef.current) {
-            isBatteryAlertSentRef.current = true;
-            addTechLog('ALERTE ÉNERGIE', `Batterie critique: ${batteryInfo.batteryLevel}%`);
-            // Store last safe position for rescue
-            if (currentPosRef.current) {
-                updateDoc(doc(firestore, 'vessels', sharingId), {
-                    lastSafePos: {
-                        latitude: currentPosRef.current.lat,
-                        longitude: currentPosRef.current.lng,
-                        timestamp: serverTimestamp()
-                    }
-                }).catch(() => {});
-            }
-        } else if (batteryInfo.batteryLevel >= 10) {
-            isBatteryAlertSentRef.current = false;
+    const batteryLevel = Math.round(battery.level * 100);
+    const isCharging = battery.charging;
+
+    // LOGIQUE SÉCURITÉ BATTERIE FAIBLE (< 10%)
+    if (batteryLevel < 10 && !isBatteryAlertSentRef.current) {
+        isBatteryAlertSentRef.current = true;
+        addTechLog('ALERTE ÉNERGIE', `Batterie critique: ${batteryLevel}%`);
+        // Store last safe position for rescue
+        if (currentPosRef.current) {
+            updateDoc(doc(firestore, 'vessels', sharingId), {
+                lastSafePos: {
+                    latitude: currentPosRef.current.lat,
+                    longitude: currentPosRef.current.lng,
+                    timestamp: serverTimestamp()
+                }
+            }).catch(() => {});
         }
-      } catch (e) {}
+    } else if (batteryLevel >= 10) {
+        isBatteryAlertSentRef.current = false;
     }
 
     const payload = {
@@ -142,7 +167,8 @@ export function useEmetteur(
       lastActive: serverTimestamp(),
       fleetId: customFleetId.trim().toUpperCase() || null,
       mooringRadius: mooringRadius,
-      ...batteryInfo
+      batteryLevel,
+      isCharging
     };
 
     setDoc(doc(firestore, 'vessels', sharingId), payload, { merge: true })
@@ -151,7 +177,7 @@ export function useEmetteur(
           lastSentStatusRef.current = data.status || lastSentStatusRef.current;
       })
       .catch(() => {});
-  }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId, mooringRadius, simulator?.isComCut, addTechLog]);
+  }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId, mooringRadius, simulator?.isComCut, addTechLog, battery]);
 
   const triggerEmergency = useCallback((type: 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE' | 'DÉRIVE') => {
     if (!isSharing) return;
@@ -409,6 +435,7 @@ export function useEmetteur(
     mooringRadius,
     setMooringRadius,
     accuracy,
+    battery,
     vesselNickname,
     setVesselNickname,
     customSharingId,
@@ -435,7 +462,7 @@ export function useEmetteur(
     clearLogs
   }), [
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
-    triggerEmergency, changeManualStatus, anchorPos, mooringRadius, accuracy,
+    triggerEmergency, changeManualStatus, anchorPos, mooringRadius, accuracy, battery,
     vesselNickname, customSharingId, customFleetId, sharingId, idsHistory,
     loadFromHistory, removeFromHistory, lastSyncTime, techLogs, tacticalLogs,
     addTacticalLog, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
