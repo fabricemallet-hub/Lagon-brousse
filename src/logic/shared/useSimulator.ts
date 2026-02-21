@@ -1,11 +1,11 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 /**
  * HOOK SIMULATEUR : Gère l'état et les commandes de simulation tactique.
- * v58.0 : Permet de manipuler les entrées GPS et les coupures de signal.
+ * v58.1 : Mémorisation de l'objet retourné pour éviter les boucles de rendu.
  */
 export function useSimulator() {
   const [isActive, setIsActive] = useState(false);
@@ -18,7 +18,7 @@ export function useSimulator() {
   const startSim = useCallback((currentPos: {lat: number, lng: number} | null) => {
     setIsActive(true);
     if (!simPos && currentPos) setSimPos(currentPos);
-    else if (!simPos) setSimPos({ lat: -22.27, lng: 166.45 }); // Default Nouméa
+    else if (!simPos) setSimPos({ lat: -22.27, lng: 166.45 }); 
   }, [simPos]);
 
   const stopSim = useCallback(() => {
@@ -35,7 +35,6 @@ export function useSimulator() {
 
   const forceDrift = useCallback((anchorPos: {lat: number, lng: number} | null, radius: number) => {
     if (!anchorPos) return;
-    // Déplacement de (radius + 5) mètres vers le Nord
     const degPerMeter = 1 / 111320;
     const offset = (radius + 5) * degPerMeter;
     setSimPos({ lat: anchorPos.lat + offset, lng: anchorPos.lng });
@@ -44,7 +43,6 @@ export function useSimulator() {
 
   const nudge = useCallback((anchorPos: {lat: number, lng: number} | null, radius: number) => {
     if (!anchorPos) return;
-    // Petit mouvement aléatoire dans le cercle (50% du rayon)
     const degPerMeter = 1 / 111320;
     const offset = (radius * 0.5) * degPerMeter;
     setSimPos({ 
@@ -54,7 +52,7 @@ export function useSimulator() {
     setIsActive(true);
   }, []);
 
-  return {
+  return useMemo(() => ({
     isActive,
     setIsActive,
     startSim,
@@ -72,5 +70,8 @@ export function useSimulator() {
     teleport,
     forceDrift,
     nudge
-  };
+  }), [
+    isActive, simPos, simSpeed, simAccuracy, isGpsCut, isComCut,
+    startSim, stopSim, teleport, forceDrift, nudge
+  ]);
 }

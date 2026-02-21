@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -8,7 +9,7 @@ import type { UserAccount, SoundLibraryEntry, VesselStatus, VesselPrefs } from '
 
 /**
  * LOGIQUE RÉCEPTEUR (B) : Journal Technique, Sons Expert, Veille Stratégique.
- * v53.3 : Ajout de watchLoop dans les prefs et playSound.
+ * v58.1 : Fix boucle de rendu infinie via Deep Guard sur les prefs.
  */
 export function useRecepteur(vesselId?: string) {
   const { user } = useUser();
@@ -46,20 +47,25 @@ export function useRecepteur(vesselId?: string) {
   const userDocRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: profile } = useDoc<UserAccount>(userDocRef);
 
+  // Deep Guard pour éviter les boucles infinies de state
   useEffect(() => {
     if (profile?.vesselPrefs) {
-      setVesselPrefs(prev => ({
-        ...prev,
-        ...profile.vesselPrefs,
-        alerts: {
-          ...prev.alerts,
-          ...(profile.vesselPrefs.alerts || {})
-        }
-      }));
+      setVesselPrefs(prev => {
+        const currentStr = JSON.stringify(prev);
+        const newStr = JSON.stringify({ ...prev, ...profile.vesselPrefs });
+        if (currentStr === newStr) return prev;
+        return {
+          ...prev,
+          ...profile.vesselPrefs,
+          alerts: {
+            ...prev.alerts,
+            ...(profile.vesselPrefs.alerts || {})
+          }
+        };
+      });
     }
-  }, [profile]);
+  }, [profile?.vesselPrefs]);
 
-  // Initialisation du thread audio (Trick silence)
   const initAudio = useCallback(() => {
     if (typeof window === 'undefined') return;
     if (!silentAudioRef.current) {
@@ -96,7 +102,6 @@ export function useRecepteur(vesselId?: string) {
     const sound = dbSounds?.find(s => s.label.toLowerCase() === soundLabel.toLowerCase() || s.id === soundLabel);
     
     if (sound) {
-      // Nettoyer si déjà actif pour cette clé
       if (activeAlarms[alertKey]) {
           activeAlarms[alertKey].pause();
       }
@@ -112,7 +117,6 @@ export function useRecepteur(vesselId?: string) {
     }
   }, [dbSounds, vesselPrefs, activeAlarms]);
 
-  // Mise à jour locale uniquement pour la réactivité UI immédiate
   const updateLocalPrefs = useCallback((updates: Partial<VesselPrefs>) => {
     setVesselPrefs(prev => {
         const next = { ...prev, ...updates };
@@ -123,8 +127,7 @@ export function useRecepteur(vesselId?: string) {
     });
   }, []);
 
-  // Sauvegarde manuelle vers Firestore (déclenchée par bouton)
-  const savePrefsToFirestore = async () => {
+  const savePrefsToFirestore = useCallback(async () => {
     if (!user || !firestore) return false;
     setIsSaving(true);
     try {
@@ -136,17 +139,16 @@ export function useRecepteur(vesselId?: string) {
       setIsSaving(false);
       return false;
     }
-  };
+  }, [user, firestore, vesselPrefs]);
 
-  // Conservation de l'ancienne méthode pour compatibilité (ex: ID suivi)
-  const savePrefs = async (updates: Partial<VesselPrefs>) => {
+  const savePrefs = useCallback(async (updates: Partial<VesselPrefs>) => {
     if (!user || !firestore) return;
     const newPrefs = { ...vesselPrefs, ...updates };
     setVesselPrefs(newPrefs);
     await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs });
-  };
+  }, [user, firestore, vesselPrefs]);
 
-  return {
+  return useMemo(() => ({
     vesselPrefs,
     updateLocalPrefs,
     savePrefsToFirestore,
@@ -158,5 +160,8 @@ export function useRecepteur(vesselId?: string) {
     isAlarmActive: Object.keys(activeAlarms).length > 0,
     initAudio,
     audioAuthorized
-  };
+  }), [
+    vesselPrefs, updateLocalPrefs, savePrefsToFirestore, isSaving, savePrefs, 
+    dbSounds, playSound, stopAllAlarms, activeAlarms, initAudio, audioAuthorized
+  ]);
 }

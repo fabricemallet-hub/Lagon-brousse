@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { getDistance } from '@/lib/utils';
 import { useFirestore } from '@/firebase';
@@ -24,7 +25,7 @@ export interface TacticalMarker {
 
 /**
  * HOOK PARTAGÉ : Gestion de la carte, des traces et des marqueurs tactiques.
- * v57.0 : Optimisation du switchViewMode pour la Navbar tactile.
+ * v58.1 : Mémorisation de l'objet retourné pour éviter les boucles de rendu.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
@@ -41,7 +42,6 @@ export function useMapCore() {
   const [tacticalMarkers, setTacticalMarkers] = useState<TacticalMarker[]>([]);
   const [isTacticalHidden, setIsTacticalHidden] = useState(false);
 
-  // FORCE LE RENDU ET RESTAURE LE CENTRE
   useEffect(() => {
     if (googleMap) {
       google.maps.event.trigger(googleMap, 'resize');
@@ -72,7 +72,6 @@ export function useMapCore() {
     }
   }, [googleMap]);
 
-  // SYNC TACTIQUE : Écoute les points de la flotte
   const syncTacticalMarkers = useCallback((vesselIds: string[]) => {
     if (!firestore || vesselIds.length === 0) return () => {};
 
@@ -156,7 +155,7 @@ export function useMapCore() {
     }
   }, [googleMap, saveMapState]);
 
-  return {
+  return useMemo(() => ({
     isGoogleLoaded,
     viewMode,
     setViewMode: switchViewMode,
@@ -177,5 +176,9 @@ export function useMapCore() {
     syncTacticalMarkers,
     isTacticalHidden,
     setIsTacticalHidden
-  };
+  }), [
+    isGoogleLoaded, viewMode, switchViewMode, googleMap, isFollowMode, isFullscreen,
+    breadcrumbs, updateBreadcrumbs, clearBreadcrumbs, handleRecenter, saveMapState,
+    tacticalMarkers, syncTacticalMarkers, isTacticalHidden
+  ]);
 }

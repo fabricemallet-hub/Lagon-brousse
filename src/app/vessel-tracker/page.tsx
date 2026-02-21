@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useMapCore } from '@/logic/shared/useMapCore';
 import { useSimulator } from '@/logic/shared/useSimulator';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
@@ -128,7 +128,6 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
 const BatteryLow = (props: any) => <Battery className={props.className} />;
 const BatteryMedium = (props: any) => <Battery className={props.className} />;
 
-// Composant de Marqueur de Navire Dynamique
 const VesselMarker = ({ vessel, isMe = false }: { vessel: VesselStatus, isMe?: boolean }) => {
     const status = vessel.status || 'moving';
     const heading = vessel.heading || 0;
@@ -200,16 +199,22 @@ export default function VesselTrackerPage() {
   
   const mapCore = useMapCore();
   const simulator = useSimulator();
+
+  // Callbacks mémorisés pour éviter les boucles de rendu
+  const handlePositionUpdate = useCallback((lat: number, lng: number) => {
+    mapCore.updateBreadcrumbs(lat, lng);
+    if (mapCore.isFollowMode && mapCore.googleMap) {
+        mapCore.googleMap.panTo({ lat, lng });
+    }
+  }, [mapCore.updateBreadcrumbs, mapCore.isFollowMode, mapCore.googleMap]);
+
+  const handleStopCleanup = useCallback(() => {
+    mapCore.clearBreadcrumbs();
+  }, [mapCore.clearBreadcrumbs]);
+
   const emetteur = useEmetteur(
-    (lat, lng) => {
-        mapCore.updateBreadcrumbs(lat, lng);
-        if (mapCore.isFollowMode && mapCore.googleMap) {
-            mapCore.googleMap.panTo({ lat, lng });
-        }
-    },
-    () => {
-        mapCore.clearBreadcrumbs();
-    },
+    handlePositionUpdate,
+    handleStopCleanup,
     simulator
   );
   
@@ -243,14 +248,14 @@ export default function VesselTrackerPage() {
         mapCore.handleRecenter(emetteur.currentPos);
         hasCenteredInitially.current = true;
     }
-  }, [emetteur.currentPos, mapCore.googleMap]);
+  }, [emetteur.currentPos, mapCore.googleMap, mapCore.handleRecenter]);
 
   useEffect(() => {
     const ids = [];
     if (emetteur.isSharing) ids.push(emetteur.sharingId);
     const unsub = mapCore.syncTacticalMarkers(ids);
     return () => unsub();
-  }, [emetteur.isSharing, emetteur.sharingId, mapCore]);
+  }, [emetteur.isSharing, emetteur.sharingId, mapCore.syncTacticalMarkers]);
 
   const [isLedActive, setIsLedActive] = useState(false);
   useEffect(() => {
@@ -321,7 +326,6 @@ export default function VesselTrackerPage() {
       )}
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
-        {/* NAV-TÉLÉMETRIE FLOTTANTE */}
         <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-[10006] flex bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-white/20 shadow-2xl">
             {['alpha', 'beta', 'gamma'].map((m) => (
                 <Button
@@ -341,21 +345,18 @@ export default function VesselTrackerPage() {
 
         {mapCore.isGoogleLoaded ? (
             <div className="relative w-full h-full">
-                {/* CALQUE WINDY (BETA OVERLAY) */}
                 {mapCore.viewMode === 'beta' && (
                     <div className="absolute inset-0 z-[5] pointer-events-none opacity-50 mix-blend-multiply">
                         <iframe src={windyUrl} className="w-full h-full border-none" />
                     </div>
                 )}
 
-                {/* CALQUE WINDY (GAMMA FULL) */}
                 {mapCore.viewMode === 'gamma' && (
                     <div className="absolute inset-0 z-[140] bg-background animate-in fade-in duration-500">
                         <iframe src={windyUrl} className="w-full h-full border-none" />
                     </div>
                 )}
 
-                {/* GOOGLE MAPS CORE (ALPHA & BETA) */}
                 <GoogleMap
                     mapContainerClassName={cn("w-full h-full", mapCore.viewMode === 'gamma' && "opacity-0 pointer-events-none")}
                     defaultCenter={INITIAL_CENTER}
@@ -427,13 +428,11 @@ export default function VesselTrackerPage() {
             </div>
         ) : <Skeleton className="h-full w-full" />}
         
-        {/* BOUTONS FLOTTANTS MAP */}
         <div className="absolute top-4 left-4 z-[9999] flex flex-col gap-2">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl hover:bg-white" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>
                 {mapCore.isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}
             </Button>
             
-            {/* BOUTON SIMULATEUR [SIM] */}
             <Popover>
                 <PopoverTrigger asChild>
                     <Button className={cn("size-10 rounded-xl border-2 shadow-xl font-black text-[10px] transition-all", simulator.isActive ? "bg-red-600 text-white border-red-400" : "bg-white/90 text-slate-600 border-slate-200")}>

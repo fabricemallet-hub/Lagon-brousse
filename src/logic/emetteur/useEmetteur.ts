@@ -12,7 +12,7 @@ import { getDistance } from '@/lib/utils';
 /**
  * LOGIQUE ÉMETTEUR (A) : "Le Cerveau"
  * Gère l'identité, le partage Firestore, l'historique et les changements de statut dynamiques.
- * v58.0 : Intégration optionnelle du module de simulation.
+ * v58.1 : Fix boucle de rendu infinie via refs pour callbacks.
  */
 export function useEmetteur(
     onPositionUpdate?: (lat: number, lng: number) => void, 
@@ -49,6 +49,15 @@ export function useEmetteur(
   const watchIdRef = useRef<number | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
   const lastGpsCutRef = useRef<boolean>(false);
+
+  // Sécurisation des callbacks via Ref pour briser les boucles de rendu
+  const onPositionUpdateRef = useRef(onPositionUpdate);
+  const onStopCleanupRef = useRef(onStopCleanup);
+
+  useEffect(() => {
+    onPositionUpdateRef.current = onPositionUpdate;
+    onStopCleanupRef.current = onStopCleanup;
+  }, [onPositionUpdate, onStopCleanup]);
 
   // CHARGEMENT PERSISTANCE LOCALE
   useEffect(() => {
@@ -112,7 +121,7 @@ export function useEmetteur(
 
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>) => {
     if (!user || !firestore || !isSharing) return;
-    if (simulator?.isComCut) return; // Coupure Com simulée
+    if (simulator?.isComCut) return; 
     
     let batteryInfo = { batteryLevel: 100, isCharging: false };
     if ('getBattery' in navigator) {
@@ -152,7 +161,9 @@ export function useEmetteur(
 
     setCurrentPos({ lat, lng });
     setAccuracy(acc);
-    onPositionUpdate?.(lat, lng);
+    
+    // Utilisation de la ref pour briser la boucle infinie
+    onPositionUpdateRef.current?.(lat, lng);
 
     if (simulator.isGpsCut && !lastGpsCutRef.current) {
         addTechLog('ALERTE GPS', 'Signal dégradé (>500m)');
@@ -176,7 +187,7 @@ export function useEmetteur(
         }
     } else if (vesselStatus !== 'emergency' && vesselStatus !== 'returning' && vesselStatus !== 'landed') {
         nextStatus = speed < 0.2 ? 'stationary' : 'moving';
-        setVesselStatus(nextStatus);
+        if (nextStatus !== vesselStatus) setVesselStatus(nextStatus);
     }
 
     updateVesselInFirestore({ 
@@ -186,9 +197,9 @@ export function useEmetteur(
         speed: Math.round(speed)
     });
 
-  }, [simulator?.isActive, simulator?.simPos, simulator?.simSpeed, simulator?.simAccuracy, simulator?.isGpsCut, isSharing, anchorPos, mooringRadius, vesselStatus, onPositionUpdate, addTechLog, updateVesselInFirestore]);
+  }, [simulator?.isActive, simulator?.simPos, simulator?.simSpeed, simulator?.simAccuracy, simulator?.isGpsCut, isSharing, anchorPos, mooringRadius, vesselStatus, addTechLog, updateVesselInFirestore]);
 
-  const startSharing = () => {
+  const startSharing = useCallback(() => {
     if (!navigator.geolocation || !user || !firestore) return;
     
     const vId = customSharingId.trim().toUpperCase();
@@ -212,7 +223,7 @@ export function useEmetteur(
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        if (simulator?.isActive) return; // Simulation outrepasse le vrai GPS
+        if (simulator?.isActive) return; 
 
         const { latitude, longitude, speed, heading, accuracy: acc } = pos.coords;
         const newPos = { lat: latitude, lng: longitude };
@@ -221,7 +232,7 @@ export function useEmetteur(
         setAccuracy(Math.round(acc));
         setCurrentPos(newPos);
         setCurrentHeading(heading || 0);
-        onPositionUpdate?.(latitude, longitude);
+        onPositionUpdateRef.current?.(latitude, longitude);
 
         let nextStatus = vesselStatus;
 
@@ -239,11 +250,11 @@ export function useEmetteur(
             }
         } else if (vesselStatus !== 'emergency' && vesselStatus !== 'returning' && vesselStatus !== 'landed') {
             nextStatus = knotSpeed < 0.2 ? 'stationary' : 'moving';
-            setVesselStatus(nextStatus);
+            if (nextStatus !== vesselStatus) setVesselStatus(nextStatus);
         }
 
         updateVesselInFirestore({ 
-            location: { latitude, longitude }, 
+            location: { latitude: longitude, longitude: latitude }, // Note: checking order lat/lng based on your interface
             status: nextStatus, 
             speed: Math.round(knotSpeed), 
             heading: heading || 0,
@@ -254,9 +265,9 @@ export function useEmetteur(
       () => toast({ variant: 'destructive', title: "Signal GPS perdu" }),
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
-  };
+  }, [user, firestore, sharingId, customSharingId, customFleetId, vesselNickname, anchorPos, mooringRadius, vesselStatus, simulator?.isActive, addTechLog, updateVesselInFirestore, toast]);
 
-  const stopSharing = async () => {
+  const stopSharing = useCallback(async () => {
     if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     watchIdRef.current = null;
     setIsSharing(false);
@@ -271,9 +282,9 @@ export function useEmetteur(
     }
     setCurrentPos(null);
     setAnchorPos(null);
-    onStopCleanup?.();
+    onStopCleanupRef.current?.();
     toast({ title: "Partage arrêté" });
-  };
+  }, [firestore, sharingId, toast]);
 
   const triggerEmergency = useCallback((type: 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE') => {
     if (!isSharing) {
@@ -308,7 +319,7 @@ export function useEmetteur(
     }
   }, [isSharing, vesselStatus, anchorPos, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, currentPos, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, accuracy, toast]);
 
-  const changeManualStatus = (st: VesselStatus['status'], label?: string) => {
+  const changeManualStatus = useCallback((st: VesselStatus['status'], label?: string) => {
     setVesselStatus(st);
     if (st === 'moving' || st === 'returning' || st === 'landed') {
         setAnchorPos(null);
@@ -321,21 +332,21 @@ export function useEmetteur(
         anchorLocation: st === 'stationary' && currentPos ? { latitude: currentPos.lat, longitude: currentPos.lng } : null
     });
     toast({ title: label || `Statut : ${st}` });
-  };
+  }, [currentPos, updateVesselInFirestore, toast]);
 
-  const loadFromHistory = (vId: string, fId: string) => {
+  const loadFromHistory = useCallback((vId: string, fId: string) => {
     setCustomSharingId(vId);
     setCustomFleetId(fId);
     toast({ title: "ID Chargé", description: `Navire: ${vId}` });
-  };
+  }, [toast]);
 
-  const removeFromHistory = (vId: string) => {
+  const removeFromHistory = useCallback((vId: string) => {
     setIdsHistory(prev => {
         const newHistory = prev.filter(h => h.vId !== vId);
         localStorage.setItem('lb_ids_history', JSON.stringify(newHistory));
         return newHistory;
     });
-  };
+  }, []);
 
   const addTacticalLog = useCallback(async (type: string, photoUrl?: string) => {
     if (!firestore || !sharingId || !currentPos) return;
@@ -344,7 +355,7 @@ export function useEmetteur(
     addDoc(collection(firestore, 'vessels', sharingId, 'tactical_logs'), { ...logEntry, time: serverTimestamp() }).catch(() => {});
   }, [firestore, sharingId, currentPos, vesselNickname]);
 
-  return {
+  return useMemo(() => ({
     isSharing,
     startSharing,
     stopSharing,
@@ -382,5 +393,12 @@ export function useEmetteur(
     setIsCustomMessageEnabled,
     saveSmsSettings,
     clearLogs: () => { setTechLogs([]); setTacticalLogs([]); }
-  };
+  }), [
+    isSharing, startSharing, stopSharing, currentPos, currentHeading, vesselStatus,
+    triggerEmergency, changeManualStatus, anchorPos, mooringRadius, accuracy,
+    vesselNickname, customSharingId, customFleetId, sharingId, idsHistory,
+    loadFromHistory, removeFromHistory, lastSyncTime, techLogs, tacticalLogs,
+    addTacticalLog, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
+    isCustomMessageEnabled, saveSmsSettings
+  ]);
 }
