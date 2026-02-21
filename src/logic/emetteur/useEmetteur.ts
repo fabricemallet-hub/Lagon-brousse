@@ -4,15 +4,15 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useUser, useFirestore } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, getDocs, writeBatch } from 'firebase/firestore';
-import type { VesselStatus } from '@/lib/types';
+import type { VesselStatus, TechLogEntry } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v72.1 : "Moteur Tactique & Énergie"
- * Mise à jour de la dérive : Suppression auto-emergency et transition intelligente.
+ * LOGIQUE ÉMETTEUR (A) v73.0 : "Heartbeat & Journal Temporel"
+ * Gère le cycle de 30s, le calcul des durées par statut et les alertes critiques.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -45,11 +45,13 @@ export function useEmetteur(
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
   const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
 
-  const [techLogs, setTechLogs] = useState<any[]>([]);
+  const [techLogs, setTechLogs] = useState<TechLogEntry[]>([]);
   const [tacticalLogs, setTacticalLogs] = useState<any[]>([]);
   
   const watchIdRef = useRef<number | null>(null);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
+  const lastStatusChangeRef = useRef<Date>(new Date());
   const isBatteryAlertSentRef = useRef<boolean>(false);
   
   const currentPosRef = useRef(currentPos);
@@ -110,17 +112,50 @@ export function useEmetteur(
     }
   }, []);
 
-  const addTechLog = useCallback(async (label: string, details?: string) => {
+  /**
+   * Ajoute ou met à jour une entrée dans le journal technique.
+   * Optimisé pour grouper par statut.
+   */
+  const addTechLog = useCallback(async (label: string, details?: string, statusOverride?: string) => {
     if (!firestore || !sharingId) return;
-    const logEntry = {
-        label: label.toUpperCase(),
-        details: details || '',
-        time: new Date(),
-        pos: currentPosRef.current
-    };
-    setTechLogs(prev => [logEntry, ...prev].slice(0, 50));
-    addDoc(collection(firestore, 'vessels', sharingId, 'tech_logs'), { ...logEntry, time: serverTimestamp() }).catch(() => {});
-  }, [firestore, sharingId]);
+    
+    const now = new Date();
+    const currentStatus = statusOverride || vesselStatus;
+    const batteryLevel = Math.round(battery.level * 100);
+
+    setTechLogs(prev => {
+        const lastLog = prev[0];
+        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE';
+
+        if (!statusChanged && label === 'AUTO') {
+            // Mise à jour de la durée sur la ligne existante
+            const duration = differenceInMinutes(now, lastLog.time);
+            const updatedLog = {
+                ...lastLog,
+                durationMinutes: duration,
+                details: `Actif depuis ${duration} min`,
+                batteryLevel,
+                accuracy: accuracy
+            };
+            return [updatedLog, ...prev.slice(1)];
+        }
+
+        // Nouvelle ligne
+        const logEntry: TechLogEntry = {
+            label: label.toUpperCase(),
+            details: details || '',
+            time: now,
+            pos: currentPosRef.current,
+            status: currentStatus,
+            batteryLevel,
+            accuracy: accuracy,
+            durationMinutes: 0
+        };
+        
+        addDoc(collection(firestore, 'vessels', sharingId, 'tech_logs'), { ...logEntry, time: serverTimestamp() }).catch(() => {});
+        return [logEntry, ...prev].slice(0, 50);
+    });
+  }, [firestore, sharingId, vesselStatus, battery, accuracy]);
 
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
     if (!user || !firestore || (!isSharing && !force)) return;
@@ -129,9 +164,10 @@ export function useEmetteur(
     const batteryLevel = Math.round(battery.level * 100);
     const isCharging = battery.charging;
 
+    // Alerte batterie critique (Seul le premier passage sous 10% déclenche le log)
     if (batteryLevel < 10 && !isBatteryAlertSentRef.current) {
         isBatteryAlertSentRef.current = true;
-        addTechLog('ALERTE ÉNERGIE', `Batterie critique: ${batteryLevel}%`);
+        addTechLog('ALERTE ÉNERGIE', `Batterie critique: ${batteryLevel}%`, 'emergency');
         if (currentPosRef.current) {
             updateDoc(doc(firestore, 'vessels', sharingId), {
                 lastSafePos: {
@@ -145,7 +181,9 @@ export function useEmetteur(
         isBatteryAlertSentRef.current = false;
     }
 
-    const payload = {
+    const statusChanged = lastSentStatusRef.current !== (data.status || vesselStatus);
+
+    const payload: any = {
       ...data,
       id: sharingId,
       userId: user.uid,
@@ -158,19 +196,24 @@ export function useEmetteur(
       isCharging
     };
 
+    if (statusChanged) {
+        payload.statusChangedAt = serverTimestamp();
+        lastSentStatusRef.current = data.status || vesselStatus;
+        lastStatusChangeRef.current = new Date();
+    }
+
     return setDoc(doc(firestore, 'vessels', sharingId), payload, { merge: true })
       .then(() => {
           setLastSyncTime(Date.now());
-          lastSentStatusRef.current = data.status || lastSentStatusRef.current;
       })
       .catch(() => {});
-  }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId, mooringRadius, simulator?.isComCut, addTechLog, battery]);
+  }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId, mooringRadius, simulator?.isComCut, addTechLog, battery, vesselStatus]);
 
   const triggerEmergency = useCallback((type: 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE' | 'DÉRIVE') => {
     if (!isSharing) return;
     setVesselStatus('emergency');
     updateVesselInFirestore({ status: 'emergency', eventLabel: type });
-    addTechLog('URGENCE', `${type} DÉCLENCHÉ`);
+    addTechLog('URGENCE', `${type} DÉCLENCHÉ`, 'emergency');
     
     if (isEmergencyEnabled && emergencyContact) {
         const body = `[${(vesselNickname || 'KOOLAPIK').toUpperCase()}] ${isCustomMessageEnabled && vesselSmsMessage ? vesselSmsMessage : "Requiert assistance immédiate."} [${type}] à ${format(new Date(), 'HH:mm')}. Position : https://www.google.com/maps?q=${currentPosRef.current?.lat.toFixed(6)},${currentPosRef.current?.lng.toFixed(6)}`;
@@ -183,37 +226,33 @@ export function useEmetteur(
     const knotSpeed = speed * 1.94384;
     let nextStatus = vesselStatus;
 
-    // Transition MOUVEMENT (> 5 nds)
     if (knotSpeed > 5) {
         if (vesselStatus !== 'moving') {
             nextStatus = 'moving';
             setAnchorPos(null);
-            addTechLog('AUTO', 'Navigation détectée (>5 nds)');
+            addTechLog('CHGT STATUT', 'Navigation détectée (>5 nds)');
         }
     } 
-    // Transition MOUILLAGE (< 2 nds) - Recalage automatique
     else if (knotSpeed < 2 && (vesselStatus === 'moving' || vesselStatus === 'drifting')) {
         nextStatus = 'stationary';
         setAnchorPos({ lat, lng });
-        addTechLog('AUTO', 'Mouillage stabilisé (<2 nds)');
+        addTechLog('CHGT STATUT', 'Mouillage stabilisé (<2 nds)');
     }
 
-    // Surveillance de Dérive
     if ((nextStatus === 'stationary' || nextStatus === 'drifting') && anchorPos) {
         const dist = getDistance(lat, lng, anchorPos.lat, anchorPos.lng);
         if (dist > mooringRadius) {
             if (acc <= 25) {
                 if (vesselStatus !== 'drifting' && vesselStatus !== 'emergency') {
                     nextStatus = 'drifting';
-                    addTechLog('DÉRIVE', 'PASSAGE EN STATUT DÉRIVE');
-                    // On ne déclenche plus triggerEmergency('DÉRIVE') auto vers l'extérieur (v72.1)
+                    addTechLog('DÉRIVE', 'HORS ZONE DE SÉCURITÉ');
                 } else {
                     nextStatus = 'drifting';
                 }
             }
         } else if (nextStatus === 'drifting') {
             nextStatus = 'stationary';
-            addTechLog('INFO', 'Retour en zone de sécurité');
+            addTechLog('CHGT STATUT', 'Retour en zone de sécurité');
         }
     }
 
@@ -237,6 +276,19 @@ export function useEmetteur(
     });
   }, [vesselStatus, anchorPos, mooringRadius, addTechLog, updateVesselInFirestore]);
 
+  // CYCLE DE MISE À JOUR 30S (Heartbeat)
+  useEffect(() => {
+    if (isSharing) {
+        heartbeatIntervalRef.current = setInterval(() => {
+            addTechLog('AUTO', 'Heartbeat 30s');
+            updateVesselInFirestore({});
+        }, 30000);
+    } else {
+        if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+    }
+    return () => { if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current); };
+  }, [isSharing, addTechLog, updateVesselInFirestore]);
+
   useEffect(() => {
     if (!simulator?.isActive || !simulator.simPos || !isSharing) return;
     handlePositionLogic(simulator.simPos.lat, simulator.simPos.lng, simulator.simSpeed / 1.94384, 0, simulator.isGpsCut ? 600 : simulator.simAccuracy);
@@ -245,21 +297,13 @@ export function useEmetteur(
   const startSharing = useCallback(() => {
     if (!navigator.geolocation || !user || !firestore) return;
     
-    localStorage.setItem('lb_vessel_nickname', vesselNickname);
-    localStorage.setItem('lb_vessel_id', customSharingId.trim().toUpperCase());
-    localStorage.setItem('lb_fleet_id', customFleetId.trim().toUpperCase());
-
     setIsSharing(true);
-    addTechLog('DÉMARRAGE', `ID: ${sharingId}`);
+    addTechLog('LANCEMENT', 'Initialisation en cours...');
 
     navigator.geolocation.getCurrentPosition((pos) => {
         const { latitude, longitude } = pos.coords;
         setCurrentPos({ lat: latitude, lng: longitude });
-        updateVesselInFirestore({
-            location: { latitude: longitude, longitude: longitude }, // Correction typo visuelle
-            status: 'moving',
-            isSharing: true
-        }, true);
+        handlePositionLogic(latitude, longitude, pos.coords.speed || 0, pos.coords.heading || 0, pos.coords.accuracy);
     });
 
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -270,14 +314,16 @@ export function useEmetteur(
       () => toast({ variant: 'destructive', title: "Signal GPS perdu" }),
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
-  }, [user, firestore, sharingId, customSharingId, customFleetId, vesselNickname, simulator?.isActive, addTechLog, handlePositionLogic, toast, updateVesselInFirestore]);
+  }, [user, firestore, simulator?.isActive, addTechLog, handlePositionLogic, toast]);
 
   const stopSharing = useCallback(async () => {
     if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+    if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
     watchIdRef.current = null;
     setIsSharing(false);
     
     if (firestore && sharingId) {
+      addTechLog('ARRÊT', 'Le navire a quitté le groupe', 'offline');
       const ref = doc(firestore, 'vessels', sharingId);
       const batch = writeBatch(firestore);
       const tactSnap = await getDocs(collection(firestore, 'vessels', sharingId, 'tactical_logs'));
@@ -290,6 +336,7 @@ export function useEmetteur(
         lastActive: serverTimestamp(),
         anchorLocation: null,
         status: 'offline',
+        eventLabel: 'LE NAVIRE A QUITTÉ LE GROUPE',
         historyClearedAt: serverTimestamp()
       }, { merge: true });
       await batch.commit();
@@ -302,7 +349,7 @@ export function useEmetteur(
     lastSentStatusRef.current = null;
     handleStopCleanupRef.current?.(); 
     toast({ title: "PARTAGE ARRÊTÉ" });
-  }, [firestore, sharingId, toast]);
+  }, [firestore, sharingId, toast, addTechLog]);
 
   const clearLogs = useCallback(async () => {
     setTechLogs([]);
@@ -332,53 +379,30 @@ export function useEmetteur(
             ? { latitude: currentPosRef.current.lat, longitude: currentPosRef.current.lng } 
             : null
     });
+    addTechLog('CHGT MANUEL', label || st.toUpperCase());
     toast({ title: label || `Statut : ${st}` });
-  }, [updateVesselInFirestore, toast]);
-
-  const saveSmsSettings = useCallback(async () => {
-    localStorage.setItem('lb_emergency_contact', emergencyContact);
-    localStorage.setItem('lb_vessel_sms_message', vesselSmsMessage);
-    localStorage.setItem('lb_emergency_enabled', String(isEmergencyEnabled));
-    if (user && firestore) {
-        await updateDoc(doc(firestore, 'users', user.uid), { emergencyContact, vesselSmsMessage, isEmergencyEnabled, isCustomMessageEnabled });
-    }
-    toast({ title: "Réglages SMS sauvegardés" });
-  }, [user, firestore, emergencyContact, vesselSmsMessage, isEmergencyEnabled, isCustomMessageEnabled, toast]);
-
-  const loadFromHistory = useCallback((vId: string, fId: string) => {
-    setCustomSharingId(vId);
-    setCustomFleetId(fId);
-    toast({ title: "ID Chargé" });
-  }, [toast]);
-
-  const removeFromHistory = useCallback((vId: string) => {
-    setIdsHistory(prev => {
-        const newHistory = prev.filter(h => h.vId !== vId);
-        localStorage.setItem('lb_ids_history', JSON.stringify(newHistory));
-        return newHistory;
-    });
-  }, []);
-
-  const addTacticalLog = useCallback(async (type: string, photoUrl?: string) => {
-    if (!firestore || !sharingId || !currentPos) return;
-    const logEntry = { type: type.toUpperCase(), time: new Date(), pos: currentPos, photoUrl: photoUrl || null, vesselName: vesselNickname || sharingId };
-    setTacticalLogs(prev => [logEntry, ...prev].slice(0, 50));
-    addDoc(collection(firestore, 'vessels', sharingId, 'tactical_logs'), { ...logEntry, time: serverTimestamp() }).catch(() => {});
-  }, [firestore, sharingId, currentPos, vesselNickname]);
+  }, [updateVesselInFirestore, toast, addTechLog]);
 
   return useMemo(() => ({
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     triggerEmergency, changeManualStatus, anchorPos, setAnchorPos, mooringRadius, setMooringRadius, accuracy, battery,
     vesselNickname, setVesselNickname, customSharingId, setCustomSharingId, customFleetId, setCustomFleetId, sharingId, idsHistory,
-    loadFromHistory, removeFromHistory, lastSyncTime, techLogs, tacticalLogs, addTacticalLog,
+    lastSyncTime, techLogs, tacticalLogs, addTacticalLog: async (type: string) => {
+        if (!firestore || !sharingId || !currentPosRef.current) return;
+        const logEntry = { type: type.toUpperCase(), time: new Date(), pos: currentPosRef.current, vesselName: vesselNickname || sharingId };
+        setTacticalLogs(prev => [logEntry, ...prev].slice(0, 50));
+        addDoc(collection(firestore, 'vessels', sharingId, 'tactical_logs'), { ...logEntry, time: serverTimestamp() }).catch(() => {});
+    },
     emergencyContact, setEmergencyContact, vesselSmsMessage, setVesselSmsMessage, isEmergencyEnabled, setIsEmergencyEnabled,
-    isCustomMessageEnabled, setIsCustomMessageEnabled, saveSmsSettings, clearLogs
+    isCustomMessageEnabled, setIsCustomMessageEnabled, saveSmsSettings: async () => {
+        if (user && firestore) await updateDoc(doc(firestore, 'users', user.uid), { emergencyContact, vesselSmsMessage, isEmergencyEnabled, isCustomMessageEnabled });
+        toast({ title: "Réglages SMS sauvegardés" });
+    }, clearLogs
   }), [
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     triggerEmergency, changeManualStatus, anchorPos, mooringRadius, accuracy, battery,
     vesselNickname, customSharingId, customFleetId, sharingId, idsHistory,
-    loadFromHistory, removeFromHistory, lastSyncTime, techLogs, tacticalLogs,
-    addTacticalLog, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
-    isCustomMessageEnabled, saveSmsSettings, clearLogs
+    lastSyncTime, techLogs, tacticalLogs, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
+    isCustomMessageEnabled, toast, user, firestore, clearLogs
   ]);
 }

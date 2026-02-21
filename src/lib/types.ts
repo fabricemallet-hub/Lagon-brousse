@@ -1,3 +1,4 @@
+
 export type WindDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 
 export type UserRole = 'client' | 'professional' | 'admin';
@@ -567,4 +568,15 @@ export interface Conversation {
   lastMessageAt: any;
   isReadByAdmin: boolean;
   isReadByUser: boolean;
+}
+
+export interface TechLogEntry {
+    label: string;
+    details: string;
+    time: Date;
+    pos?: { lat: number, lng: number } | null;
+    status: string;
+    durationMinutes?: number;
+    batteryLevel?: number;
+    accuracy?: number;
 }
