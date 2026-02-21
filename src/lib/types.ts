@@ -42,6 +42,28 @@ export interface ShootingAngle {
   isActive: boolean;
 }
 
+export interface VesselAlertConfig {
+  enabled: boolean;
+  sound: string;
+  loop: boolean;
+}
+
+export interface VesselPrefs {
+  volume: number;
+  isNotifyEnabled: boolean;
+  batteryThreshold: number;
+  watchDuration: number;
+  watchSound: string;
+  alerts: {
+    moving: VesselAlertConfig;
+    stationary: VesselAlertConfig;
+    offline: VesselAlertConfig;
+    assistance: VesselAlertConfig;
+    tactical: VesselAlertConfig;
+    battery: VesselAlertConfig;
+  };
+}
+
 export interface UserAccount {
   id: string;
   email: string;
@@ -62,7 +84,7 @@ export interface UserAccount {
   notificationsEnabled?: boolean;
   mapIcon?: string;
   mapColor?: string;
-  vesselPrefs?: any;
+  vesselPrefs?: VesselPrefs;
   ballisticsPrefs?: BallisticsPrefs;
   subscriptionStartDate?: string;
   cgvAcceptedAt?: string;

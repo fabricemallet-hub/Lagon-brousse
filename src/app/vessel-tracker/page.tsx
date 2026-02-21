@@ -1,7 +1,6 @@
-
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useMapCore } from '@/logic/shared/useMapCore';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
 import { useRecepteur } from '@/logic/recepteur/useRecepteur';
@@ -57,7 +56,9 @@ import {
   BatteryCharging,
   BatteryLow,
   BatteryMedium,
-  WifiOff
+  WifiOff,
+  Volume2,
+  Timer
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -73,14 +74,14 @@ export default function VesselTrackerPage() {
   const mapCore = useMapCore();
   const emetteur = useEmetteur(
     mapCore.updateBreadcrumbs,
-    () => mapCore.clearBreadcrumbs() // Callback cleanup à l'arrêt
+    () => mapCore.clearBreadcrumbs() 
   );
   const recepteur = useRecepteur(emetteur.customSharingId);
   const flotte = useFlotte(emetteur.customSharingId, emetteur.vesselNickname);
   
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  // Synchronisation LED Sync
+  // Sync LED
   const [isLedActive, setIsLedActive] = useState(false);
   useEffect(() => {
     if (emetteur.lastSyncTime > 0) {
@@ -92,9 +93,6 @@ export default function VesselTrackerPage() {
 
   const handleRecenterTo = (pos: { lat: number, lng: number }) => {
       mapCore.handleRecenter(pos);
-      if (mapCore.isFullscreen) {
-          toast({ title: "Position centrée" });
-      }
   };
 
   const handleClearTrace = () => {
@@ -105,36 +103,27 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="w-full space-y-4 pb-32 px-1">
+      {recepteur.isAlarmActive && (
+        <Button 
+            className="fixed top-2 left-1/2 -translate-x-1/2 z-[1000] h-14 bg-red-600 hover:bg-red-700 text-white font-black uppercase shadow-2xl animate-bounce gap-3 px-8 rounded-full border-4 border-white"
+            onClick={recepteur.stopAllAlarms}
+        >
+            <Volume2 className="size-6 animate-pulse" /> ARRÊTER LE SON
+        </Button>
+      )}
+
       {/* SÉLECTEUR DE MODE GLOBAL */}
       <div className="flex bg-slate-900 text-white p-1 rounded-xl shadow-lg border-2 border-primary/20 sticky top-0 z-[100]">
-          <Button 
-            variant={appMode === 'sender' ? 'default' : 'ghost'} 
-            className="flex-1 font-black uppercase text-[9px] sm:text-[10px] h-12 px-1" 
-            onClick={() => setAppMode('sender')}
-          >
-            Émetteur (A)
-          </Button>
-          <Button 
-            variant={appMode === 'receiver' ? 'default' : 'ghost'} 
-            className="flex-1 font-black uppercase text-[9px] sm:text-[10px] h-12 px-1" 
-            onClick={() => setAppMode('receiver')}
-          >
-            Récepteur (B)
-          </Button>
-          <Button 
-            variant={appMode === 'fleet' ? 'default' : 'ghost'} 
-            className="flex-1 font-black uppercase text-[9px] sm:text-[10px] h-12 px-1" 
-            onClick={() => setAppMode('fleet')}
-          >
-            Flotte (C)
-          </Button>
+          <Button variant={appMode === 'sender' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[9px] sm:text-[10px] h-12 px-1" onClick={() => setAppMode('sender')}>Émetteur (A)</Button>
+          <Button variant={appMode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[9px] sm:text-[10px] h-12 px-1" onClick={() => setAppMode('receiver')}>Récepteur (B)</Button>
+          <Button variant={appMode === 'fleet' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[9px] sm:text-[10px] h-12 px-1" onClick={() => setAppMode('fleet')}>Flotte (C)</Button>
       </div>
 
       {/* SÉLECTEUR DE MODE CARTE */}
       <div className="flex bg-muted/30 p-1 rounded-xl border relative z-20">
-          <Button variant={mapCore.viewMode === 'alpha' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('alpha')}>Maps</Button>
-          <Button variant={mapCore.viewMode === 'beta' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('beta')}>Météo</Button>
-          <Button variant={mapCore.viewMode === 'gamma' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('gamma')}>Windy</Button>
+          <Button variant={mapCore.viewMode === 'alpha' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('alpha')}>Alpha (Maps)</Button>
+          <Button variant={mapCore.viewMode === 'beta' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('beta')}>Béta (Météo)</Button>
+          <Button variant={mapCore.viewMode === 'gamma' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('gamma')}>Gamma (Full)</Button>
       </div>
 
       {/* CONTENEUR CARTE */}
@@ -148,7 +137,6 @@ export default function VesselTrackerPage() {
                 onDragStart={() => mapCore.setIsFollowMode(false)}
                 options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
             >
-                {/* POSITION RÉELLE */}
                 {emetteur.currentPos && (
                     <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -50%)' }} className="relative">
@@ -160,7 +148,6 @@ export default function VesselTrackerPage() {
                     </OverlayView>
                 )}
 
-                {/* BREADCRUMBS (REF STOCKÉE) */}
                 {mapCore.breadcrumbs.length > 1 && (
                     <Polyline 
                         path={mapCore.breadcrumbs} 
@@ -169,7 +156,6 @@ export default function VesselTrackerPage() {
                     />
                 )}
 
-                {/* MOUILLAGE ACTIF (REF STOCKÉE) */}
                 {emetteur.anchorPos && (
                     <>
                         <OverlayView position={emetteur.anchorPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
@@ -188,24 +174,17 @@ export default function VesselTrackerPage() {
             </GoogleMap>
         )}
         
-        {/* BOUTONS FLOTTANTS TACTIQUES - Z-INDEX MAXIMAL */}
-        <div className="absolute top-4 left-4 z-[9999] flex flex-col gap-2">
+        <div className="absolute top-4 left-4 z-[200] flex flex-col gap-2">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>
                 {mapCore.isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}
             </Button>
         </div>
-        <div className="absolute top-4 right-4 z-[9999] flex flex-col gap-2">
-            <Button 
-                onClick={() => mapCore.setIsFollowMode(!mapCore.isFollowMode)} 
-                className={cn("h-10 w-10 border-2 shadow-xl", mapCore.isFollowMode ? "bg-primary text-white" : "bg-white text-primary")}
-            >
+        <div className="absolute top-4 right-4 z-[200] flex flex-col gap-2">
+            <Button onClick={() => mapCore.setIsFollowMode(!mapCore.isFollowMode)} className={cn("h-10 w-10 border-2 shadow-xl", mapCore.isFollowMode ? "bg-primary text-white" : "bg-white text-primary")}>
                 {mapCore.isFollowMode ? <Lock className="size-5" /> : <Unlock className="size-5" />}
             </Button>
             {!mapCore.isFollowMode && (
-                <Button 
-                    onClick={() => mapCore.handleRecenter(emetteur.currentPos)} 
-                    className="bg-white border-2 font-black text-[9px] uppercase gap-2 px-2 h-10 text-primary shadow-xl"
-                >
+                <Button onClick={() => mapCore.handleRecenter(emetteur.currentPos)} className="bg-white border-2 font-black text-[9px] uppercase gap-2 px-2 h-10 text-primary shadow-xl">
                     <LocateFixed className="size-4"/> RE-CENTRER
                 </Button>
             )}
@@ -214,8 +193,8 @@ export default function VesselTrackerPage() {
 
       {/* PANNEAUX DE CONTRÔLE */}
       <div className="grid grid-cols-1 gap-4">
-          {appMode === 'sender' && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-left-2">
+          <Tabs value={appMode} className="w-full">
+              <TabsContent value="sender" className="space-y-4 m-0">
                   <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
                       <CardHeader className="bg-primary/5 p-4 border-b">
                         <div className="flex items-center justify-between">
@@ -224,10 +203,7 @@ export default function VesselTrackerPage() {
                             </CardTitle>
                             {emetteur.isSharing && (
                                 <div className="flex items-center gap-2">
-                                    <div className={cn(
-                                        "size-2.5 rounded-full bg-green-500 transition-all shadow-sm",
-                                        isLedActive ? "opacity-100 scale-125 shadow-[0_0_8px_rgba(34,197,94,0.8)]" : "opacity-30 scale-100"
-                                    )} />
+                                    <div className={cn("size-2.5 rounded-full bg-green-500 transition-all shadow-sm", isLedActive ? "opacity-100 scale-125 shadow-[0_0_8px_rgba(34,197,94,0.8)]" : "opacity-30 scale-100")} />
                                     <span className="text-[8px] font-black text-green-600 uppercase">Sync Active</span>
                                 </div>
                             )}
@@ -245,7 +221,7 @@ export default function VesselTrackerPage() {
                               <div className="space-y-4">
                                   <div className="p-4 bg-primary/10 rounded-xl border-2 border-primary/20 flex flex-col items-center text-center gap-1">
                                       <p className="text-[10px] font-black uppercase text-primary">Navire en cours de partage</p>
-                                      <p className="text-xl font-black uppercase">{emetteur.sharingId}</p>
+                                      <p className="text-xl font-black uppercase">{emetteur.customSharingId || 'MASTER'}</p>
                                       <Badge variant="outline" className="bg-green-500 text-white border-none text-[8px] animate-pulse">EN LIGNE</Badge>
                                   </div>
                                   
@@ -294,147 +270,33 @@ export default function VesselTrackerPage() {
                           )}
                       </CardContent>
                   </Card>
+              </TabsContent>
 
-                  {/* JOURNAL DE BORD ÉMETTEUR */}
-                  <Card className="border-2 shadow-lg rounded-2xl overflow-hidden bg-white z-30 relative">
-                      <CardHeader className="bg-slate-100 p-4 border-b">
-                          <CardTitle className="text-xs font-black uppercase flex items-center justify-between">
-                              <div className="flex items-center gap-2"><HistoryIcon className="size-4 text-primary" /> Journal de Bord</div>
-                              <div className="flex items-center gap-2">
-                                <Button variant="outline" className="h-7 text-[8px] font-black uppercase border-primary/30 text-primary gap-1 px-2" onClick={handleClearTrace}>
-                                    <Waves className="size-2.5" /> Effacer Trace
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/40 hover:text-destructive" onClick={emetteur.clearLogs}><Trash2 className="size-3" /></Button>
-                              </div>
-                          </CardTitle>
-                      </CardHeader>
-                      <Tabs defaultValue="tech">
-                          <TabsList className="grid grid-cols-2 h-10 border-b bg-muted/20">
-                              <TabsTrigger value="tech" className="text-[10px] font-black uppercase">Technique</TabsTrigger>
-                              <TabsTrigger value="tact" className="text-[10px] font-black uppercase">Tactique</TabsTrigger>
-                          </TabsList>
-                          <TabsContent value="tech" className="p-0">
-                              <ScrollArea className="h-48">
-                                  <div className="p-3 space-y-2">
-                                      {emetteur.techLogs.length > 0 ? emetteur.techLogs.map((log, i) => (
-                                          <div key={i} className="p-2 bg-slate-50 border-2 rounded-xl flex items-center justify-between shadow-sm text-[9px] font-bold">
-                                              <div className="flex flex-col">
-                                                  <span className="text-primary font-black uppercase">{log.label}</span>
-                                                  <span className="text-[8px] opacity-60 uppercase">{log.details}</span>
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                  <span className="opacity-40">{format(new Date(log.time), 'HH:mm:ss')}</span>
-                                                  <div className="flex items-center gap-1 bg-white px-1.5 rounded border shadow-inner">
-                                                      <Battery className="size-2.5" /> {log.battery}%
-                                                  </div>
-                                              </div>
-                                          </div>
-                                      )) : <p className="py-10 text-center text-[10px] font-black uppercase opacity-20 italic tracking-widest">Boîte noire vide</p>}
-                                  </div>
-                              </ScrollArea>
-                          </TabsContent>
-                          <TabsContent value="tact" className="p-0">
-                              <ScrollArea className="h-48">
-                                  <div className="p-3 space-y-2">
-                                      {emetteur.tacticalLogs.length > 0 ? emetteur.tacticalLogs.map((log, i) => (
-                                          <div 
-                                            key={i} 
-                                            onClick={() => handleRecenterTo(log.pos)}
-                                            className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm cursor-pointer active:scale-95 transition-all"
-                                          >
-                                              <div className="flex items-center gap-3">
-                                                  <div className="p-1.5 bg-primary/10 rounded-lg"><Target className="size-3.5 text-primary" /></div>
-                                                  <div className="flex flex-col">
-                                                      <span className="font-black text-[10px] uppercase text-slate-800">{log.type}</span>
-                                                      <span className="text-[8px] opacity-40 uppercase">{format(new Date(log.time), 'HH:mm')} • GPS OK</span>
-                                                  </div>
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                  {log.photoUrl && <div className="size-8 rounded border overflow-hidden shadow-sm"><img src={log.photoUrl} className="w-full h-full object-cover" /></div>}
-                                                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full border-2"><ChevronDown className="size-3 -rotate-90" /></Button>
-                                              </div>
-                                          </div>
-                                      )) : <p className="py-10 text-center text-[10px] font-black uppercase opacity-20 italic tracking-widest">Aucune prise enregistrée</p>}
-                                  </div>
-                              </ScrollArea>
-                          </TabsContent>
-                      </Tabs>
-                  </Card>
-
-                  <Accordion type="single" collapsible className="w-full">
-                      <AccordionItem value="id-history" className="border-none">
-                          <AccordionTrigger className="h-12 bg-white px-4 rounded-xl border-2 shadow-sm hover:no-underline">
-                              <div className="flex items-center gap-2 font-black uppercase text-[10px] text-slate-700">
-                                <HistoryIcon className="size-4 text-primary" /> Historique des IDs
-                              </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-2 space-y-2">
-                              <div className="grid grid-cols-1 gap-2 p-2 bg-muted/10 rounded-xl">
-                                  <p className="text-[8px] font-black uppercase text-muted-foreground ml-1">Derniers navires</p>
-                                  {emetteur.vesselHistory.map(id => (
-                                      <div key={id} className="flex items-center justify-between p-2 bg-white border rounded-lg shadow-sm">
-                                          <code className="text-xs font-black text-primary">{id}</code>
-                                          <div className="flex gap-1">
-                                              <Button variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase" onClick={() => emetteur.handleSelectFromHistory(id)}>Utiliser</Button>
-                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => emetteur.deleteFromHistory(id)}><Trash2 className="size-3" /></Button>
-                                          </div>
-                                      </div>
-                                  ))}
-                                  {emetteur.vesselHistory.length === 0 && <p className="text-center py-4 text-[9px] italic opacity-40">Aucun historique</p>}
-                              </div>
-                          </AccordionContent>
-                      </AccordionItem>
-                  </Accordion>
-              </div>
-          )}
-
-          {appMode === 'receiver' && (
-              <div className="space-y-4 animate-in fade-in">
+              <TabsContent value="receiver" className="m-0 space-y-4">
                   <Card className="border-2 shadow-lg rounded-2xl overflow-hidden min-h-[400px]">
-                      <Tabs defaultValue="tech">
-                          <TabsList className="grid grid-cols-2 h-12 bg-muted/30 border-b">
-                              <TabsTrigger value="tech" className="font-black uppercase text-[10px]">Technique</TabsTrigger>
-                              <TabsTrigger value="pref" className="font-black uppercase text-[10px]">Réglages</TabsTrigger>
-                          </TabsList>
-                          <TabsContent value="tech" className="p-0 m-0">
-                              <ScrollArea className="h-[350px]">
-                                  <div className="p-3 space-y-2">
-                                      {recepteur.techLogs.length > 0 ? recepteur.techLogs.map((log, i) => (
-                                          <div key={i} className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm">
-                                              <div className="flex flex-col">
-                                                <span className="font-black text-[10px] uppercase text-primary">{log.status}</span>
-                                                <span className="text-[8px] font-bold opacity-40">{log.time ? format(log.time.toDate(), 'HH:mm:ss') : '...'}</span>
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                  <span className="text-[9px] font-black">{log.batteryLevel}%</span>
-                                                  <BatteryIcon level={log.batteryLevel / 100} charging={log.isCharging} />
-                                              </div>
-                                          </div>
-                                      )) : <div className="py-20 text-center opacity-20"><RefreshCw className="size-8 mx-auto mb-2" /><p className="text-[10px] font-black uppercase">Attente de données...</p></div>}
+                      <CardHeader className="bg-slate-900 text-white p-4">
+                          <CardTitle className="text-xs font-black uppercase">Surveillance Récepteur</CardTitle>
+                      </CardHeader>
+                      <ScrollArea className="h-[350px]">
+                          <div className="p-3 space-y-2">
+                              {recepteur.techLogs.length > 0 ? recepteur.techLogs.map((log, i) => (
+                                  <div key={i} className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm">
+                                      <div className="flex flex-col">
+                                        <span className={cn("font-black text-[10px] uppercase", log.label === 'DÉRIVE' ? 'text-red-600' : 'text-primary')}>{log.label}</span>
+                                        <span className="text-[8px] font-bold opacity-40">{log.time ? format(log.time.toDate(), 'HH:mm:ss') : '...'}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                          <span className="text-[9px] font-black">{log.battery}%</span>
+                                          <BatteryIconComp level={log.battery} />
+                                      </div>
                                   </div>
-                              </ScrollArea>
-                          </TabsContent>
-                          <TabsContent value="pref" className="p-4 space-y-4">
-                              <div className="space-y-4">
-                                  <Label className="text-[10px] font-black uppercase">Volume alertes</Label>
-                                  <Slider value={[recepteur.vesselPrefs.volume * 100]} max={100} onValueChange={v => recepteur.savePrefs({ volume: v[0] / 100 })} />
-                                  <div className="grid gap-2">
-                                      {Object.keys(recepteur.vesselPrefs.sounds).map(key => (
-                                          <div key={key} className="flex items-center justify-between p-2 bg-muted/10 rounded-lg">
-                                              <span className="text-[10px] font-black uppercase">{key}</span>
-                                              <Switch checked={recepteur.vesselPrefs.notifyEnabled} onCheckedChange={v => recepteur.savePrefs({ notifyEnabled: v })} />
-                                          </div>
-                                      ))}
-                                  </div>
-                              </div>
-                          </TabsContent>
-                      </Tabs>
+                              )) : <div className="py-20 text-center opacity-20"><RefreshCw className="size-8 mx-auto mb-2" /><p className="text-[10px] font-black uppercase">Attente de données...</p></div>}
+                          </div>
+                      </ScrollArea>
                   </Card>
-              </div>
-          )}
+              </TabsContent>
 
-          {appMode === 'fleet' && (
-              <div className="space-y-4 animate-in fade-in">
+              <TabsContent value="fleet" className="m-0 space-y-4">
                   <Card className="border-2 shadow-lg rounded-2xl overflow-hidden min-h-[400px]">
                       <CardHeader className="bg-slate-900 text-white p-4">
                           <CardTitle className="text-xs font-black uppercase">Journal Tactique Flotte</CardTitle>
@@ -459,8 +321,102 @@ export default function VesselTrackerPage() {
                           </div>
                       </ScrollArea>
                   </Card>
-              </div>
-          )}
+              </TabsContent>
+          </Tabs>
+
+          <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="audio-prefs" className="border-none">
+                  <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                      <Volume2 className="size-4 text-primary" />
+                      <span className="text-[10px] font-black uppercase">Alertes Audio & Veille</span>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4 space-y-6">
+                      <Card className="p-4 border-2 rounded-2xl space-y-6 bg-white shadow-inner">
+                          <div className="space-y-4">
+                              <div className="flex items-center justify-between border-b pb-2">
+                                  <Label className="text-[10px] font-black uppercase text-primary flex items-center gap-2">
+                                      <Timer className="size-3" /> Veille Stratégique
+                                  </Label>
+                                  <Badge variant="outline" className="font-black bg-white">{recepteur.vesselPrefs.watchDuration} h</Badge>
+                              </div>
+                              <Slider 
+                                value={[recepteur.vesselPrefs.watchDuration]} 
+                                min={1} max={24} step={1}
+                                onValueChange={v => recepteur.savePrefs({ watchDuration: v[0] })}
+                              />
+                              <div className="flex items-center gap-4">
+                                  <Select value={recepteur.vesselPrefs.watchSound} onValueChange={v => recepteur.savePrefs({ watchSound: v })}>
+                                      <SelectTrigger className="h-9 text-[10px] font-black uppercase w-full bg-slate-50 border-2">
+                                          <SelectValue placeholder="Son de veille..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                          {recepteur.availableSounds.map(s => <SelectItem key={s.id} value={s.label.toLowerCase()} className="text-[10px] uppercase font-black">{s.label}</SelectItem>)}
+                                      </SelectContent>
+                                  </Select>
+                                  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 border-2" onClick={() => recepteur.playSound('watch')}>
+                                      <Play className="size-3" />
+                                  </Button>
+                              </div>
+                          </div>
+
+                          <div className="space-y-4 border-t pt-4">
+                              <div className="flex items-center justify-between border-b pb-2">
+                                  <Label className="text-[10px] font-black uppercase text-red-600 flex items-center gap-2">
+                                      <Battery className="size-3" /> Seuil Batterie Faible
+                                  </Label>
+                                  <Badge variant="outline" className="font-black bg-red-50 text-red-600 border-red-100">{recepteur.vesselPrefs.batteryThreshold}%</Badge>
+                              </div>
+                              <Slider 
+                                value={[recepteur.vesselPrefs.batteryThreshold]} 
+                                min={5} max={90} step={5}
+                                onValueChange={v => recepteur.savePrefs({ batteryThreshold: v[0] })}
+                              />
+                          </div>
+
+                          <div className="space-y-4 pt-4 border-t">
+                              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Réglages Sons Individuels</p>
+                              <div className="grid gap-3">
+                                  {Object.entries(recepteur.vesselPrefs.alerts).map(([key, config]) => (
+                                      <div key={key} className="p-3 border-2 rounded-xl space-y-3 bg-slate-50/50">
+                                          <div className="flex items-center justify-between">
+                                              <Label className="text-[9px] font-black uppercase text-slate-700 flex items-center gap-2">
+                                                  <Bell className="size-3" /> {key.replace('moving', 'MOUVEMENT').replace('stationary', 'MOUILLAGE').replace('offline', 'SIGNAL PERDU').replace('assistance', 'ASSISTANCE').replace('tactical', 'SIGNALEMENT TACTIQUE').replace('battery', 'BATTERIE FAIBLE')}
+                                              </Label>
+                                              <Switch 
+                                                checked={config.enabled} 
+                                                onCheckedChange={v => recepteur.savePrefs({ alerts: { ...recepteur.vesselPrefs.alerts, [key]: { ...config, enabled: v } } })} 
+                                                className="scale-75"
+                                              />
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                              <Select value={config.sound} onValueChange={v => recepteur.savePrefs({ alerts: { ...recepteur.vesselPrefs.alerts, [key]: { ...config, sound: v } } })}>
+                                                  <SelectTrigger className="h-8 text-[9px] font-black uppercase flex-grow bg-white border-2">
+                                                      <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                      {recepteur.availableSounds.map(s => <SelectItem key={s.id} value={s.label.toLowerCase()} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
+                                                  </SelectContent>
+                                              </Select>
+                                              <div className="flex items-center gap-1.5 px-2 py-1 bg-white border-2 rounded-lg">
+                                                  <span className="text-[8px] font-black uppercase opacity-40">Boucle</span>
+                                                  <Switch 
+                                                    checked={config.loop} 
+                                                    onCheckedChange={v => recepteur.savePrefs({ alerts: { ...recepteur.vesselPrefs.alerts, [key]: { ...config, loop: v } } })} 
+                                                    className="scale-50"
+                                                  />
+                                              </div>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 border-2 bg-white" onClick={() => recepteur.playSound(key as any)}>
+                                                  <Play className="size-3" />
+                                              </Button>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                      </Card>
+                  </AccordionContent>
+              </AccordionItem>
+          </Accordion>
       </div>
 
       <input type="file" accept="image/*" capture="environment" ref={photoInputRef} className="hidden" onChange={e => {
@@ -485,10 +441,10 @@ export default function VesselTrackerPage() {
   );
 }
 
-function BatteryIcon({ level, charging }: { level: number; charging: boolean }) {
-  const props = { className: 'w-4 h-4' };
+function BatteryIconComp({ level, charging, className }: { level?: number; charging?: boolean; className?: string }) {
+  const props = { className: cn('w-4 h-4', className) };
   if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
-  if (level < 0.2) return <BatteryLow {...props} className="text-red-500" />;
-  if (level < 0.6) return <BatteryMedium {...props} className="text-amber-500" />;
+  if (level !== undefined && level < 20) return <BatteryLow {...props} className="text-red-500" />;
+  if (level !== undefined && level < 60) return <BatteryMedium {...props} className="text-amber-500" />;
   return <BatteryFull {...props} className="text-green-500" />;
 }
