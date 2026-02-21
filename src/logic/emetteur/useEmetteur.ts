@@ -11,8 +11,8 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v73.2 : "Mouillage Automatique"
- * Utilise le rayon configuré pour détecter la stabilité GPS sur 30s.
+ * LOGIQUE ÉMETTEUR (A) v74.1 : "Sync & Robustesse"
+ * Utilise des Refs pour éviter les stale closures dans watchPosition et heartbeat.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -35,7 +35,6 @@ export function useEmetteur(
   const [vesselNickname, setVesselNickname] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
   const [customFleetId, setCustomFleetId] = useState('');
-  const [idsHistory, setIdsHistory] = useState<{ vId: string, fId: string }[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
   const [battery, setBattery] = useState<{ level: number, charging: boolean }>({ level: 1, charging: false });
@@ -48,16 +47,27 @@ export function useEmetteur(
   const [techLogs, setTechLogs] = useState<TechLogEntry[]>([]);
   const [tacticalLogs, setTacticalLogs] = useState<any[]>([]);
   
+  // REFS POUR ÉVITER LES STALE CLOSURES (v74.1)
+  const vesselStatusRef = useRef<VesselStatus['status']>('moving');
+  const currentPosRef = useRef(currentPos);
+  const anchorPosRef = useRef(anchorPos);
+  const mooringRadiusRef = useRef(mooringRadius);
+  const batteryRef = useRef(battery);
+  const isSharingRef = useRef(isSharing);
+
+  useEffect(() => { vesselStatusRef.current = vesselStatus; }, [vesselStatus]);
+  useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
+  useEffect(() => { anchorPosRef.current = anchorPos; }, [anchorPos]);
+  useEffect(() => { mooringRadiusRef.current = mooringRadius; }, [mooringRadius]);
+  useEffect(() => { batteryRef.current = battery; }, [battery]);
+  useEffect(() => { isSharingRef.current = isSharing; }, [isSharing]);
+
   const watchIdRef = useRef<number | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
-  const lastStatusChangeRef = useRef<Date>(new Date());
   const isBatteryAlertSentRef = useRef<boolean>(false);
   const lastHeartbeatPosRef = useRef<{ lat: number, lng: number } | null>(null);
   
-  const currentPosRef = useRef(currentPos);
-  useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
-
   const handlePositionUpdateRef = useRef(handlePositionUpdate);
   const handleStopCleanupRef = useRef(handleStopCleanup);
   useEffect(() => { handlePositionUpdateRef.current = handlePositionUpdate; }, [handlePositionUpdate]);
@@ -65,6 +75,7 @@ export function useEmetteur(
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
+  // Surveillance Batterie
   useEffect(() => {
     if (typeof window === 'undefined' || !('getBattery' in navigator)) return;
     let batteryObj: any = null;
@@ -87,12 +98,12 @@ export function useEmetteur(
     };
   }, []);
 
+  // Chargement des préférences locales
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedNickname = localStorage.getItem('lb_vessel_nickname');
       const savedVesselId = localStorage.getItem('lb_vessel_id');
       const savedFleetId = localStorage.getItem('lb_fleet_id');
-      const savedHistory = localStorage.getItem('lb_ids_history');
       const savedStatus = localStorage.getItem('lb_vessel_status') as VesselStatus['status'];
       const savedRadius = localStorage.getItem('lb_mooring_radius');
       const savedEmergencyContact = localStorage.getItem('lb_emergency_contact');
@@ -102,14 +113,11 @@ export function useEmetteur(
       if (savedNickname) setVesselNickname(savedNickname);
       if (savedVesselId) setCustomSharingId(savedVesselId);
       if (savedFleetId) setCustomFleetId(savedFleetId);
-      if (savedStatus) setVesselStatus(savedStatus);
+      if (savedStatus) { setVesselStatus(savedStatus); vesselStatusRef.current = savedStatus; }
       if (savedRadius) setMooringRadius(parseInt(savedRadius));
       if (savedEmergencyContact) setEmergencyContact(savedEmergencyContact);
       if (savedSmsMessage) setVesselSmsMessage(savedSmsMessage);
       if (savedEmergencyEnabled !== null) setIsEmergencyEnabled(savedEmergencyEnabled === 'true');
-      if (savedHistory) {
-        try { setIdsHistory(JSON.parse(savedHistory)); } catch (e) {}
-      }
     }
   }, []);
 
@@ -117,8 +125,8 @@ export function useEmetteur(
     if (!firestore || !sharingId) return;
     
     const now = new Date();
-    const currentStatus = statusOverride || vesselStatus;
-    const batteryLevel = Math.round(battery.level * 100);
+    const currentStatus = statusOverride || vesselStatusRef.current;
+    const batteryLevel = Math.round(batteryRef.current.level * 100);
 
     setTechLogs(prev => {
         const lastLog = prev[0];
@@ -150,15 +158,15 @@ export function useEmetteur(
         addDoc(collection(firestore, 'vessels', sharingId, 'tech_logs'), { ...logEntry, time: serverTimestamp() }).catch(() => {});
         return [logEntry, ...prev].slice(0, 50);
     });
-  }, [firestore, sharingId, vesselStatus, battery, accuracy]);
+  }, [firestore, sharingId, accuracy]);
 
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
     if (!user || !firestore) return;
-    if (!isSharing && !force) return;
+    if (!isSharingRef.current && !force) return;
     if (simulator?.isComCut) return; 
     
-    const batteryLevel = Math.round(battery.level * 100);
-    const isCharging = battery.charging;
+    const batteryLevel = Math.round(batteryRef.current.level * 100);
+    const isCharging = batteryRef.current.charging;
 
     if (batteryLevel < 10 && !isBatteryAlertSentRef.current) {
         isBatteryAlertSentRef.current = true;
@@ -176,7 +184,7 @@ export function useEmetteur(
         isBatteryAlertSentRef.current = false;
     }
 
-    const currentActualStatus = data.status || vesselStatus;
+    const currentActualStatus = data.status || vesselStatusRef.current;
     const statusChanged = lastSentStatusRef.current !== currentActualStatus;
 
     const payload: any = {
@@ -184,10 +192,10 @@ export function useEmetteur(
       id: sharingId,
       userId: user.uid,
       displayName: vesselNickname || user.displayName || 'Capitaine',
-      isSharing: force ? true : isSharing,
+      isSharing: force ? true : isSharingRef.current,
       lastActive: serverTimestamp(),
       fleetId: customFleetId.trim().toUpperCase() || null,
-      mooringRadius: mooringRadius,
+      mooringRadius: mooringRadiusRef.current,
       batteryLevel,
       isCharging
     };
@@ -195,18 +203,15 @@ export function useEmetteur(
     if (statusChanged) {
         payload.statusChangedAt = serverTimestamp();
         lastSentStatusRef.current = currentActualStatus;
-        lastStatusChangeRef.current = new Date();
     }
 
     return setDoc(doc(firestore, 'vessels', sharingId), payload, { merge: true })
-      .then(() => {
-          setLastSyncTime(Date.now());
-      })
+      .then(() => setLastSyncTime(Date.now()))
       .catch(() => {});
-  }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId, mooringRadius, simulator?.isComCut, addTechLog, battery, vesselStatus]);
+  }, [user, firestore, sharingId, vesselNickname, customFleetId, simulator?.isComCut, addTechLog]);
 
   const triggerEmergency = useCallback((type: 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE' | 'DÉRIVE') => {
-    if (!isSharing) return;
+    if (!isSharingRef.current) return;
     setVesselStatus('emergency');
     updateVesselInFirestore({ status: 'emergency', eventLabel: type });
     addTechLog('URGENCE', `${type} DÉCLENCHÉ`, 'emergency');
@@ -216,34 +221,32 @@ export function useEmetteur(
         window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
     }
     toast({ variant: "destructive", title: `ALERTE ${type}` });
-  }, [isSharing, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, toast]);
+  }, [updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, toast]);
 
   const handlePositionLogic = useCallback((lat: number, lng: number, speed: number, heading: number, acc: number) => {
     const knotSpeed = speed * 1.94384;
-    let nextStatus = vesselStatus;
+    let nextStatus = vesselStatusRef.current;
 
     if (knotSpeed > 5) {
-        if (vesselStatus !== 'moving') {
+        if (nextStatus !== 'moving') {
             nextStatus = 'moving';
             setAnchorPos(null);
             addTechLog('CHGT STATUT', 'Navigation détectée (>5 nds)');
         }
     } 
-    else if (knotSpeed < 2 && (vesselStatus === 'moving' || vesselStatus === 'drifting')) {
+    else if (knotSpeed < 2 && (nextStatus === 'moving' || nextStatus === 'drifting')) {
         nextStatus = 'stationary';
         setAnchorPos({ lat, lng });
         addTechLog('CHGT STATUT', 'Mouillage stabilisé (<2 nds)');
     }
 
-    if ((nextStatus === 'stationary' || nextStatus === 'drifting') && anchorPos) {
-        const dist = getDistance(lat, lng, anchorPos.lat, anchorPos.lng);
-        if (dist > mooringRadius) {
+    if ((nextStatus === 'stationary' || nextStatus === 'drifting') && anchorPosRef.current) {
+        const dist = getDistance(lat, lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
+        if (dist > mooringRadiusRef.current) {
             if (acc <= 25) {
-                if (vesselStatus !== 'drifting' && vesselStatus !== 'emergency') {
+                if (nextStatus !== 'drifting' && nextStatus !== 'emergency') {
                     nextStatus = 'drifting';
                     addTechLog('DÉRIVE', 'HORS ZONE DE SÉCURITÉ');
-                } else {
-                    nextStatus = 'drifting';
                 }
             }
         } else if (nextStatus === 'drifting') {
@@ -266,33 +269,27 @@ export function useEmetteur(
         speed: Math.round(knotSpeed),
         heading: heading,
         accuracy: Math.round(acc),
-        anchorLocation: (nextStatus === 'stationary' || nextStatus === 'drifting' || nextStatus === 'emergency') && anchorPos 
-            ? { latitude: anchorPos.lat, longitude: anchorPos.lng } 
+        anchorLocation: (nextStatus === 'stationary' || nextStatus === 'drifting' || nextStatus === 'emergency') && anchorPosRef.current 
+            ? { latitude: anchorPosRef.current.lat, longitude: anchorPosRef.current.lng } 
             : null
     });
-  }, [vesselStatus, anchorPos, mooringRadius, addTechLog, updateVesselInFirestore]);
+  }, [addTechLog, updateVesselInFirestore]);
 
-  // HEARTBEAT + LOGIQUE DE MOUILLAGE AUTO (v73.2)
+  // Heartbeat 30s
   useEffect(() => {
     if (isSharing) {
         heartbeatIntervalRef.current = setInterval(() => {
             const nowPos = currentPosRef.current;
             const lastPos = lastHeartbeatPosRef.current;
+            const currentStatus = vesselStatusRef.current;
             
-            if (nowPos && lastPos && vesselStatus === 'moving') {
+            if (nowPos && lastPos && currentStatus === 'moving') {
                 const dist = getDistance(nowPos.lat, nowPos.lng, lastPos.lat, lastPos.lng);
-                // Si le déplacement en 30s est inférieur au rayon configuré, on considère l'arrêt
-                if (dist < mooringRadius) {
-                    setVesselStatus('stationary');
+                if (dist < mooringRadiusRef.current) {
+                    updateStatus('stationary');
                     setAnchorPos(nowPos);
                     addTechLog('MOUILLAGE AUTO', 'Détecté par stabilité GPS (30s)');
-                    
-                    updateVesselInFirestore({ 
-                        status: 'stationary', 
-                        anchorLocation: { latitude: nowPos.lat, longitude: nowPos.lng } 
-                    });
-                    
-                    toast({ title: "MOUILLAGE AUTO", description: "Navire stabilisé. Cercle activé." });
+                    updateVesselInFirestore({ status: 'stationary', anchorLocation: { latitude: nowPos.lat, longitude: nowPos.lng } });
                 }
             }
 
@@ -301,21 +298,21 @@ export function useEmetteur(
             updateVesselInFirestore({});
         }, 30000);
     } else {
-        lastHeartbeatPosRef.current = null;
         if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
     }
     return () => { if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current); };
-  }, [isSharing, addTechLog, updateVesselInFirestore, vesselStatus, mooringRadius, toast]);
+  }, [isSharing, addTechLog, updateVesselInFirestore]);
 
-  useEffect(() => {
-    if (!simulator?.isActive || !simulator.simPos || !isSharing) return;
-    handlePositionLogic(simulator.simPos.lat, simulator.simPos.lng, simulator.simSpeed / 1.94384, 0, simulator.isGpsCut ? 600 : simulator.simAccuracy);
-  }, [simulator?.isActive, simulator?.simPos, simulator?.simSpeed, simulator?.simAccuracy, simulator?.isGpsCut, isSharing, handlePositionLogic]);
+  const updateStatus = (s: VesselStatus['status']) => {
+    vesselStatusRef.current = s;
+    setVesselStatus(s);
+  };
 
   const startSharing = useCallback(() => {
     if (!navigator.geolocation || !user || !firestore) return;
     
     setIsSharing(true);
+    isSharingRef.current = true;
     addTechLog('LANCEMENT', 'Initialisation en cours...');
 
     navigator.geolocation.getCurrentPosition((pos) => {
@@ -324,7 +321,7 @@ export function useEmetteur(
         lastHeartbeatPosRef.current = { lat: latitude, lng: longitude };
         
         updateVesselInFirestore({
-            location: { latitude, longitude },
+            location: { latitude: longitude },
             status: 'moving',
             accuracy: Math.round(pos.coords.accuracy),
             speed: Math.round((pos.coords.speed || 0) * 1.94384),
@@ -349,6 +346,7 @@ export function useEmetteur(
     if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
     watchIdRef.current = null;
     setIsSharing(false);
+    isSharingRef.current = false;
     
     if (firestore && sharingId) {
       addTechLog('ARRÊT', 'Le navire a quitté le groupe', 'offline');
@@ -397,7 +395,7 @@ export function useEmetteur(
   }, [firestore, sharingId, toast]);
 
   const changeManualStatus = useCallback((st: VesselStatus['status'], label?: string) => {
-    setVesselStatus(st);
+    updateStatus(st);
     if (st === 'moving') setAnchorPos(null);
     else if (currentPosRef.current) setAnchorPos(currentPosRef.current);
 
@@ -415,7 +413,7 @@ export function useEmetteur(
   return useMemo(() => ({
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     triggerEmergency, changeManualStatus, anchorPos, setAnchorPos, mooringRadius, setMooringRadius, accuracy, battery,
-    vesselNickname, setVesselNickname, customSharingId, setCustomSharingId, customFleetId, setCustomFleetId, sharingId, idsHistory,
+    vesselNickname, setVesselNickname, customSharingId, setCustomSharingId, customFleetId, setCustomFleetId, sharingId,
     lastSyncTime, techLogs, tacticalLogs, addTacticalLog: async (type: string) => {
         if (!firestore || !sharingId || !currentPosRef.current) return;
         const logEntry = { type: type.toUpperCase(), time: new Date(), pos: currentPosRef.current, vesselName: vesselNickname || sharingId };
@@ -430,7 +428,7 @@ export function useEmetteur(
   }), [
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     triggerEmergency, changeManualStatus, anchorPos, mooringRadius, accuracy, battery,
-    vesselNickname, customSharingId, customFleetId, sharingId, idsHistory,
+    vesselNickname, customSharingId, customFleetId, sharingId,
     lastSyncTime, techLogs, tacticalLogs, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
     isCustomMessageEnabled, toast, user, firestore, clearLogs
   ]);

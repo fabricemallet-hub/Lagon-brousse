@@ -90,7 +90,9 @@ import {
   CloudLightning,
   Sun,
   Move,
-  Copy
+  Copy,
+  BatteryLow,
+  BatteryMedium
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -125,7 +127,6 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
 
 const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
     const status = vessel.status || 'moving';
-    const heading = vessel.heading || 0;
     
     let Icon = Navigation;
     let bgColor = 'bg-green-600'; 
@@ -178,8 +179,8 @@ const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
                     </div>
                     <div className="flex items-center gap-1 mt-0.5 border-t border-white/10 pt-0.5 w-full justify-center">
                         <span className={cn("text-[7px] font-black uppercase tracking-tighter", 
-                            status === 'moving' ? "text-green-400" : 
-                            status === 'stationary' ? "text-blue-400" : 
+                            statusLabel === 'MOUVEMENT' ? "text-green-400" : 
+                            statusLabel === 'MOUILLAGE' ? "text-blue-400" : 
                             "text-red-400"
                         )}>
                             {statusLabel}
@@ -187,16 +188,7 @@ const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
                     </div>
                 </div>
             </div>
-            <div 
-                className={cn(
-                    "p-2 rounded-full border-2 border-white shadow-xl transition-all", 
-                    bgColor, 
-                    animationClass
-                )}
-                style={{
-                    transform: (status === 'moving' || status === 'returning' || status === 'stationary' || status === 'drifting') ? `rotate(${heading}deg)` : 'none'
-                }}
-            >
+            <div className={cn("p-2 rounded-full border-2 border-white shadow-xl transition-all", bgColor, animationClass)}>
                 <Icon className="size-4 text-white" />
             </div>
         </div>
@@ -219,11 +211,11 @@ export default function VesselTrackerPage() {
     if (mapCore.isFollowMode && mapCore.googleMap) {
         mapCore.googleMap.panTo({ lat, lng });
     }
-  }, [mapCore.isFollowMode, mapCore.googleMap]);
+  }, [mapCore.isFollowMode, mapCore.googleMap, mapCore.updateBreadcrumbs]);
 
   const handleStopCleanup = useCallback(() => {
     mapCore.clearBreadcrumbs();
-  }, []);
+  }, [mapCore]);
 
   const emetteur = useEmetteur(
     handlePositionUpdate,
@@ -299,6 +291,14 @@ export default function VesselTrackerPage() {
     return `[${nick.toUpperCase()}] ${msg} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
   }, [emetteur.vesselSmsMessage, emetteur.isCustomMessageEnabled, emetteur.vesselNickname]);
 
+  const handleCopyLogEntry = (log: any) => {
+    const pos = log.pos;
+    if (!pos) return;
+    const text = `Vessel: ${log.vesselName || 'Unknown'} - Status: ${log.statusLabel || log.label} - GPS: ${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)} - Maps: https://www.google.com/maps?q=${pos.lat},${pos.lng}`;
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copié !", description: "Coordonnées prêtes à être collées." });
+  };
+
   if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
   if (!isLoaded || isProfileLoading) return <Skeleton className="h-96 w-full" />;
 
@@ -320,32 +320,10 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
-        {/* BARRE DE BASULEMENT DE CARTE - Z-INDEX MASTER */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[10000] flex bg-slate-900/90 backdrop-blur-md p-1 rounded-2xl border-2 border-white/20 shadow-2xl">
-            <Button 
-                variant={mapCore.viewMode === 'alpha' ? 'default' : 'ghost'} 
-                size="sm" 
-                className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" 
-                onClick={() => mapCore.setViewMode('alpha')}
-            >
-                Maps
-            </Button>
-            <Button 
-                variant={mapCore.viewMode === 'beta' ? 'default' : 'ghost'} 
-                size="sm" 
-                className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" 
-                onClick={() => mapCore.setViewMode('beta')}
-            >
-                Météo
-            </Button>
-            <Button 
-                variant={mapCore.viewMode === 'gamma' ? 'default' : 'ghost'} 
-                size="sm" 
-                className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" 
-                onClick={() => mapCore.setViewMode('gamma')}
-            >
-                Windy
-            </Button>
+            <Button variant={mapCore.viewMode === 'alpha' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" onClick={() => mapCore.setViewMode('alpha')}>Maps</Button>
+            <Button variant={mapCore.viewMode === 'beta' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" onClick={() => mapCore.setViewMode('beta')}>Météo</Button>
+            <Button variant={mapCore.viewMode === 'gamma' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" onClick={() => mapCore.setViewMode('gamma')}>Windy</Button>
         </div>
 
         {mapCore.viewMode === 'gamma' ? (
@@ -358,11 +336,7 @@ export default function VesselTrackerPage() {
                     defaultZoom={12}
                     onLoad={mapCore.setGoogleMap}
                     onDragStart={() => mapCore.setIsFollowMode(false)}
-                    options={{ 
-                        disableDefaultUI: true, 
-                        mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', 
-                        gestureHandling: 'greedy' 
-                    }}
+                    options={{ disableDefaultUI: true, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}
                 >
                     {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                         <React.Fragment key={`mooring-singleton-${activeAnchorVessel.id}`}>
@@ -390,9 +364,8 @@ export default function VesselTrackerPage() {
                                 id: emetteur.sharingId, 
                                 displayName: emetteur.vesselNickname || 'Moi', 
                                 status: emetteur.vesselStatus, 
-                                location: { latitude: emetteur.currentPos.lat, longitude: emetteur.currentPos.lng },
-                                batteryLevel: Math.round(emetteur.battery.level * 100),
-                                isCharging: emetteur.battery.charging,
+                                batteryLevel: Math.round(emetteur.battery?.level * 100),
+                                isCharging: emetteur.battery?.charging,
                                 isSharing: true,
                                 lastActive: new Date()
                             } as any} />
@@ -530,7 +503,7 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v74.0 prêt - Surveillance Temporelle OK</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v74.1 prêt - Sync & Robustesse OK</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm cursor-pointer transition-all active:scale-[0.98]", log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') ? 'border-red-200 bg-red-50' : 'border-slate-100')} onClick={() => handleCopyLogEntry(log)}>
                                                   <div className="flex justify-between items-start">
