@@ -7,7 +7,7 @@ import { useEmetteur } from '@/logic/emetteur/useEmetteur';
 import { useRecepteur } from '@/logic/recepteur/useRecepteur';
 import { useFlotte } from '@/logic/flotteC/useFlotte';
 import { GoogleMap, OverlayView, Polyline, Circle } from '@react-google-maps/api';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -91,13 +91,16 @@ import {
   Move,
   Copy
 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useRouter } from 'next/navigation';
 import { cn, getDistance } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { UserAccount, VesselStatus, SoundLibraryEntry } from '@/lib/types';
 import { useGoogleMaps } from '@/context/google-maps-context';
+import { useToast } from '@/hooks/use-toast';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -134,7 +137,7 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
 const BatteryLow = (props: any) => <Battery className={props.className} />;
 const BatteryMedium = (props: any) => <Battery className={props.className} />;
 
-const VesselMarker = ({ vessel, isMe = false }: { vessel: VesselStatus, isMe?: boolean }) => {
+const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
     const status = vessel.status || 'moving';
     const heading = vessel.heading || 0;
     
@@ -517,7 +520,7 @@ export default function VesselTrackerPage() {
 
                     {followedVessels?.filter(v => v.isSharing).map(vessel => (
                         <OverlayView key={vessel.id} position={{ lat: vessel.location?.latitude || 0, lng: vessel.location?.longitude || 0 }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                            <VesselMarker vessel={vessel} isMe={vessel.id === emetteur.sharingId} />
+                            <VesselMarker vessel={vessel} />
                         </OverlayView>
                     ))}
 
