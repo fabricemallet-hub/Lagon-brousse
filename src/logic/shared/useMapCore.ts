@@ -8,25 +8,26 @@ export type ViewMode = 'alpha' | 'beta' | 'gamma';
 
 /**
  * HOOK PARTAGÉ : Gestion de la carte, des traces et du verrouillage.
- * Version 47.0 : Persistance du centre et synchronisation des modes.
+ * Version 47.1 : Automatisation du rendu et du centrage initial.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
   const [viewMode, setViewMode] = useState<ViewMode>('alpha');
   const [googleMap, setGoogleMap] = useState<google.maps.Map | null>(null);
-  const [isFollowMode, setIsFollowMode] = useState(true);
+  const [isFollowMode, setIsFollowMode] = useState(true); // Verrouillage actif par défaut
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // State pour le rendu React des traces
   const [breadcrumbs, setBreadcrumbs] = useState<{ lat: number, lng: number, timestamp: number }[]>([]);
-  
-  // Références pour les objets de carte
   const polylineRef = useRef<google.maps.Polyline | null>(null);
   const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
 
-  // RESTAURATION DU CENTRE AU CHARGEMENT
+  // FORCE LE RENDU ET RESTAURE LE CENTRE
   useEffect(() => {
-    if (googleMap && typeof window !== 'undefined') {
+    if (googleMap) {
+      // 1. Déclenche le resize pour éviter la carte grise
+      google.maps.event.trigger(googleMap, 'resize');
+
+      // 2. Restaure la dernière position connue si disponible
       const saved = localStorage.getItem('lb_last_map_center');
       if (saved) {
         try {
@@ -37,12 +38,9 @@ export function useMapCore() {
           console.warn("Erreur restauration centre map", e);
         }
       }
-      // Force le rendu des tuiles (équivalent invalidateSize)
-      google.maps.event.trigger(googleMap, 'resize');
     }
   }, [googleMap]);
 
-  // SAUVEGARDE DU CENTRE LORS DES DÉPLACEMENTS
   const saveMapState = useCallback(() => {
     if (googleMap) {
       const center = googleMap.getCenter();
@@ -57,7 +55,6 @@ export function useMapCore() {
     }
   }, [googleMap]);
 
-  // MISE À JOUR DE LA TRACE (30 min / 2m)
   const updateBreadcrumbs = useCallback((lat: number, lng: number) => {
     const now = Date.now();
     const distMoved = lastTracePosRef.current ? getDistance(lat, lng, lastTracePosRef.current.lat, lastTracePosRef.current.lng) : 10;
@@ -89,17 +86,17 @@ export function useMapCore() {
     }
   }, [googleMap, saveMapState]);
 
-  // SYNCHRONISATION DES MODES (Sync du centre lors du passage Maps -> Météo)
   const switchViewMode = useCallback((newMode: ViewMode) => {
     if (googleMap) {
-        saveMapState(); // On sauve avant de switcher
+        saveMapState();
         const center = googleMap.getCenter();
         setViewMode(newMode);
         
-        // On redonne le centre à la carte après un court délai pour laisser React respirer
         setTimeout(() => {
-            if (center) googleMap.setCenter(center);
-            google.maps.event.trigger(googleMap, 'resize');
+            if (center) {
+                googleMap.setCenter(center);
+                google.maps.event.trigger(googleMap, 'resize');
+            }
         }, 50);
     } else {
         setViewMode(newMode);

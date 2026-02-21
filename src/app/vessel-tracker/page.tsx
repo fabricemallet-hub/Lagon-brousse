@@ -84,17 +84,27 @@ export default function VesselTrackerPage() {
   const emetteur = useEmetteur(
     (lat, lng) => {
         mapCore.updateBreadcrumbs(lat, lng);
-        // Si follow mode, on suit le point bleu
+        // Si follow mode actif, on maintient au centre
         if (mapCore.isFollowMode && mapCore.googleMap) {
             mapCore.googleMap.panTo({ lat, lng });
         }
     },
     () => mapCore.clearBreadcrumbs() 
   );
+  
   const recepteur = useRecepteur(emetteur.customSharingId);
   const flotte = useFlotte(emetteur.customSharingId, emetteur.vesselNickname);
   
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const hasCenteredInitially = useRef(false);
+
+  // AUTO-CENTRAGE AU PREMIER SIGNAL GPS
+  useEffect(() => {
+    if (emetteur.currentPos && !hasCenteredInitially.current && mapCore.googleMap) {
+        mapCore.handleRecenter(emetteur.currentPos);
+        hasCenteredInitially.current = true;
+    }
+  }, [emetteur.currentPos, mapCore.googleMap, mapCore]);
 
   // Sync LED Clignotante pour l'émetteur
   const [isLedActive, setIsLedActive] = useState(false);
@@ -106,15 +116,14 @@ export default function VesselTrackerPage() {
     }
   }, [emetteur.lastSyncTime]);
 
-  // FONCTION DE DÉMARRAGE ÉTENDUE
+  // DÉMARRAGE ÉTENDU : FORCE LE LOCK ET LE CENTRE
   const handleStartSharingExtended = () => {
     emetteur.startSharing();
     mapCore.setIsFollowMode(true);
-    // On force un recentrage si on a déjà un fix, sinon on attend le prochain fix GPS
     if (emetteur.currentPos) {
         mapCore.handleRecenter(emetteur.currentPos);
     }
-    toast({ title: "Session Démarrée", description: "GPS Actif et Verrouillage activé." });
+    toast({ title: "Partage Actif", description: "GPS & Verrouillage activés." });
   };
 
   return (
@@ -128,14 +137,14 @@ export default function VesselTrackerPage() {
         </Button>
       )}
 
-      {/* SÉLECTEUR DE MODE GLOBAL */}
+      {/* NAVIGATION MODES */}
       <div className="flex bg-slate-900 text-white p-1 rounded-xl shadow-lg border-2 border-primary/20 sticky top-0 z-[100]">
           <Button variant={appMode === 'sender' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[9px] sm:text-[10px] h-12 px-1" onClick={() => { setAppMode('sender'); recepteur.initAudio(); }}>Émetteur (A)</Button>
           <Button variant={appMode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[9px] sm:text-[10px] h-12 px-1" onClick={() => { setAppMode('receiver'); recepteur.initAudio(); }}>Récepteur (B)</Button>
           <Button variant={appMode === 'fleet' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[9px] sm:text-[10px] h-12 px-1" onClick={() => { setAppMode('fleet'); recepteur.initAudio(); }}>Flotte (C)</Button>
       </div>
 
-      {/* SÉLECTEUR DE MODE CARTE */}
+      {/* NAVIGATION CALQUES */}
       <div className="flex bg-muted/30 p-1 rounded-xl border relative z-20">
           <Button variant={mapCore.viewMode === 'alpha' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('alpha')}>Alpha (Maps)</Button>
           <Button variant={mapCore.viewMode === 'beta' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('beta')}>Béta (Météo)</Button>
@@ -145,13 +154,13 @@ export default function VesselTrackerPage() {
       {!recepteur.audioAuthorized && (
           <Alert className="bg-primary/10 border-primary/20 animate-in fade-in">
               <Zap className="size-4 text-primary" />
-              <AlertDescription className="text-[10px] font-black uppercase">Interagissez avec la page pour autoriser les alertes sonores.</AlertDescription>
+              <AlertDescription className="text-[10px] font-black uppercase">Interagissez avec la page pour activer les alertes sonores.</AlertDescription>
           </Alert>
       )}
 
-      {/* CONTENEUR CARTE (Initialisé en premier) */}
+      {/* CONTENEUR CARTE */}
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
-        {mapCore.isGoogleLoaded && (
+        {mapCore.isGoogleLoaded ? (
             <GoogleMap
                 mapContainerClassName="w-full h-full"
                 defaultCenter={INITIAL_CENTER}
@@ -165,7 +174,7 @@ export default function VesselTrackerPage() {
                     gestureHandling: 'greedy' 
                 }}
             >
-                {/* POINT BLEU ÉMETTEUR */}
+                {/* POINT BLEU */}
                 {emetteur.currentPos && (
                     <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -50%)' }} className="relative">
@@ -177,16 +186,15 @@ export default function VesselTrackerPage() {
                     </OverlayView>
                 )}
 
-                {/* TRACE BREADCRUMBS */}
+                {/* BREADCRUMBS */}
                 {mapCore.breadcrumbs.length > 1 && (
                     <Polyline 
                         path={mapCore.breadcrumbs} 
-                        onLoad={(p) => mapCore.polylineRef.current = p}
                         options={{ strokeColor: "#3b82f6", strokeOpacity: 0.6, strokeWeight: 2 }} 
                     />
                 )}
 
-                {/* MOUILLAGE ACTIF */}
+                {/* MOUILLAGE */}
                 {emetteur.anchorPos && (
                     <>
                         <OverlayView position={emetteur.anchorPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
@@ -197,15 +205,14 @@ export default function VesselTrackerPage() {
                         <Circle 
                             center={emetteur.anchorPos} 
                             radius={emetteur.mooringRadius} 
-                            onLoad={(c) => emetteur.anchorCircleRef.current = c}
                             options={{ strokeColor: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15, strokeWeight: 1 }} 
                         />
                     </>
                 )}
             </GoogleMap>
-        )}
+        ) : <Skeleton className="h-full w-full" />}
         
-        {/* BOUTONS FLOTTANTS TACTIQUES (Priorité Z-Index) */}
+        {/* BOUTONS FLOTTANTS */}
         <div className="absolute top-4 left-4 z-[9999] flex flex-col gap-2">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl hover:bg-white" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>
                 {mapCore.isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}
@@ -216,14 +223,14 @@ export default function VesselTrackerPage() {
                 {mapCore.isFollowMode ? <Lock className="size-5" /> : <Unlock className="size-5" />}
             </Button>
             {!mapCore.isFollowMode && (
-                <Button onClick={() => mapCore.handleRecenter(emetteur.currentPos)} className="bg-white/90 backdrop-blur-sm border-2 font-black text-[9px] uppercase gap-2 px-3 h-10 text-primary shadow-xl rounded-xl hover:bg-white">
+                <Button onClick={handleRecenter} className="bg-white/90 backdrop-blur-sm border-2 font-black text-[9px] uppercase gap-2 px-3 h-10 text-primary shadow-xl rounded-xl hover:bg-white">
                     <LocateFixed className="size-4"/> RE-CENTRER
                 </Button>
             )}
         </div>
       </div>
 
-      {/* PANNEAUX DE CONTRÔLE */}
+      {/* PANNEAUX DE CONTROLE */}
       <div className="grid grid-cols-1 gap-4">
           <Tabs value={appMode} className="w-full">
               <TabsContent value="sender" className="space-y-4 m-0">
@@ -246,7 +253,6 @@ export default function VesselTrackerPage() {
                               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Surnom du Navire</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-11 border-2 font-black uppercase" /></div>
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Navire (Partage Direct)</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ID UNIQUE" className="h-11 border-2 font-black uppercase text-center tracking-widest" /></div>
-                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Flotte C (Communautaire)</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="ID GROUPE" className="h-11 border-2 font-black uppercase text-center tracking-widest" /></div>
                                   
                                   <div className="space-y-3">
                                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Historique des IDs</p>
@@ -291,21 +297,6 @@ export default function VesselTrackerPage() {
                                           <Label className="text-[8px] font-black uppercase opacity-60">Rayon Dérive: {emetteur.mooringRadius}m</Label>
                                           <Slider value={[emetteur.mooringRadius]} min={10} max={200} step={10} onValueChange={v => emetteur.setMooringRadius(v[0])} />
                                       </div>
-                                  </div>
-
-                                  <div className="grid grid-cols-4 gap-2">
-                                      <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => emetteur.addTacticalLog('THON')}>
-                                        <Target className="size-4 text-red-600"/> THON
-                                      </Button>
-                                      <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => emetteur.addTacticalLog('TAZARD')}>
-                                        <Fish className="size-4 text-emerald-600"/> TAZARD
-                                      </Button>
-                                      <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => emetteur.addTacticalLog('OISEAUX')}>
-                                        <Bird className="size-4 text-slate-500"/> OISEAUX
-                                      </Button>
-                                      <Button variant="secondary" className="h-12 flex-col gap-1 font-black text-[8px] border-2 shadow-sm" onClick={() => photoInputRef.current?.click()}>
-                                        <Camera className="size-4 text-primary"/> PRISE
-                                      </Button>
                                   </div>
 
                                   <Button variant="destructive" className="w-full h-16 font-black uppercase tracking-widest shadow-xl rounded-2xl border-2 border-white/20" onClick={emetteur.stopSharing}>
@@ -369,6 +360,7 @@ export default function VesselTrackerPage() {
               </TabsContent>
           </Tabs>
 
+          {/* RÉGLAGES AUDIO */}
           <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="audio-prefs" className="border-none">
                   <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
@@ -425,7 +417,7 @@ export default function VesselTrackerPage() {
                                       <div key={key} className="p-3 border-2 rounded-xl space-y-3 bg-slate-50/50">
                                           <div className="flex items-center justify-between">
                                               <Label className="text-[9px] font-black uppercase text-slate-700 flex items-center gap-2">
-                                                  <Bell className="size-3" /> {key.replace('moving', 'MOUVEMENT').replace('stationary', 'MOUILLAGE').replace('offline', 'SIGNAL PERDU').replace('assistance', 'ASSISTANCE').replace('tactical', 'SIGNALEMENT TACTIQUE').replace('battery', 'BATTERIE FAIBLE')}
+                                                  <Bell className="size-3" /> {key.toUpperCase()}
                                               </Label>
                                               <Switch 
                                                 checked={config.enabled} 
@@ -442,14 +434,6 @@ export default function VesselTrackerPage() {
                                                       {recepteur.availableSounds.map(s => <SelectItem key={s.id} value={s.label.toLowerCase()} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
                                                   </SelectContent>
                                               </Select>
-                                              <div className="flex items-center gap-1.5 px-2 py-1 bg-white border-2 rounded-lg">
-                                                  <span className="text-[8px] font-black uppercase opacity-40">Boucle</span>
-                                                  <Switch 
-                                                    checked={config.loop} 
-                                                    onCheckedChange={v => recepteur.savePrefs({ alerts: { ...recepteur.vesselPrefs.alerts, [key]: { ...config, loop: v } } })} 
-                                                    className="scale-50"
-                                                  />
-                                              </div>
                                               <Button variant="ghost" size="icon" className="h-8 w-8 border-2 bg-white" onClick={() => recepteur.playSound(key as any)}>
                                                   <Play className="size-3" />
                                               </Button>
