@@ -16,14 +16,17 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Navigation, Anchor, LocateFixed, ShieldAlert, Expand, Shrink, Zap, AlertTriangle,
-  BatteryFull, History, MapPin, X, Play, RefreshCw, Home, Settings, Smartphone, 
-  Bird, Target, Fish, Camera, Ghost, Users, Phone, Waves, Lock, Unlock, Save
+  BatteryFull, History as HistoryIcon, MapPin, X, Play, RefreshCw, Home, Settings, Smartphone, 
+  Bird, Target, Fish, Camera, Ghost, Users, Phone, Waves, Lock, Unlock, Save, Battery
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+
+const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 export default function VesselTrackerPage() {
   const [appMode, setAppMode] = useState<'sender' | 'receiver'>('sender');
@@ -240,5 +243,3 @@ export default function VesselTrackerPage() {
     </div>
   );
 }
-
-const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
