@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { useMapCore } from '@/logic/shared/useMapCore';
+import { useMapCore, type WindyLayer } from '@/logic/shared/useMapCore';
 import { useSimulator } from '@/logic/shared/useSimulator';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
 import { useRecepteur } from '@/logic/recepteur/useRecepteur';
@@ -84,7 +84,12 @@ import {
   ClipboardList,
   Lock,
   Unlock,
-  TestTube2
+  TestTube2,
+  CloudRain,
+  Wind,
+  Thermometer,
+  CloudLightning,
+  Sun
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -226,7 +231,6 @@ export default function VesselTrackerPage() {
   }, [user, firestore]);
   const { data: profile } = useDoc<UserAccount>(userDocRef);
 
-  // Stabilisation de la liste des IDs pour éviter la boucle infinie de requête vessels
   const savedVesselIds = useMemo(() => profile?.savedVesselIds || [], [profile?.savedVesselIds]);
   
   const vesselsQuery = useMemoFirebase(() => {
@@ -291,7 +295,13 @@ export default function VesselTrackerPage() {
   const centerLng = mapCore.googleMap?.getCenter()?.lng() || INITIAL_CENTER.lng;
   const currentZoom = mapCore.googleMap?.getZoom() || 11;
 
-  const windyUrl = `https://embed.windy.com/embed2.html?lat=${centerLat}&lon=${centerLng}&zoom=${currentZoom}&level=surface&overlay=wind&menu=&message=&marker=&calendar=&pressure=&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1`;
+  // Calcul du calque Windy dynamique
+  const windyUrl = useMemo(() => {
+    const layer = mapCore.windyLayer === 'wind' ? 'wind' : 
+                  mapCore.windyLayer === 'temp' ? 'temp' : 
+                  mapCore.windyLayer === 'waves' ? 'waves' : 'wind';
+    return `https://embed.windy.com/embed2.html?lat=${centerLat}&lon=${centerLng}&zoom=${currentZoom}&level=surface&overlay=${layer}&menu=&message=&marker=&calendar=&pressure=&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1`;
+  }, [centerLat, centerLng, currentZoom, mapCore.windyLayer]);
 
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
@@ -306,7 +316,7 @@ export default function VesselTrackerPage() {
 
       {simulator.isActive && (
         <div className="fixed top-12 left-0 right-0 h-6 bg-red-600/90 text-white flex items-center justify-center text-[9px] font-black z-[10008] animate-pulse uppercase tracking-widest border-b border-white/20">
-            ⚠️ Mode Simulation Actif ⚠️
+            ⚠️ MODE SIMULATION ACTIF ⚠️
         </div>
       )}
 
@@ -316,32 +326,65 @@ export default function VesselTrackerPage() {
           <Button variant={appMode === 'fleet' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setAppMode('fleet'); recepteur.initAudio(); }}>Flotte (C)</Button>
       </div>
 
-      {!recepteur.audioAuthorized && (
-        <Alert className="bg-primary/10 border-primary/20 border-2">
-            <Zap className="size-4 text-primary" />
-            <AlertTitle className="text-xs font-black uppercase">Initialisation Audio</AlertTitle>
-            <AlertDescription className="text-[10px] font-bold">
-                Appuyez n'importe où sur l'écran pour activer les alertes sonores de sécurité.
-            </AlertDescription>
-        </Alert>
-      )}
-
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
-        <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-[10006] flex bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-white/20 shadow-2xl">
-            {['alpha', 'beta', 'gamma'].map((m) => (
+        {/* NAV BAR FLOTTANTE : MAPS / MÉTÉO / WINDY */}
+        <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-[10006] flex flex-col items-center gap-2">
+            <div className="flex bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-white/20 shadow-2xl">
                 <Button
-                    key={m}
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                        "h-9 px-5 text-[10px] font-black uppercase rounded-lg transition-all",
-                        mapCore.viewMode === m ? "bg-primary text-white shadow-lg" : "text-white/60 hover:text-white hover:bg-white/10"
-                    )}
-                    onClick={() => mapCore.setViewMode(m as any)}
-                >
-                    {m === 'alpha' ? 'MAPS' : m === 'beta' ? 'MÉTÉO' : 'WINDY'}
-                </Button>
-            ))}
+                    variant="ghost" size="sm"
+                    className={cn("h-9 px-5 text-[10px] font-black uppercase rounded-lg transition-all", mapCore.viewMode === 'alpha' ? "bg-primary text-white shadow-lg" : "text-white/60")}
+                    onClick={() => mapCore.setViewMode('alpha')}
+                >MAPS</Button>
+                
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="ghost" size="sm"
+                            className={cn("h-9 px-5 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-2", mapCore.viewMode === 'beta' ? "bg-primary text-white shadow-lg" : "text-white/60")}
+                            onClick={() => mapCore.setViewMode('beta')}
+                        >
+                            MÉTÉO <ChevronDown className="size-3" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48 p-2 bg-slate-900/95 border-white/20 backdrop-blur-xl rounded-2xl shadow-2xl z-[10007]">
+                        <div className="space-y-1">
+                            <p className="text-[8px] font-black uppercase text-primary mb-2 px-2 tracking-widest">Calques Actifs</p>
+                            {[
+                                { id: 'wind', label: 'Vent', icon: Wind, free: true },
+                                { id: 'temp', label: 'Température', icon: Thermometer, free: true },
+                                { id: 'waves', label: 'Houle', icon: Waves, free: false },
+                                { id: 'gust', label: 'Rafales', icon: Zap, free: false },
+                                { id: 'rain', label: 'Pluie', icon: CloudRain, free: false },
+                                { id: 'thunder', label: 'Orages', icon: CloudLightning, free: false },
+                                { id: 'uv', label: 'Index UV', icon: Sun, free: false }
+                            ].map(l => (
+                                <button
+                                    key={l.id}
+                                    disabled={!l.free}
+                                    onClick={() => mapCore.setWindyLayer(l.id as any)}
+                                    className={cn(
+                                        "w-full flex items-center justify-between p-2.5 rounded-xl transition-all",
+                                        mapCore.windyLayer === l.id ? "bg-primary text-white" : "text-white/60 hover:bg-white/5",
+                                        !l.free && "opacity-40 grayscale cursor-not-allowed"
+                                    )}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <l.icon className="size-3.5" />
+                                        <span className="text-[10px] font-black uppercase">{l.label}</span>
+                                    </div>
+                                    {!l.free && <Badge className="bg-slate-700 text-[7px] font-black h-4 px-1">PRO 🔒</Badge>}
+                                </button>
+                            ))}
+                        </div>
+                    </PopoverContent>
+                </Popover>
+
+                <Button
+                    variant="ghost" size="sm"
+                    className={cn("h-9 px-5 text-[10px] font-black uppercase rounded-lg transition-all", mapCore.viewMode === 'gamma' ? "bg-primary text-white shadow-lg" : "text-white/60")}
+                    onClick={() => mapCore.setViewMode('gamma')}
+                >WINDY</Button>
+            </div>
         </div>
 
         {mapCore.isGoogleLoaded ? (
@@ -364,28 +407,13 @@ export default function VesselTrackerPage() {
                     defaultZoom={12}
                     onLoad={mapCore.setGoogleMap}
                     onDragStart={() => mapCore.setIsFollowMode(false)}
-                    options={{ 
-                        disableDefaultUI: true, 
-                        mapTypeId: 'hybrid', 
-                        gestureHandling: 'greedy' 
-                    }}
+                    options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
                 >
                     {followedVessels?.filter(v => v.isSharing).map(vessel => (
                         <OverlayView key={vessel.id} position={{ lat: vessel.location?.latitude || 0, lng: vessel.location?.longitude || 0 }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                             <VesselMarker vessel={vessel} isMe={vessel.id === emetteur.sharingId} />
                         </OverlayView>
                     ))}
-
-                    {!emetteur.isSharing && emetteur.currentPos && (
-                        <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                            <div style={{ transform: 'translate(-50%, -50%)' }} className="relative z-[1000]">
-                                <div className="size-10 bg-blue-500/20 rounded-full animate-ping absolute inset-0" />
-                                <div className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg flex items-center justify-center">
-                                    <Navigation className="size-3 text-white fill-white" />
-                                </div>
-                            </div>
-                        </OverlayView>
-                    )}
 
                     {mapCore.breadcrumbs.length > 1 && (
                         <Polyline 
@@ -401,7 +429,6 @@ export default function VesselTrackerPage() {
                                 <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center group cursor-pointer z-[500]" onClick={() => mapCore.handleRecenter(marker.pos)}>
                                     <div className="px-2 py-1 bg-white/90 backdrop-blur-md rounded border shadow-lg text-[8px] font-black uppercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap mb-1">
                                         {marker.type} - {marker.vesselName} • {format(marker.time, 'HH:mm')}
-                                        {marker.weather && <div className="text-primary mt-0.5">{marker.weather.windSpeed} ND • {marker.weather.temp}°C</div>}
                                     </div>
                                     <div className="p-1.5 bg-accent rounded-full border-2 border-white shadow-xl">
                                         <Icon className="size-3.5 text-white" />
@@ -447,7 +474,10 @@ export default function VesselTrackerPage() {
                     <div className="p-4 space-y-4 bg-white">
                         <div className="space-y-3">
                             <Label className="text-[9px] font-black uppercase opacity-40">Position & Vitesse</Label>
-                            <Button variant="outline" className="w-full h-10 text-[9px] font-black uppercase border-2 gap-2" onClick={() => simulator.teleport({ lat: centerLat, lng: centerLng })}>
+                            <Button variant="outline" className="w-full h-10 text-[9px] font-black uppercase border-2 gap-2" onClick={() => {
+                                const center = mapCore.googleMap?.getCenter();
+                                if (center) simulator.teleport({ lat: center.lat(), lng: center.lng() });
+                            }}>
                                 <MapPin className="size-3" /> Téléporter sur centre carte
                             </Button>
                             <div className="flex flex-col gap-1">
@@ -469,7 +499,7 @@ export default function VesselTrackerPage() {
                             <div className="flex flex-col gap-2">
                                 <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border-2">
                                     <span className="text-[9px] font-black uppercase">Coupure GPS</span>
-                                    <Switch checked={simulator.isGpsCut} onCheckedChange={simulator.setIsGpsCut} className="scale-75" />
+                                    <Switch checked={simulator.isGpsCut} onCheckedChange={v => { simulator.setIsGpsCut(v); if(v) simulator.setSimAccuracy(999); }} className="scale-75" />
                                 </div>
                                 <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border-2">
                                     <span className="text-[9px] font-black uppercase">Coupure Com</span>

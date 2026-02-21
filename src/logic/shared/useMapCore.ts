@@ -8,6 +8,7 @@ import { useFirestore } from '@/firebase';
 import { collection, query, orderBy, onSnapshot, where, type DocumentData } from 'firebase/firestore';
 
 export type ViewMode = 'alpha' | 'beta' | 'gamma';
+export type WindyLayer = 'wind' | 'temp' | 'waves' | 'gust' | 'rain' | 'thunder' | 'uv';
 
 export interface TacticalMarker {
     id: string;
@@ -24,19 +25,18 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ : Gestion de la carte, des traces et des marqueurs tactiques.
- * v58.1 : Mémorisation de l'objet retourné pour éviter les boucles de rendu.
+ * HOOK PARTAGÉ v59.0 : Gestion de la carte et des calques météo.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
   const firestore = useFirestore();
   const [viewMode, setViewMode] = useState<ViewMode>('alpha');
+  const [windyLayer, setWindyLayer] = useState<WindyLayer>('wind');
   const [googleMap, setGoogleMap] = useState<google.maps.Map | null>(null);
   const [isFollowMode, setIsFollowMode] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   const [breadcrumbs, setBreadcrumbs] = useState<{ lat: number, lng: number, timestamp: number }[]>([]);
-  const polylineRef = useRef<google.maps.Polyline | null>(null);
   const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
 
   const [tacticalMarkers, setTacticalMarkers] = useState<TacticalMarker[]>([]);
@@ -123,10 +123,6 @@ export function useMapCore() {
   const clearBreadcrumbs = useCallback(() => {
     setBreadcrumbs([]);
     lastTracePosRef.current = null;
-    if (polylineRef.current) {
-        polylineRef.current.setMap(null);
-        polylineRef.current = null;
-    }
   }, []);
 
   const handleRecenter = useCallback((pos: { lat: number, lng: number } | null) => {
@@ -159,6 +155,8 @@ export function useMapCore() {
     isGoogleLoaded,
     viewMode,
     setViewMode: switchViewMode,
+    windyLayer,
+    setWindyLayer,
     googleMap,
     setGoogleMap,
     isFollowMode,
@@ -170,14 +168,13 @@ export function useMapCore() {
     clearBreadcrumbs,
     handleRecenter,
     saveMapState,
-    polylineRef,
     tacticalMarkers,
     setTacticalMarkers,
     syncTacticalMarkers,
     isTacticalHidden,
     setIsTacticalHidden
   }), [
-    isGoogleLoaded, viewMode, switchViewMode, googleMap, isFollowMode, isFullscreen,
+    isGoogleLoaded, viewMode, switchViewMode, windyLayer, googleMap, isFollowMode, isFullscreen,
     breadcrumbs, updateBreadcrumbs, clearBreadcrumbs, handleRecenter, saveMapState,
     tacticalMarkers, syncTacticalMarkers, isTacticalHidden
   ]);
