@@ -82,13 +82,11 @@ import {
   Users,
   Eye,
   EyeOff,
-  Lock,
-  Unlock,
-  Waves,
   Phone,
-  AlertCircle,
-  BellRing,
-  ShieldCheck
+  Waves,
+  History,
+  Clock,
+  Battery
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -99,7 +97,7 @@ import { useGoogleMaps } from '@/context/google-maps-context';
 import { fetchWindyWeather } from '@/lib/windy-api';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
-const WINDY_API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
+const WINDY_API_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
@@ -145,7 +143,7 @@ export default function VesselTrackerPage() {
   const isSharingRef = useRef(false);
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
   const startTimeRef = useRef<Date | null>(null);
-  const watchIdRef = useRef<number | null>(null);
+  const watchIdRef = useRef<number | null>(watchIdRef.current || null);
   const lastPosRef = useRef<{ lat: number, lng: number } | null>(null);
   const lastTechLogTime = useRef<number>(0);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -195,6 +193,7 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
+  // JOURNAUX (LOGS)
   const [techHistory, setTechHistory] = useState<{ status: string, battery: number, accuracy: number, time: Date, duration: string }[]>([]);
   const [tacticalHistory, setTacticalHistory] = useState<{ type: string, lat: number, lng: number, time: Date, wind: number, temp: number, photoUrl?: string | null }[]>([]);
 
@@ -260,7 +259,7 @@ export default function VesselTrackerPage() {
       verbose: false
     };
 
-    const bootWindy = (retries = 0) => {
+    const bootSequentially = (retries = 0) => {
         (window as any).windyInit(options, (windyAPI: any) => {
             const { map } = windyAPI;
             setWindyMap(windyAPI);
@@ -272,15 +271,15 @@ export default function VesselTrackerPage() {
             }, 800);
         }, (err: any) => {
             if (retries < 3) {
-                setTimeout(() => bootWindy(retries + 1), 2000 * (retries + 1));
+                setTimeout(() => bootSequentially(retries + 1), 2000 * (retries + 1));
             } else {
                 isWindyInitializing.current = false;
-                toast({ variant: 'destructive', title: "Erreur Météo", description: "Impossible d'autoriser Windy." });
+                toast({ variant: 'destructive', title: "Authentification Windy", description: "Impossible d'autoriser la clé météo." });
             }
         });
     };
 
-    bootWindy();
+    bootSequentially();
   }, [currentPos, windyMap, toast]);
 
   useEffect(() => {
@@ -339,6 +338,22 @@ export default function VesselTrackerPage() {
                     nextStatus = 'drifting';
                     if (!activeAlarm) playSound(vesselPrefs.notifySounds.stationary || 'alerte', true);
                 }
+            }
+
+            // Journal Technique (Auto 60s)
+            if (now - lastTechLogTime.current > 60000 || nextStatus !== vesselStatusRef.current) {
+                const elapsedMin = startTimeRef.current ? differenceInMinutes(new Date(), startTimeRef.current) : 0;
+                const hours = Math.floor(elapsedMin / 60);
+                const mins = elapsedMin % 60;
+                
+                setTechHistory(prev => [{
+                    status: nextStatus.toUpperCase(),
+                    battery: 100, // Placeholder
+                    accuracy: Math.round(accuracy),
+                    time: new Date(),
+                    duration: `ACTIF ${hours}H ${mins}MIN`
+                }, ...prev].slice(0, 50));
+                lastTechLogTime.current = now;
             }
 
             lastPosRef.current = newPos;
@@ -414,6 +429,33 @@ export default function VesselTrackerPage() {
         }).catch(() => {});
     }
     toast({ title: label || "Statut mis à jour" });
+  };
+
+  const addTacticalMarker = async (type: string, photoUrl?: string) => {
+    if (!currentPos) return;
+    
+    const weather = await fetchWindyWeather(currentPos.lat, currentPos.lng);
+    const marker = {
+        type,
+        lat: currentPos.lat,
+        lng: currentPos.lng,
+        time: new Date(),
+        wind: weather.windSpeed || 0,
+        temp: weather.temp || 0,
+        photoUrl
+    };
+
+    setTacticalHistory(prev => [marker, ...prev].slice(0, 50));
+    
+    if (firestore && isSharing) {
+        await addDoc(collection(firestore, 'vessels', sharingId, 'tactical_logs'), {
+            ...marker,
+            time: serverTimestamp()
+        });
+    }
+    
+    toast({ title: `Signalement ${type}`, description: `Vent: ${marker.wind} nds` });
+    playSound(vesselPrefs.notifySounds.birds || 'bip');
   };
 
   const sendEmergencySms = (type: 'MAYDAY' | 'PANPAN' | 'SOS') => {
@@ -516,6 +558,21 @@ export default function VesselTrackerPage() {
                           <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-red-50 text-red-600 animate-pulse" onClick={() => handleManualStatus('emergency', 'ASSISTANCE')}>ASSISTANCE</Button>
                       </div>
 
+                      <div className="grid grid-cols-4 gap-2">
+                          <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] bg-slate-50 border-2" onClick={() => addTacticalMarker('OISEAUX')}><Bird className="size-4" /> OISEAUX</Button>
+                          <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] bg-red-50 border-2 border-red-100" onClick={() => addTacticalMarker('THON')}><Target className="size-4 text-red-600" /> THON</Button>
+                          <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] bg-emerald-50 border-2 border-emerald-100" onClick={() => addTacticalMarker('TAZARD')}><Fish className="size-4 text-emerald-600" /> TAZARD</Button>
+                          <Button variant="secondary" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => photoInputRef.current?.click()}><Camera className="size-4" /> PHOTO</Button>
+                          <input type="file" accept="image/*" capture="environment" className="hidden" ref={photoInputRef} onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (ev) => addTacticalMarker('PRISE', ev.target?.result as string);
+                                  reader.readAsDataURL(file);
+                              }
+                          }} />
+                      </div>
+
                       <Button variant="destructive" className="w-full h-16 font-black uppercase tracking-widest shadow-xl rounded-2xl" onClick={handleStopSharing}>
                           <X className="size-5 mr-2" /> Arrêter le partage
                       </Button>
@@ -561,37 +618,98 @@ export default function VesselTrackerPage() {
               )}
           </div>
 
-          <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="settings" className="border-none">
-                  <AccordionTrigger className="h-12 bg-muted/30 px-4 rounded-xl border-2 hover:no-underline">
-                      <div className="flex items-center gap-2 font-black uppercase text-[10px]"><Settings className="size-4" /> Réglages Notifications & Veille</div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pt-4 space-y-4">
-                      <Card className="border-2 p-4 space-y-4 bg-card shadow-inner">
-                          <div className="space-y-3">
-                              <div className="flex justify-between items-center">
-                                  <Label className="text-[10px] font-black uppercase opacity-60">Volume Global</Label>
-                                  <span className="text-[10px] font-black">{Math.round(vesselPrefs.vesselVolume * 100)}%</span>
-                              </div>
-                              <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} onValueChange={v => setVesselPrefs({...vesselPrefs, vesselVolume: v[0] / 100})} />
+          <Card className="border-2 shadow-lg rounded-2xl overflow-hidden flex flex-col h-full bg-white">
+              <Tabs defaultValue="tactical" className="flex flex-col h-full">
+                  <TabsList className="grid grid-cols-2 h-12 rounded-none bg-muted/30 border-b p-1">
+                      <TabsTrigger value="tactical" className="font-black uppercase text-[10px] gap-2"><MapPin className="size-3"/> Tactique</TabsTrigger>
+                      <TabsTrigger value="tech" className="font-black uppercase text-[10px] gap-2"><Settings className="size-3"/> Technique</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="tactical" className="flex-1 p-0 m-0">
+                      <ScrollArea className="h-[280px]">
+                          <div className="p-3 space-y-2">
+                              {tacticalHistory.length > 0 ? tacticalHistory.map((log, i) => (
+                                  <div key={i} onClick={() => googleMap?.panTo({ lat: log.lat, lng: log.lng })} className="p-3 bg-white border-2 rounded-xl flex items-center justify-between cursor-pointer active:scale-95 transition-all shadow-sm">
+                                      <div className="flex items-center gap-3">
+                                          {log.photoUrl ? (
+                                              <div className="size-10 rounded-lg border overflow-hidden"><img src={log.photoUrl} className="size-full object-cover" alt=""/></div>
+                                          ) : (
+                                              <div className="p-2 bg-muted rounded-lg"><History className="size-4 opacity-40"/></div>
+                                          )}
+                                          <div className="flex flex-col">
+                                              <span className="font-black text-xs uppercase text-primary">{log.type}</span>
+                                              <span className="text-[8px] font-bold opacity-40 uppercase">{format(log.time, 'HH:mm:ss')}</span>
+                                          </div>
+                                      </div>
+                                      <div className="text-right">
+                                          <p className="text-[9px] font-black uppercase text-blue-600">{log.wind} ND</p>
+                                          <p className="text-[9px] font-black uppercase text-orange-600">{log.temp}°C</p>
+                                      </div>
+                                  </div>
+                              )) : (
+                                  <div className="p-12 text-center border-2 border-dashed rounded-2xl opacity-20"><HistoryIcon className="size-8 mx-auto mb-2"/><p className="text-[10px] font-black uppercase">Aucun événement</p></div>
+                              )}
                           </div>
-                          <div className="grid gap-3 pt-2 border-t border-dashed">
-                              {Object.keys(vesselPrefs.notifySettings).map(key => (
-                                  <div key={key} className="flex items-center justify-between">
-                                      <span className="text-[10px] font-bold uppercase">{key}</span>
+                      </ScrollArea>
+                  </TabsContent>
+                  <TabsContent value="tech" className="flex-1 p-0 m-0">
+                      <ScrollArea className="h-[280px]">
+                          <div className="p-3 space-y-2">
+                              {techHistory.map((log, i) => (
+                                  <div key={i} className="p-3 bg-slate-50 border-2 rounded-xl flex items-center justify-between">
+                                      <div className="flex flex-col">
+                                          <div className="flex items-center gap-2">
+                                              <span className={cn("font-black text-[10px] uppercase", 
+                                                  log.status.includes('DÉRIVE') || log.status.includes('ALERTE') ? 'text-red-600' : 'text-slate-800'
+                                              )}>{log.status}</span>
+                                              <Badge variant="outline" className="text-[8px] h-4 font-bold border-slate-200">{log.duration}</Badge>
+                                          </div>
+                                          <span className="text-[8px] font-bold opacity-40 uppercase mt-1">{format(log.time, 'dd/MM HH:mm:ss')}</span>
+                                      </div>
                                       <div className="flex items-center gap-2">
-                                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playSound(vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds])}><Play className="size-3" /></Button>
-                                          <Switch checked={vesselPrefs.notifySettings[key as keyof typeof vesselPrefs.notifySettings]} onCheckedChange={v => setVesselPrefs({...vesselPrefs, notifySettings: {...vesselPrefs.notifySettings, [key]: v}})} />
+                                          <div className="flex flex-col items-end gap-0.5">
+                                              <div className="flex items-center gap-1 text-[9px] font-black text-slate-500"><Battery className="size-2.5"/> {log.battery}%</div>
+                                              <div className="text-[8px] font-bold text-slate-400">+/- {log.accuracy}m</div>
+                                          </div>
                                       </div>
                                   </div>
                               ))}
                           </div>
-                          <Button className="w-full h-10 font-black uppercase text-[9px] tracking-widest border-2" variant="outline" onClick={() => updateDoc(doc(firestore!, 'users', user!.uid), { vesselPrefs })}>Sauvegarder Sons</Button>
-                      </Card>
-                  </AccordionContent>
-              </AccordionItem>
-          </Accordion>
+                      </ScrollArea>
+                  </TabsContent>
+              </Tabs>
+          </Card>
       </div>
+
+      <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="settings" className="border-none">
+              <AccordionTrigger className="h-12 bg-muted/30 px-4 rounded-xl border-2 hover:no-underline">
+                  <div className="flex items-center gap-2 font-black uppercase text-[10px]"><Settings className="size-4" /> Réglages Notifications & Veille</div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4 space-y-4">
+                  <Card className="border-2 p-4 space-y-4 bg-card shadow-inner">
+                      <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                              <Label className="text-[10px] font-black uppercase opacity-60">Volume Global</Label>
+                              <span className="text-[10px] font-black">{Math.round(vesselPrefs.vesselVolume * 100)}%</span>
+                          </div>
+                          <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} onValueChange={v => setVesselPrefs({...vesselPrefs, vesselVolume: v[0] / 100})} />
+                      </div>
+                      <div className="grid gap-3 pt-2 border-t border-dashed">
+                          {Object.keys(vesselPrefs.notifySettings).map(key => (
+                              <div key={key} className="flex items-center justify-between">
+                                  <span className="text-[10px] font-bold uppercase">{key}</span>
+                                  <div className="flex items-center gap-2">
+                                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playSound(vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds])}><Play className="size-3" /></Button>
+                                      <Switch checked={vesselPrefs.notifySettings[key as keyof typeof vesselPrefs.notifySettings]} onCheckedChange={v => setVesselPrefs({...vesselPrefs, notifySettings: {...vesselPrefs.notifySettings, [key]: v}})} />
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                      <Button className="w-full h-10 font-black uppercase text-[9px] tracking-widest border-2" variant="outline" onClick={() => updateDoc(doc(firestore!, 'users', user!.uid), { vesselPrefs })}>Sauvegarder Sons</Button>
+                  </Card>
+              </AccordionContent>
+          </AccordionItem>
+      </Accordion>
 
       <div className="space-y-2 relative z-10">
           <Card className="border-2 shadow-sm bg-muted/5">
@@ -604,5 +722,17 @@ export default function VesselTrackerPage() {
           </Card>
       </div>
     </div>
+  );
+}
+
+function Lock({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+  );
+}
+
+function Unlock({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
   );
 }
