@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -235,11 +236,11 @@ export default function VesselTrackerPage() {
     if (mapCore.isFollowMode && mapCore.googleMap) {
         mapCore.googleMap.panTo({ lat, lng });
     }
-  }, [mapCore.updateBreadcrumbs, mapCore.isFollowMode, mapCore.googleMap]);
+  }, [mapCore.isFollowMode, mapCore.googleMap]);
 
   const handleStopCleanup = useCallback(() => {
     mapCore.clearBreadcrumbs();
-  }, [mapCore.clearBreadcrumbs]);
+  }, []);
 
   const emetteur = useEmetteur(
     handlePositionUpdate,
@@ -270,6 +271,13 @@ export default function VesselTrackerPage() {
 
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
+  // Debug logs for marker visibility
+  useEffect(() => {
+    if (followedVessels) {
+        console.log("Boat Tracker: Following vessels", followedVessels.map(v => ({ id: v.id, isSharing: v.isSharing, status: v.status, hasLoc: !!v.location })));
+    }
+  }, [followedVessels]);
+
   const activeAnchorVessel = useMemo(() => {
     if (!followedVessels || mapCore.isCirclesHidden) return null;
     return followedVessels.find(v => v.isSharing && v.id === emetteur.sharingId && v.anchorLocation) 
@@ -287,10 +295,18 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     if (emetteur.currentPos && !hasCenteredInitially.current && mapCore.googleMap) {
+        console.log("Boat Tracker: Initial Auto-Center on", emetteur.currentPos);
         mapCore.handleRecenter(emetteur.currentPos);
         hasCenteredInitially.current = true;
     }
   }, [emetteur.currentPos, mapCore.googleMap, mapCore.handleRecenter]);
+
+  // Reset centering if sharing stops
+  useEffect(() => {
+    if (!emetteur.isSharing) {
+        hasCenteredInitially.current = false;
+    }
+  }, [emetteur.isSharing]);
 
   useEffect(() => {
     const ids = [];
@@ -518,8 +534,12 @@ export default function VesselTrackerPage() {
                         </React.Fragment>
                     )}
 
-                    {followedVessels?.filter(v => v.isSharing).map(vessel => (
-                        <OverlayView key={vessel.id} position={{ lat: vessel.location?.latitude || 0, lng: vessel.location?.longitude || 0 }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                    {followedVessels?.filter(v => v.isSharing && v.location).map(vessel => (
+                        <OverlayView 
+                            key={vessel.id} 
+                            position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} 
+                            mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                        >
                             <VesselMarker vessel={vessel} />
                         </OverlayView>
                     ))}
