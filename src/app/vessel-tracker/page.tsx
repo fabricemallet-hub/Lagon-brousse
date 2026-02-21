@@ -6,7 +6,7 @@ import { useEmetteur } from '@/logic/emetteur/useEmetteur';
 import { useRecepteur } from '@/logic/recepteur/useRecepteur';
 import { useFlotte } from '@/logic/flotteC/useFlotte';
 import { GoogleMap, OverlayView, Polyline, Circle } from '@react-google-maps/api';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -69,15 +69,11 @@ import {
   Users, 
   Phone, 
   Waves, 
-  Lock, 
-  Unlock, 
   Save, 
   Battery,
-  MessageSquare,
   CheckCircle2,
   Trash2,
   ChevronDown,
-  ChevronRight,
   Volume2,
   Timer,
   Bell,
@@ -126,7 +122,7 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
 const BatteryLow = (props: any) => <Battery className={props.className} />;
 const BatteryMedium = (props: any) => <Battery className={props.className} />;
 
-// Composant de Marqueur de Navire Dynamique (v55.0)
+// Composant de Marqueur de Navire Dynamique (v57.0)
 const VesselMarker = ({ vessel, isMe = false }: { vessel: VesselStatus, isMe?: boolean }) => {
     const status = vessel.status || 'moving';
     const heading = vessel.heading || 0;
@@ -218,7 +214,6 @@ export default function VesselTrackerPage() {
   }, [user, firestore]);
   const { data: profile } = useDoc<UserAccount>(userDocRef);
 
-  // RÉCUPÉRATION DES NAVIRES SUIVIS
   const savedVesselIds = profile?.savedVesselIds || [];
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -278,6 +273,12 @@ export default function VesselTrackerPage() {
     return `[${nick.toUpperCase()}] ${msg} [MAYDAY] à ${time}. Position (+/- ${acc}m) : ${posUrl}`;
   }, [emetteur.vesselNickname, emetteur.vesselSmsMessage, emetteur.accuracy, emetteur.currentPos]);
 
+  const centerLat = mapCore.googleMap?.getCenter()?.lat() || INITIAL_CENTER.lat;
+  const centerLng = mapCore.googleMap?.getCenter()?.lng() || INITIAL_CENTER.lng;
+  const currentZoom = mapCore.googleMap?.getZoom() || 11;
+
+  const windyUrl = `https://embed.windy.com/embed2.html?lat=${centerLat}&lon=${centerLng}&zoom=${currentZoom}&level=surface&overlay=wind&menu=&message=&marker=&calendar=&pressure=&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1`;
+
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
       {recepteur.isAlarmActive && (
@@ -306,77 +307,110 @@ export default function VesselTrackerPage() {
       )}
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
+        {/* NAV-TÉLÉMETRIE FLOTTANTE (v57.0) */}
+        <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-[10006] flex bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-white/20 shadow-2xl">
+            {['alpha', 'beta', 'gamma'].map((m) => (
+                <Button
+                    key={m}
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                        "h-9 px-5 text-[10px] font-black uppercase rounded-lg transition-all",
+                        mapCore.viewMode === m ? "bg-primary text-white shadow-lg" : "text-white/60 hover:text-white hover:bg-white/10"
+                    )}
+                    onClick={() => mapCore.setViewMode(m as any)}
+                >
+                    {m === 'alpha' ? 'MAPS' : m === 'beta' ? 'MÉTÉO' : 'WINDY'}
+                </Button>
+            ))}
+        </div>
+
         {mapCore.isGoogleLoaded ? (
-            <GoogleMap
-                mapContainerClassName="w-full h-full"
-                defaultCenter={INITIAL_CENTER}
-                defaultZoom={12}
-                onLoad={mapCore.setGoogleMap}
-                onDragStart={() => mapCore.setIsFollowMode(false)}
-                options={{ 
-                    disableDefaultUI: true, 
-                    mapTypeId: mapCore.viewMode === 'alpha' ? 'hybrid' : 'roadmap', 
-                    gestureHandling: 'greedy' 
-                }}
-            >
-                {/* Rendu des navires de la flotte (inclut soi-même) */}
-                {followedVessels?.filter(v => v.isSharing).map(vessel => (
-                    <OverlayView key={vessel.id} position={{ lat: vessel.location?.latitude || 0, lng: vessel.location?.longitude || 0 }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                        <VesselMarker vessel={vessel} isMe={vessel.id === emetteur.sharingId} />
-                    </OverlayView>
-                ))}
-
-                {/* Secours visuel si non partagé mais GPS actif */}
-                {!emetteur.isSharing && emetteur.currentPos && (
-                    <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                        <div style={{ transform: 'translate(-50%, -50%)' }} className="relative z-[1000]">
-                            <div className="size-10 bg-blue-500/20 rounded-full animate-ping absolute inset-0" />
-                            <div className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg flex items-center justify-center">
-                                <Navigation className="size-3 text-white fill-white" />
-                            </div>
-                        </div>
-                    </OverlayView>
+            <div className="relative w-full h-full">
+                {/* CALQUE WINDY (BETA OVERLAY) */}
+                {mapCore.viewMode === 'beta' && (
+                    <div className="absolute inset-0 z-[5] pointer-events-none opacity-50 mix-blend-multiply">
+                        <iframe src={windyUrl} className="w-full h-full border-none" />
+                    </div>
                 )}
 
-                {mapCore.breadcrumbs.length > 1 && (
-                    <Polyline 
-                        path={mapCore.breadcrumbs} 
-                        options={{ strokeColor: "#3b82f6", strokeOpacity: 0.6, strokeWeight: 2 }} 
-                    />
+                {/* CALQUE WINDY (GAMMA FULL) */}
+                {mapCore.viewMode === 'gamma' && (
+                    <div className="absolute inset-0 z-[140] bg-background animate-in fade-in duration-500">
+                        <iframe src={windyUrl} className="w-full h-full border-none" />
+                    </div>
                 )}
 
-                {!mapCore.isTacticalHidden && mapCore.tacticalMarkers.map(marker => {
-                    const Icon = TACTICAL_ICONS[marker.type] || Fish;
-                    return (
-                        <OverlayView key={marker.id} position={marker.pos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                            <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center group cursor-pointer z-[500]" onClick={() => mapCore.handleRecenter(marker.pos)}>
-                                <div className="px-2 py-1 bg-white/90 backdrop-blur-md rounded border shadow-lg text-[8px] font-black uppercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap mb-1">
-                                    {marker.type} - {marker.vesselName} • {format(marker.time, 'HH:mm')}
-                                    {marker.weather && <div className="text-primary mt-0.5">{marker.weather.windSpeed} ND • {marker.weather.temp}°C</div>}
-                                </div>
-                                <div className="p-1.5 bg-accent rounded-full border-2 border-white shadow-xl">
-                                    <Icon className="size-3.5 text-white" />
+                {/* GOOGLE MAPS CORE (ALPHA & BETA) */}
+                <GoogleMap
+                    mapContainerClassName={cn("w-full h-full", mapCore.viewMode === 'gamma' && "opacity-0 pointer-events-none")}
+                    defaultCenter={INITIAL_CENTER}
+                    defaultZoom={12}
+                    onLoad={mapCore.setGoogleMap}
+                    onDragStart={() => mapCore.setIsFollowMode(false)}
+                    options={{ 
+                        disableDefaultUI: true, 
+                        mapTypeId: 'hybrid', 
+                        gestureHandling: 'greedy' 
+                    }}
+                >
+                    {followedVessels?.filter(v => v.isSharing).map(vessel => (
+                        <OverlayView key={vessel.id} position={{ lat: vessel.location?.latitude || 0, lng: vessel.location?.longitude || 0 }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                            <VesselMarker vessel={vessel} isMe={vessel.id === emetteur.sharingId} />
+                        </OverlayView>
+                    ))}
+
+                    {!emetteur.isSharing && emetteur.currentPos && (
+                        <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                            <div style={{ transform: 'translate(-50%, -50%)' }} className="relative z-[1000]">
+                                <div className="size-10 bg-blue-500/20 rounded-full animate-ping absolute inset-0" />
+                                <div className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg flex items-center justify-center">
+                                    <Navigation className="size-3 text-white fill-white" />
                                 </div>
                             </div>
                         </OverlayView>
-                    );
-                })}
+                    )}
 
-                {emetteur.anchorPos && (
-                    <>
-                        <OverlayView position={emetteur.anchorPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                            <div style={{ transform: 'translate(-50%, -50%)' }} className="size-8 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]">
-                                <Anchor className="size-4 text-white" />
-                            </div>
-                        </OverlayView>
-                        <Circle 
-                            center={emetteur.anchorPos} 
-                            radius={emetteur.mooringRadius} 
-                            options={{ strokeColor: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15, strokeWeight: 1 }} 
+                    {mapCore.breadcrumbs.length > 1 && (
+                        <Polyline 
+                            path={mapCore.breadcrumbs} 
+                            options={{ strokeColor: "#3b82f6", strokeOpacity: 0.6, strokeWeight: 2 }} 
                         />
-                    </>
-                )}
-            </GoogleMap>
+                    )}
+
+                    {!mapCore.isTacticalHidden && mapCore.tacticalMarkers.map(marker => {
+                        const Icon = TACTICAL_ICONS[marker.type] || Fish;
+                        return (
+                            <OverlayView key={marker.id} position={marker.pos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center group cursor-pointer z-[500]" onClick={() => mapCore.handleRecenter(marker.pos)}>
+                                    <div className="px-2 py-1 bg-white/90 backdrop-blur-md rounded border shadow-lg text-[8px] font-black uppercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap mb-1">
+                                        {marker.type} - {marker.vesselName} • {format(marker.time, 'HH:mm')}
+                                        {marker.weather && <div className="text-primary mt-0.5">{marker.weather.windSpeed} ND • {marker.weather.temp}°C</div>}
+                                    </div>
+                                    <div className="p-1.5 bg-accent rounded-full border-2 border-white shadow-xl">
+                                        <Icon className="size-3.5 text-white" />
+                                    </div>
+                                </div>
+                            </OverlayView>
+                        );
+                    })}
+
+                    {emetteur.anchorPos && (
+                        <>
+                            <OverlayView position={emetteur.anchorPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                <div style={{ transform: 'translate(-50%, -50%)' }} className="size-8 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]">
+                                    <Anchor className="size-4 text-white" />
+                                </div>
+                            </OverlayView>
+                            <Circle 
+                                center={emetteur.anchorPos} 
+                                radius={emetteur.mooringRadius} 
+                                options={{ strokeColor: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15, strokeWeight: 1 }} 
+                            />
+                        </>
+                    )}
+                </GoogleMap>
+            </div>
         ) : <Skeleton className="h-full w-full" />}
         
         <div className="absolute top-4 left-4 z-[9999] flex flex-col gap-2">
@@ -416,7 +450,6 @@ export default function VesselTrackerPage() {
                                   </div>
                               </CardHeader>
                               <CardContent className="p-4 space-y-4">
-                                  {/* Ligne Supérieure : Statuts Destination */}
                                   <div className="grid grid-cols-2 gap-2">
                                       <Button 
                                           variant="outline" 
@@ -438,7 +471,6 @@ export default function VesselTrackerPage() {
                                       </Button>
                                   </div>
 
-                                  {/* Ligne Centrale : Surveillance Dérive */}
                                   <div className="p-4 bg-orange-50/30 border-2 border-orange-100 rounded-2xl space-y-4">
                                       <div className="flex items-center justify-between">
                                           <Button 
@@ -473,7 +505,6 @@ export default function VesselTrackerPage() {
                                       </div>
                                   </div>
 
-                                  {/* Pied de Panneau : Arrêt */}
                                   <Button 
                                       variant="destructive" 
                                       className="w-full h-16 font-black uppercase text-xs tracking-widest shadow-xl rounded-2xl gap-3 border-4 border-white/20 transition-all active:scale-95" 
@@ -638,7 +669,7 @@ export default function VesselTrackerPage() {
                                 className="font-black text-center h-12 border-2 uppercase tracking-widest bg-white flex-grow" 
                               />
                               <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={() => { recepteur.savePrefs({ lastFollowedId: vesselIdToFollow.toUpperCase() }); toast({ title: "ID enregistré" }); }}>
-                                  <Check className="size-4" />
+                                  <CheckCircle2 className="size-4" />
                               </Button>
                           </div>
                       </div>

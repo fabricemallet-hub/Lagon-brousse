@@ -24,7 +24,7 @@ export interface TacticalMarker {
 
 /**
  * HOOK PARTAGÉ : Gestion de la carte, des traces et des marqueurs tactiques.
- * v50.0 : Ajout du listener de points tactiques pour toute la flotte.
+ * v57.0 : Optimisation du switchViewMode pour la Navbar tactile.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
@@ -84,7 +84,6 @@ export function useMapCore() {
 
         return onSnapshot(q, (snapshot) => {
             setTacticalMarkers(prev => {
-                const otherVesselsMarkers = prev.filter(m => !vesselIds.includes(m.id.split('_')[0]));
                 const newMarkers: TacticalMarker[] = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
@@ -100,9 +99,8 @@ export function useMapCore() {
                         });
                     }
                 });
-                // On fusionne les anciens marqueurs des autres vaisseaux avec les nouveaux de ce vaisseau
                 const merged = [...prev.filter(m => !m.id.startsWith(vid)), ...newMarkers];
-                return merged.slice(0, 100); // Limite raisonnable
+                return merged.slice(0, 100);
             });
         });
     });
