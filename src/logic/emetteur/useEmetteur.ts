@@ -11,8 +11,8 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v74.1 : "Sync & Robustesse"
- * Utilise des Refs pour éviter les stale closures dans watchPosition et heartbeat.
+ * LOGIQUE ÉMETTEUR (A) v75.0 : "Sync & Robustesse"
+ * Gestion automatique de la visibilité des calques de sécurité.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -47,7 +47,6 @@ export function useEmetteur(
   const [techLogs, setTechLogs] = useState<TechLogEntry[]>([]);
   const [tacticalLogs, setTacticalLogs] = useState<any[]>([]);
   
-  // REFS POUR ÉVITER LES STALE CLOSURES (v74.1)
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
   const currentPosRef = useRef(currentPos);
   const anchorPosRef = useRef(anchorPos);
@@ -75,7 +74,6 @@ export function useEmetteur(
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  // Surveillance Batterie
   useEffect(() => {
     if (typeof window === 'undefined' || !('getBattery' in navigator)) return;
     let batteryObj: any = null;
@@ -98,7 +96,6 @@ export function useEmetteur(
     };
   }, []);
 
-  // Chargement des préférences locales
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedNickname = localStorage.getItem('lb_vessel_nickname');
@@ -275,7 +272,6 @@ export function useEmetteur(
     });
   }, [addTechLog, updateVesselInFirestore]);
 
-  // Heartbeat 30s
   useEffect(() => {
     if (isSharing) {
         heartbeatIntervalRef.current = setInterval(() => {

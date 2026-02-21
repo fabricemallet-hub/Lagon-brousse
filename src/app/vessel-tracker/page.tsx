@@ -7,7 +7,7 @@ import { useSimulator } from '@/logic/shared/useSimulator';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
 import { useRecepteur } from '@/logic/recepteur/useRecepteur';
 import { useFlotte } from '@/logic/flotteC/useFlotte';
-import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
+import { GoogleMap, OverlayView, Circle, Polyline } from '@react-google-maps/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -247,10 +247,20 @@ export default function VesselTrackerPage() {
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
   const activeAnchorVessel = useMemo(() => {
-    if (!followedVessels || mapCore.isCirclesHidden) return null;
-    return followedVessels.find(v => v.isSharing && v.id === emetteur.sharingId && v.anchorLocation) 
-        || followedVessels.find(v => v.isSharing && v.anchorLocation);
-  }, [followedVessels, emetteur.sharingId, mapCore.isCirclesHidden]);
+    if (mapCore.isCirclesHidden) return null;
+    // Si l'émetteur local est stationnaire, on utilise ses données locales prioritaires
+    if (emetteur.isSharing && (emetteur.vesselStatus === 'stationary' || emetteur.vesselStatus === 'drifting') && emetteur.anchorPos) {
+        return { 
+            id: emetteur.sharingId, 
+            status: emetteur.vesselStatus, 
+            anchorLocation: { latitude: emetteur.anchorPos.lat, longitude: emetteur.anchorPos.lng },
+            location: emetteur.currentPos ? { latitude: emetteur.currentPos.lat, longitude: emetteur.currentPos.lng } : null,
+            mooringRadius: emetteur.mooringRadius 
+        };
+    }
+    if (!followedVessels) return null;
+    return followedVessels.find(v => v.isSharing && v.anchorLocation);
+  }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, mapCore.isCirclesHidden]);
 
   useEffect(() => {
     if (followedVessels) {
@@ -291,14 +301,6 @@ export default function VesselTrackerPage() {
     return `[${nick.toUpperCase()}] ${msg} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
   }, [emetteur.vesselSmsMessage, emetteur.isCustomMessageEnabled, emetteur.vesselNickname]);
 
-  const handleCopyLogEntry = (log: any) => {
-    const pos = log.pos;
-    if (!pos) return;
-    const text = `Vessel: ${log.vesselName || 'Unknown'} - Status: ${log.statusLabel || log.label} - GPS: ${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)} - Maps: https://www.google.com/maps?q=${pos.lat},${pos.lng}`;
-    navigator.clipboard.writeText(text);
-    toast({ title: "Copié !", description: "Coordonnées prêtes à être collées." });
-  };
-
   if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
   if (!isLoaded || isProfileLoading) return <Skeleton className="h-96 w-full" />;
 
@@ -338,21 +340,54 @@ export default function VesselTrackerPage() {
                     onDragStart={() => mapCore.setIsFollowMode(false)}
                     options={{ disableDefaultUI: true, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}
                 >
+                    {/* TRACÉ HISTORIQUE (BREADCRUMBS) */}
+                    {mapCore.breadcrumbs.length > 1 && (
+                        <Polyline 
+                            path={mapCore.breadcrumbs.map(p => ({ lat: p.lat, lng: p.lng }))}
+                            options={{ strokeColor: '#3b82f6', strokeOpacity: 0.6, strokeWeight: 2, zIndex: 1 }}
+                        />
+                    )}
+
+                    {/* CERCLE DE MOUILLAGE & LIGNE DE TENSION */}
                     {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                         <React.Fragment key={`mooring-singleton-${activeAnchorVessel.id}`}>
+                            {/* LIGNE DE TENSION (BOAT -> ANCHOR) */}
+                            {activeAnchorVessel.location && (
+                                <Polyline 
+                                    path={[
+                                        { lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude },
+                                        { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }
+                                    ]}
+                                    options={{ 
+                                        strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6', 
+                                        strokeOpacity: 0.8, 
+                                        strokeWeight: 2,
+                                        zIndex: 2
+                                    }}
+                                />
+                            )}
+                            
                             <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]">
                                     <Anchor className="size-3.5 text-white" />
                                 </div>
                             </OverlayView>
                             <Circle 
-                                key={`circle-${activeAnchorVessel.id}-${activeAnchorVessel.anchorLocation.latitude}-${activeAnchorVessel.anchorLocation.longitude}`}
                                 center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
                                 radius={activeAnchorVessel.mooringRadius || 100} 
-                                options={{ strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6', strokeOpacity: 0.8, strokeWeight: 3, fillColor: '#3b82f6', fillOpacity: 0.15, clickable: false, zIndex: 1 }} 
+                                options={{ 
+                                    strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6', 
+                                    strokeOpacity: 0.8, 
+                                    strokeWeight: 3, 
+                                    fillColor: '#3b82f6', 
+                                    fillOpacity: 0.15, 
+                                    clickable: false, 
+                                    zIndex: 1 
+                                }} 
                             />
                         </React.Fragment>
                     )}
+
                     {followedVessels?.filter(v => v.isSharing && v.location).map(vessel => (
                         <OverlayView key={vessel.id} position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                             <VesselMarker vessel={vessel} />
@@ -405,7 +440,7 @@ export default function VesselTrackerPage() {
                           <CardContent className="p-4 space-y-4">
                               <div className="grid grid-cols-2 gap-2">
                                   <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", emetteur.vesselStatus === 'returning' ? "bg-indigo-600 text-white border-indigo-700" : "bg-indigo-50 border-indigo-100 text-indigo-700")} onClick={() => emetteur.changeManualStatus('returning')}>Retour Maison</Button>
-                                  <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", emetteur.vesselStatus === 'landed' ? "bg-green-600 text-white border-green-700" : "bg-green-50 border-green-100 text-green-700")} onClick={() => emetteur.changeManualStatus('landed')}>À terre</Button>
+                                  <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", emetteur.vesselStatus === 'landed' ? "bg-green-600 text-white border-green-700" : "bg-green-50 border-indigo-100 text-green-700")} onClick={() => emetteur.changeManualStatus('landed')}>À terre</Button>
                               </div>
                               <div className="p-4 bg-orange-50/30 border-2 border-orange-100 rounded-2xl space-y-4">
                                   <div className="flex items-center justify-between">
@@ -503,7 +538,7 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v74.1 prêt - Sync & Robustesse OK</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v75.0 prêt - Sync & Robustesse OK</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm cursor-pointer transition-all active:scale-[0.98]", log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') ? 'border-red-200 bg-red-50' : 'border-slate-100')} onClick={() => handleCopyLogEntry(log)}>
                                                   <div className="flex justify-between items-start">
