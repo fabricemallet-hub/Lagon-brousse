@@ -66,7 +66,8 @@ import {
   WifiOff,
   Volume2,
   Timer,
-  Bell
+  Bell,
+  Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -81,7 +82,13 @@ export default function VesselTrackerPage() {
   
   const mapCore = useMapCore();
   const emetteur = useEmetteur(
-    mapCore.updateBreadcrumbs,
+    (lat, lng) => {
+        mapCore.updateBreadcrumbs(lat, lng);
+        // Si follow mode, on suit le point bleu
+        if (mapCore.isFollowMode && mapCore.googleMap) {
+            mapCore.googleMap.panTo({ lat, lng });
+        }
+    },
     () => mapCore.clearBreadcrumbs() 
   );
   const recepteur = useRecepteur(emetteur.customSharingId);
@@ -89,7 +96,7 @@ export default function VesselTrackerPage() {
   
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync LED
+  // Sync LED Clignotante pour l'émetteur
   const [isLedActive, setIsLedActive] = useState(false);
   useEffect(() => {
     if (emetteur.lastSyncTime > 0) {
@@ -99,11 +106,22 @@ export default function VesselTrackerPage() {
     }
   }, [emetteur.lastSyncTime]);
 
+  // FONCTION DE DÉMARRAGE ÉTENDUE
+  const handleStartSharingExtended = () => {
+    emetteur.startSharing();
+    mapCore.setIsFollowMode(true);
+    // On force un recentrage si on a déjà un fix, sinon on attend le prochain fix GPS
+    if (emetteur.currentPos) {
+        mapCore.handleRecenter(emetteur.currentPos);
+    }
+    toast({ title: "Session Démarrée", description: "GPS Actif et Verrouillage activé." });
+  };
+
   return (
     <div className="w-full space-y-4 pb-32 px-1">
       {recepteur.isAlarmActive && (
         <Button 
-            className="fixed top-2 left-1/2 -translate-x-1/2 z-[1000] h-14 bg-red-600 hover:bg-red-700 text-white font-black uppercase shadow-2xl animate-bounce gap-3 px-8 rounded-full border-4 border-white"
+            className="fixed top-2 left-1/2 -translate-x-1/2 z-[10000] h-14 bg-red-600 hover:bg-red-700 text-white font-black uppercase shadow-2xl animate-bounce gap-3 px-8 rounded-full border-4 border-white"
             onClick={recepteur.stopAllAlarms}
         >
             <Volume2 className="size-6 animate-pulse" /> ARRÊTER LE SON
@@ -131,7 +149,7 @@ export default function VesselTrackerPage() {
           </Alert>
       )}
 
-      {/* CONTENEUR CARTE */}
+      {/* CONTENEUR CARTE (Initialisé en premier) */}
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
         {mapCore.isGoogleLoaded && (
             <GoogleMap
@@ -140,8 +158,14 @@ export default function VesselTrackerPage() {
                 defaultZoom={12}
                 onLoad={mapCore.setGoogleMap}
                 onDragStart={() => mapCore.setIsFollowMode(false)}
-                options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
+                onIdle={mapCore.saveMapState}
+                options={{ 
+                    disableDefaultUI: true, 
+                    mapTypeId: mapCore.viewMode === 'alpha' ? 'hybrid' : 'roadmap', 
+                    gestureHandling: 'greedy' 
+                }}
             >
+                {/* POINT BLEU ÉMETTEUR */}
                 {emetteur.currentPos && (
                     <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -50%)' }} className="relative">
@@ -153,6 +177,7 @@ export default function VesselTrackerPage() {
                     </OverlayView>
                 )}
 
+                {/* TRACE BREADCRUMBS */}
                 {mapCore.breadcrumbs.length > 1 && (
                     <Polyline 
                         path={mapCore.breadcrumbs} 
@@ -161,6 +186,7 @@ export default function VesselTrackerPage() {
                     />
                 )}
 
+                {/* MOUILLAGE ACTIF */}
                 {emetteur.anchorPos && (
                     <>
                         <OverlayView position={emetteur.anchorPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
@@ -179,17 +205,18 @@ export default function VesselTrackerPage() {
             </GoogleMap>
         )}
         
-        <div className="absolute top-4 left-4 z-[200] flex flex-col gap-2">
-            <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>
+        {/* BOUTONS FLOTTANTS TACTIQUES (Priorité Z-Index) */}
+        <div className="absolute top-4 left-4 z-[9999] flex flex-col gap-2">
+            <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl hover:bg-white" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>
                 {mapCore.isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}
             </Button>
         </div>
-        <div className="absolute top-4 right-4 z-[200] flex flex-col gap-2">
-            <Button onClick={() => mapCore.setIsFollowMode(!mapCore.isFollowMode)} className={cn("h-10 w-10 border-2 shadow-xl", mapCore.isFollowMode ? "bg-primary text-white" : "bg-white text-primary")}>
+        <div className="absolute top-4 right-4 z-[9999] flex flex-col gap-2">
+            <Button onClick={() => mapCore.setIsFollowMode(!mapCore.isFollowMode)} className={cn("h-10 w-10 border-2 shadow-xl rounded-xl transition-all", mapCore.isFollowMode ? "bg-primary text-white border-primary" : "bg-white text-primary")}>
                 {mapCore.isFollowMode ? <Lock className="size-5" /> : <Unlock className="size-5" />}
             </Button>
             {!mapCore.isFollowMode && (
-                <Button onClick={() => mapCore.handleRecenter(emetteur.currentPos)} className="bg-white border-2 font-black text-[9px] uppercase gap-2 px-2 h-10 text-primary shadow-xl">
+                <Button onClick={() => mapCore.handleRecenter(emetteur.currentPos)} className="bg-white/90 backdrop-blur-sm border-2 font-black text-[9px] uppercase gap-2 px-3 h-10 text-primary shadow-xl rounded-xl hover:bg-white">
                     <LocateFixed className="size-4"/> RE-CENTRER
                 </Button>
             )}
@@ -216,11 +243,24 @@ export default function VesselTrackerPage() {
                       </CardHeader>
                       <CardContent className="p-4 space-y-4">
                           {!emetteur.isSharing ? (
-                              <div className="space-y-4">
+                              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Surnom du Navire</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-11 border-2 font-black uppercase" /></div>
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Navire (Partage Direct)</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ID UNIQUE" className="h-11 border-2 font-black uppercase text-center tracking-widest" /></div>
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Flotte C (Communautaire)</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="ID GROUPE" className="h-11 border-2 font-black uppercase text-center tracking-widest" /></div>
-                                  <Button className="w-full h-14 font-black uppercase tracking-widest shadow-xl text-base" onClick={emetteur.startSharing}>Lancer le Partage GPS</Button>
+                                  
+                                  <div className="space-y-3">
+                                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Historique des IDs</p>
+                                      <div className="flex flex-wrap gap-2">
+                                          {emetteur.vesselHistory.map(id => (
+                                              <Badge key={id} variant="outline" className="h-8 px-3 cursor-pointer bg-white border-2 hover:bg-primary/5 gap-2" onClick={() => emetteur.handleSelectFromHistory(id)}>
+                                                  <span className="font-mono text-[9px]">{id}</span>
+                                                  <X className="size-3 text-destructive opacity-40 hover:opacity-100" onClick={(e) => { e.stopPropagation(); emetteur.deleteFromHistory(id); }} />
+                                              </Badge>
+                                          ))}
+                                      </div>
+                                  </div>
+
+                                  <Button className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base bg-primary hover:bg-primary/90 rounded-2xl" onClick={handleStartSharingExtended}>Démarrer le Partage GPS</Button>
                               </div>
                           ) : (
                               <div className="space-y-4">
@@ -269,7 +309,7 @@ export default function VesselTrackerPage() {
                                   </div>
 
                                   <Button variant="destructive" className="w-full h-16 font-black uppercase tracking-widest shadow-xl rounded-2xl border-2 border-white/20" onClick={emetteur.stopSharing}>
-                                    <X className="size-5 mr-2" /> Arrêter le partage
+                                    <X className="size-5" /> Arrêter le partage
                                   </Button>
                               </div>
                           )}
