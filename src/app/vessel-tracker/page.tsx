@@ -97,7 +97,6 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 const WINDY_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
-const IMMOBILITY_THRESHOLD_METERS = 20;
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
@@ -140,6 +139,7 @@ export default function VesselTrackerPage() {
   const lastSentStatusRef = useRef<string | null>(null);
   const lastTechLogTime = useRef<number>(0);
   const lastPosRef = useRef<{ lat: number, lng: number } | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // IDENTITÉ & FLOTTE
   const [vesselNickname, setVesselNickname] = useState('');
@@ -186,7 +186,7 @@ export default function VesselTrackerPage() {
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
   const [techHistory, setTechHistory] = useState<{ status: string, battery: number, accuracy: number, time: Date, duration: string }[]>([]);
-  const [tacticalHistory, setTacticalHistory] = useState<{ type: string, lat: number, lng: number, time: Date, wind: number, temp: number }[]>([]);
+  const [tacticalHistory, setTacticalHistory] = useState<{ type: string, lat: number, lng: number, time: Date, wind: number, temp: number, photoUrl?: string | null }[]>([]);
 
   const soundsQuery = useMemoFirebase(() => (firestore) ? query(collection(firestore, 'sound_library'), orderBy('label', 'asc')) : null, [firestore]);
   const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
@@ -320,7 +320,7 @@ export default function VesselTrackerPage() {
     update();
   }, [user, firestore, sharingId, customFleetId, vesselNickname, isGhostMode]);
 
-  const handleTacticalEvent = async (label: string) => {
+  const handleTacticalEvent = async (label: string, photo?: string | null) => {
     if (!firestore || !currentPos || !isSharing) return;
     
     toast({ title: `${label} signalé`, description: "Récupération météo IA..." });
@@ -335,6 +335,7 @@ export default function VesselTrackerPage() {
 
     const newTacticalLog = {
         type: label,
+        photoUrl: photo || null,
         location: { latitude: currentPos.lat, longitude: currentPos.lng },
         wind: weatherInfo.wind,
         temp: weatherInfo.temp,
@@ -345,6 +346,7 @@ export default function VesselTrackerPage() {
     
     setTacticalHistory(prev => [{
         type: label,
+        photoUrl: photo || null,
         lat: currentPos.lat,
         lng: currentPos.lng,
         time: new Date(),
@@ -353,6 +355,17 @@ export default function VesselTrackerPage() {
     }, ...prev].slice(0, 50));
 
     updateVesselInFirestore({ eventLabel: label });
+  };
+
+  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const photo = event.target?.result as string;
+        handleTacticalEvent('PRISE (PHOTO)', photo);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleClearLogs = async (type: 'tech' | 'tactique') => {
@@ -461,12 +474,6 @@ export default function VesselTrackerPage() {
     const customText = vesselSmsMessage ? vesselSmsMessage : "Requiert assistance immédiate.";
     const body = `${nicknamePrefix}${customText} [${type}] Position : ${posUrl}`;
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
-  };
-
-  const saveVesselPrefs = async (newPrefs: typeof vesselPrefs) => {
-    if (!user || !firestore) return;
-    setVesselPrefs(newPrefs);
-    await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
   };
 
   const toggleWakeLock = async () => {
@@ -585,11 +592,18 @@ export default function VesselTrackerPage() {
                           </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
-                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation" onClick={() => handleTacticalEvent('MARLIN')}><Fish className="size-4 text-blue-600" /> MARLIN</Button>
-                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation" onClick={() => handleTacticalEvent('THON')}><Fish className="size-4 text-red-600" /> THON</Button>
-                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation" onClick={() => handleTacticalEvent('TAZARD')}><Fish className="size-4 text-emerald-600" /> TAZARD</Button>
-                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation" onClick={() => handleTacticalEvent('OISEAUX')}><Bird className="size-4 text-slate-600" /> OISEAUX</Button>
+                      <div className="grid grid-cols-2 gap-2 p-2 bg-white rounded-2xl border-2">
+                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation" onClick={() => handleTacticalEvent('OISEAUX', null)}><Bird className="size-4 text-slate-600" /> OISEAUX</Button>
+                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation" onClick={() => handleTacticalEvent('THON', null)}><Fish className="size-4 text-red-600" /> THON</Button>
+                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation text-orange-600" onClick={() => handleTacticalEvent('MAHI MAHI', null)}><Fish className="size-4 text-orange-600" /> MAHI MAHI</Button>
+                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation" onClick={() => handleTacticalEvent('TAZARD', null)}><Fish className="size-4 text-emerald-600" /> TAZARD</Button>
+                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation" onClick={() => handleTacticalEvent('WAHOO', null)}><Fish className="size-4 text-blue-600" /> WAHOO</Button>
+                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation text-indigo-600" onClick={() => handleTacticalEvent('BONITE', null)}><Fish className="size-4 text-indigo-600" /> BONITE</Button>
+                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2 touch-manipulation text-cyan-600" onClick={() => handleTacticalEvent('SARDINES', null)}><Waves className="size-4 text-cyan-600" /> SARDINES</Button>
+                          <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-primary/5 text-primary border-primary/20 gap-2 touch-manipulation" onClick={() => photoInputRef.current?.click()}>
+                              <Camera className="size-5" /> PRISE (PHOTO)
+                          </Button>
+                          <input type="file" accept="image/*" capture="environment" ref={photoInputRef} className="hidden" onChange={handlePhotoCapture} />
                       </div>
 
                       <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3 border-2 border-white/20 touch-manipulation" onClick={handleStopSharing}>
@@ -653,7 +667,7 @@ export default function VesselTrackerPage() {
                               {tacticalHistory.map((log, i) => (
                                   <div key={i} onClick={() => { if(googleMap) { googleMap.panTo({ lat: log.lat, lng: log.lng }); googleMap.setZoom(16); } }} className="flex justify-between items-center p-3 bg-white rounded-xl border-2 text-[9px] font-black shadow-sm cursor-pointer active:scale-95 transition-all">
                                       <div className="flex items-center gap-3">
-                                          <div className="size-2 rounded-full bg-primary" />
+                                          {log.photoUrl ? <img src={log.photoUrl} className="size-8 rounded-lg object-cover border" alt="prise" /> : <div className="size-2 rounded-full bg-primary" />}
                                           <span className="uppercase">{log.type}</span>
                                       </div>
                                       <div className="flex items-center gap-3 text-muted-foreground">
