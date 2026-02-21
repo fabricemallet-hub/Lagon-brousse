@@ -97,6 +97,7 @@ import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { UserAccount, VesselStatus, SoundLibraryEntry } from '@/lib/types';
+import { useGoogleMaps } from '@/context/google-maps-context';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -218,6 +219,7 @@ export default function VesselTrackerPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { isLoaded, loadError } = useGoogleMaps();
   
   const [appMode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
@@ -264,8 +266,6 @@ export default function VesselTrackerPage() {
   }, [firestore, user, savedVesselIds, emetteur.isSharing, emetteur.sharingId]);
 
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
-
-  const [history, setHistory] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean }[]>([]);
 
   const activeAnchorVessel = useMemo(() => {
     if (!followedVessels || mapCore.isCirclesHidden) return null;
