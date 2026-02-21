@@ -11,8 +11,8 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v73.1 : "Initialisation Forcée"
- * Répare le bug de visibilité au lancement en forçant le premier sync Firestore.
+ * LOGIQUE ÉMETTEUR (A) v73.2 : "Mouillage Automatique"
+ * Utilise le rayon configuré pour détecter la stabilité GPS sur 30s.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -53,6 +53,7 @@ export function useEmetteur(
   const lastSentStatusRef = useRef<string | null>(null);
   const lastStatusChangeRef = useRef<Date>(new Date());
   const isBatteryAlertSentRef = useRef<boolean>(false);
+  const lastHeartbeatPosRef = useRef<{ lat: number, lng: number } | null>(null);
   
   const currentPosRef = useRef(currentPos);
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
@@ -121,7 +122,7 @@ export function useEmetteur(
 
     setTechLogs(prev => {
         const lastLog = prev[0];
-        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE';
+        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE' || label === 'MOUILLAGE AUTO';
 
         if (!statusChanged && label === 'AUTO') {
             const duration = differenceInMinutes(now, lastLog.time);
@@ -153,7 +154,6 @@ export function useEmetteur(
 
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
     if (!user || !firestore) return;
-    // Si on n'est pas en partage ET que ce n'est pas un appel forcé (initialisation), on sort
     if (!isSharing && !force) return;
     if (simulator?.isComCut) return; 
     
@@ -272,17 +272,40 @@ export function useEmetteur(
     });
   }, [vesselStatus, anchorPos, mooringRadius, addTechLog, updateVesselInFirestore]);
 
+  // HEARTBEAT + LOGIQUE DE MOUILLAGE AUTO (v73.2)
   useEffect(() => {
     if (isSharing) {
         heartbeatIntervalRef.current = setInterval(() => {
+            const nowPos = currentPosRef.current;
+            const lastPos = lastHeartbeatPosRef.current;
+            
+            if (nowPos && lastPos && vesselStatus === 'moving') {
+                const dist = getDistance(nowPos.lat, nowPos.lng, lastPos.lat, lastPos.lng);
+                // Si le déplacement en 30s est inférieur au rayon configuré, on considère l'arrêt
+                if (dist < mooringRadius) {
+                    setVesselStatus('stationary');
+                    setAnchorPos(nowPos);
+                    addTechLog('MOUILLAGE AUTO', 'Détecté par stabilité GPS (30s)');
+                    
+                    updateVesselInFirestore({ 
+                        status: 'stationary', 
+                        anchorLocation: { latitude: nowPos.lat, longitude: nowPos.lng } 
+                    });
+                    
+                    toast({ title: "MOUILLAGE AUTO", description: "Navire stabilisé. Cercle activé." });
+                }
+            }
+
+            lastHeartbeatPosRef.current = nowPos;
             addTechLog('AUTO', 'Heartbeat 30s');
             updateVesselInFirestore({});
         }, 30000);
     } else {
+        lastHeartbeatPosRef.current = null;
         if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
     }
     return () => { if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current); };
-  }, [isSharing, addTechLog, updateVesselInFirestore]);
+  }, [isSharing, addTechLog, updateVesselInFirestore, vesselStatus, mooringRadius, toast]);
 
   useEffect(() => {
     if (!simulator?.isActive || !simulator.simPos || !isSharing) return;
@@ -298,9 +321,8 @@ export function useEmetteur(
     navigator.geolocation.getCurrentPosition((pos) => {
         const { latitude, longitude } = pos.coords;
         setCurrentPos({ lat: latitude, lng: longitude });
+        lastHeartbeatPosRef.current = { lat: latitude, lng: longitude };
         
-        // FORCE SYNC : On force l'écriture Firestore immédiatement avec le statut 'moving' par défaut
-        // Cela garantit que le marqueur apparaît instantanément sur la carte pour tout le monde.
         updateVesselInFirestore({
             location: { latitude, longitude },
             status: 'moving',
@@ -353,6 +375,7 @@ export function useEmetteur(
     setTechLogs([]);
     setTacticalLogs([]);
     lastSentStatusRef.current = null;
+    lastHeartbeatPosRef.current = null;
     handleStopCleanupRef.current?.(); 
     toast({ title: "PARTAGE ARRÊTÉ" });
   }, [firestore, sharingId, toast, addTechLog]);

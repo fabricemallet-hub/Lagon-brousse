@@ -367,6 +367,7 @@ export default function VesselTrackerPage() {
                     onDragStart={() => mapCore.setIsFollowMode(false)}
                     options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
                 >
+                    {/* NETTOYAGE FORCÉ : On utilise une clé unique basée sur la position pour forcer le re-rendu du cercle */}
                     {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                         <React.Fragment key={`mooring-singleton-${activeAnchorVessel.id}`}>
                             <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
@@ -374,7 +375,12 @@ export default function VesselTrackerPage() {
                                     <Anchor className="size-3.5 text-white" />
                                 </div>
                             </OverlayView>
-                            <Circle center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} radius={activeAnchorVessel.mooringRadius || 100} options={{ strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6', strokeOpacity: 0.8, strokeWeight: 3, fillColor: '#3b82f6', fillOpacity: 0.15, clickable: false, zIndex: 1 }} />
+                            <Circle 
+                                key={`circle-${activeAnchorVessel.id}-${activeAnchorVessel.anchorLocation.latitude}-${activeAnchorVessel.anchorLocation.longitude}`}
+                                center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
+                                radius={activeAnchorVessel.mooringRadius || 100} 
+                                options={{ strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6', strokeOpacity: 0.8, strokeWeight: 3, fillColor: '#3b82f6', fillOpacity: 0.15, clickable: false, zIndex: 1 }} 
+                            />
                         </React.Fragment>
                     )}
                     {followedVessels?.filter(v => v.isSharing && v.location).map(vessel => (
@@ -382,7 +388,6 @@ export default function VesselTrackerPage() {
                             <VesselMarker vessel={vessel} />
                         </OverlayView>
                     ))}
-                    {/* RENDU LOCAL PRIORITAIRE : On affiche le bateau local immédiatement depuis l'état GPS local si Firestore n'a pas encore réagi */}
                     {emetteur.isSharing && emetteur.currentPos && !followedVessels?.find(v => v.id === emetteur.sharingId && v.isSharing) && (
                         <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                             <VesselMarker vessel={{ 
@@ -456,7 +461,7 @@ export default function VesselTrackerPage() {
                           <CardContent className="p-5 space-y-5">
                               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">Mon Surnom</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg" /></div>
                               <div className="grid grid-cols-2 gap-3">
-                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
+                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 text-indigo-600">ID Flotte</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase" /></div>
                               </div>
                               <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl gap-3" onClick={emetteur.startSharing}><Zap className="size-5 fill-white" /> Lancer le Partage GPS</Button>
@@ -529,7 +534,7 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v73.1 prêt - Initialisation Immédiate OK</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v73.2 prêt - Mouillage Auto OK</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-2 border rounded-lg bg-white flex justify-between items-center text-[9px] shadow-sm cursor-pointer", log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') ? 'border-red-200 bg-red-50' : '')} onClick={() => handleCopyLogEntry(log)}>
                                                   <div className="flex flex-col gap-0.5">
