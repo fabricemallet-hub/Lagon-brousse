@@ -93,7 +93,9 @@ import {
   Copy,
   BatteryLow,
   BatteryMedium,
-  History
+  History,
+  MousePointer2,
+  Undo2
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -199,6 +201,12 @@ export default function VesselTrackerPage() {
   }, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
+  const isAdmin = useMemo(() => {
+    if (!user) return false;
+    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com', 'kledostyle@hotmail.com', 'kledostyle@outlook.com'];
+    return masterEmails.includes(user.email?.toLowerCase() || '') || userProfile?.role === 'admin';
+  }, [user, userProfile]);
+
   const [testMinutes, setTestTestMinutes] = useState('60');
 
   const savedVesselIds = userProfile?.savedVesselIds || [];
@@ -238,6 +246,13 @@ export default function VesselTrackerPage() {
     else toast({ description: "En attente de signal GPS..." });
   };
 
+  const handleMapClick = (e: google.maps.MapMouseEvent) => {
+    if (simulator.isTeleportMode && e.latLng) {
+        simulator.teleport(e.latLng.lat(), e.latLng.lng());
+        toast({ title: "Position Sandbox injectée" });
+    }
+  };
+
   const activeAnchorVessel = useMemo(() => {
     if (mapCore.isCirclesHidden) return null;
     if (emetteur.isSharing && (emetteur.vesselStatus === 'stationary' || emetteur.vesselStatus === 'drifting') && emetteur.anchorPos) {
@@ -271,7 +286,7 @@ export default function VesselTrackerPage() {
             <Button variant={mapCore.viewMode === 'gamma' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" onClick={() => mapCore.setViewMode('gamma')}>Windy</Button>
         </div>
 
-        <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={12} onLoad={mapCore.setGoogleMap} onDragStart={() => mapCore.setIsFollowMode(false)} options={{ disableDefaultUI: true, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}>
+        <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={12} onLoad={mapCore.setGoogleMap} onDragStart={() => mapCore.setIsFollowMode(false)} onClick={handleMapClick} options={{ disableDefaultUI: true, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}>
             {!emetteur.isTrajectoryHidden && mapCore.breadcrumbs.length > 1 && <Polyline path={mapCore.breadcrumbs.map(p => ({ lat: p.lat, lng: p.lng }))} options={{ strokeColor: '#3b82f6', strokeOpacity: 0.6, strokeWeight: 2, zIndex: 1 }} />}
             {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                 <React.Fragment>
@@ -293,6 +308,14 @@ export default function VesselTrackerPage() {
             <Button onClick={() => mapCore.setIsFollowMode(!mapCore.isFollowMode)} className={cn("h-10 w-10 border-2 shadow-xl rounded-xl transition-all", mapCore.isFollowMode ? "bg-primary text-white" : "bg-white text-primary")}>{mapCore.isFollowMode ? <Lock className="size-5" /> : <Unlock className="size-5" />}</Button>
             <Button onClick={handleRecenter} className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl hover:bg-white flex items-center justify-center"><LocateFixed className="size-5"/></Button>
         </div>
+
+        {simulator.isTeleportMode && (
+            <div className="absolute inset-0 z-[140] pointer-events-none border-4 border-primary animate-pulse flex items-center justify-center">
+                <div className="bg-primary text-white px-6 py-2 rounded-full font-black uppercase text-xs shadow-2xl">
+                    CLIQUEZ SUR LA CARTE POUR INJECTER LE GPS
+                </div>
+            </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4">
@@ -387,10 +410,11 @@ export default function VesselTrackerPage() {
                       </AccordionTrigger>
                       <AccordionContent className="p-0">
                           <Tabs defaultValue="tactical" className="w-full">
-                              <TabsList className="grid grid-cols-3 h-12 bg-muted/20 border-y rounded-none">
+                              <TabsList className={cn("grid h-12 bg-muted/20 border-y rounded-none", isAdmin ? "grid-cols-4" : "grid-cols-3")}>
                                   <TabsTrigger value="tactical" className="text-[10px] font-black uppercase gap-2"><Fish className="size-3" /> Tactique</TabsTrigger>
                                   <TabsTrigger value="technical" className="text-[10px] font-black uppercase gap-2"><HistoryIcon className="size-3" /> Journal</TabsTrigger>
-                                  <TabsTrigger value="settings" className="text-[10px] font-black uppercase gap-2 text-primary"><Settings className="size-3" /> Réglages</TabsTrigger>
+                                  <TabsTrigger value="settings" className="text-[10px] font-black uppercase gap-2"><Settings className="size-3" /> Réglages</TabsTrigger>
+                                  {isAdmin && <TabsTrigger value="labo" className="text-[10px] font-black uppercase gap-2 text-primary"><TestTube2 className="size-3" /> Labo</TabsTrigger>}
                               </TabsList>
                               
                               <TabsContent value="tactical" className="m-0 bg-white p-4 space-y-4">
@@ -418,12 +442,12 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v77.0 prêt - Mode Labo OK</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v78.0 prêt - Sandbox Active</div>
                                           {emetteur.techLogs.map((log, i) => (
-                                              <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm border-slate-100", (log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') || log.label === 'DÉRIVE') && 'border-red-200 bg-red-50')}>
+                                              <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm border-slate-100", (log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') || log.label === 'DÉRIVE' || log.label === 'SANDBOX') && 'border-red-200 bg-red-50')}>
                                                   <div className="flex justify-between items-start">
                                                       <div className="flex flex-col gap-0.5">
-                                                          <span className={cn("font-black uppercase text-[10px]", log.label.includes('ÉNERGIE') || log.label.includes('URGENCE') || log.label === 'DÉRIVE' ? 'text-red-600' : 'text-slate-800')}>
+                                                          <span className={cn("font-black uppercase text-[10px]", log.label.includes('ÉNERGIE') || log.label.includes('URGENCE') || log.label === 'DÉRIVE' || log.label === 'SANDBOX' ? 'text-red-600' : 'text-slate-800')}>
                                                               {log.label} {log.durationMinutes > 0 ? `(${log.durationMinutes} min)` : ''}
                                                               <span className={cn("ml-1", 
                                                                   log.status === 'moving' ? "text-blue-600" :
@@ -465,21 +489,6 @@ export default function VesselTrackerPage() {
                                       <Button variant="outline" className="w-full h-12 font-black uppercase text-[10px] border-2 bg-white text-slate-900 mt-2 gap-2" onClick={emetteur.resetTrajectory}><HistoryIcon className="size-4" /> RESET TRAJECTOIRE</Button>
                                   </div>
 
-                                  <div className="space-y-4 p-4 border-2 border-dashed border-primary/30 rounded-2xl bg-primary/5">
-                                      <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 flex items-center gap-2"><TestTube2 className="size-3" /> Labo : Test Télémétrie & Temps</p>
-                                      <div className="space-y-2">
-                                          <Label className="text-[9px] font-black uppercase opacity-60">Avancer le temps du statut (min)</Label>
-                                          <div className="flex gap-2">
-                                              <Input type="number" value={testMinutes} onChange={e => setTestTestMinutes(e.target.value)} className="h-10 border-2 font-black text-center" />
-                                              <Button className="h-10 font-black uppercase text-[10px] gap-2" onClick={() => emetteur.forceTimeOffset(parseInt(testMinutes))}>Injecter Temps</Button>
-                                          </div>
-                                      </div>
-                                      <div className="flex items-center justify-between p-2 bg-white rounded-xl border">
-                                          <div className="space-y-0.5"><Label className="text-[10px] font-black uppercase">Perte de Signal</Label><p className="text-[8px] font-bold text-muted-foreground uppercase">Couper updates Firestore</p></div>
-                                          <Switch checked={simulator.isComCut} onCheckedChange={simulator.setIsComCut} />
-                                      </div>
-                                  </div>
-
                                   <Button className="w-full h-14 font-black uppercase tracking-widest shadow-lg rounded-2xl bg-primary text-white" onClick={() => recepteur.savePrefsToFirestore()}>ENREGISTRER LES RÉGLAGES</Button>
                                   <div className="flex items-center justify-between p-4 bg-primary/5 rounded-2xl border-2 border-primary/10"><Label className="text-xs font-black uppercase">Activer les signaux sonores</Label><Switch checked={recepteur.vesselPrefs.isNotifyEnabled} onCheckedChange={v => recepteur.updateLocalPrefs({ isNotifyEnabled: v })} /></div>
                                   <div className="space-y-3"><Label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2"><Volume2 className="size-3" /> Volume global</Label><Slider value={[recepteur.vesselPrefs.volume * 100]} max={100} onValueChange={v => recepteur.updateLocalPrefs({ volume: v[0] / 100 })} /></div>
@@ -491,6 +500,61 @@ export default function VesselTrackerPage() {
                                       </div>
                                   </div>
                               </TabsContent>
+
+                              {isAdmin && (
+                                <TabsContent value="labo" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
+                                    <div className="space-y-4 p-4 border-2 border-dashed border-red-200 rounded-3xl bg-red-50/30">
+                                        <div className="flex items-center justify-between border-b pb-2">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique</p>
+                                            <Switch checked={simulator.isActive} onCheckedChange={simulator.setIsActive} />
+                                        </div>
+                                        
+                                        <div className={cn("space-y-4", !simulator.isActive && "opacity-40 pointer-events-none")}>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <Button variant={simulator.isTeleportMode ? "default" : "outline"} className="h-12 text-[10px] font-black uppercase gap-2 border-2" onClick={() => simulator.setIsTeleportMode(!simulator.isTeleportMode)}>
+                                                    <MousePointer2 className="size-4" /> Injection Clic
+                                                </Button>
+                                                <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2" onClick={() => simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius)}>
+                                                    <Move className="size-4" /> Forcer Dérive
+                                                </Button>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-[9px] font-black uppercase">
+                                                    <span>Vitesse Simulée</span>
+                                                    <span className="text-red-600">{simulator.simSpeed} ND</span>
+                                                </div>
+                                                <Slider value={[simulator.simSpeed]} max={30} step={1} onValueChange={v => simulator.setSimSpeed(v[0])} />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-[9px] font-black uppercase">
+                                                    <span>Batterie Simulée</span>
+                                                    <span className="text-red-600">{simulator.simBattery}%</span>
+                                                </div>
+                                                <Slider value={[simulator.simBattery]} min={1} max={100} step={1} onValueChange={v => simulator.setSimBattery(v[0])} />
+                                            </div>
+
+                                            <div className="flex items-center justify-between p-2 bg-white rounded-xl border">
+                                                <div className="space-y-0.5"><Label className="text-[10px] font-black uppercase">Perte de Signal</Label><p className="text-[8px] font-bold text-muted-foreground uppercase">Couper updates Firestore</p></div>
+                                                <Switch checked={simulator.isComCut} onCheckedChange={simulator.setIsComCut} />
+                                            </div>
+
+                                            <div className="space-y-2 border-t pt-3">
+                                                <Label className="text-[9px] font-black uppercase opacity-60">Avancer le temps (min)</Label>
+                                                <div className="flex gap-2">
+                                                    <Input type="number" value={testMinutes} onChange={e => setTestTestMinutes(e.target.value)} className="h-10 border-2 font-black text-center" />
+                                                    <Button className="h-10 font-black uppercase text-[10px] gap-2" onClick={() => emetteur.forceTimeOffset(parseInt(testMinutes))}>Injecter</Button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <Button variant="outline" className="w-full h-12 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => { simulator.stopSim(); emetteur.resetTrajectory(); }}>
+                                            <Undo2 className="size-4" /> Rétablir GPS Réel
+                                        </Button>
+                                    </div>
+                                </TabsContent>
+                              )}
                           </Tabs>
                       </AccordionContent>
                   </AccordionItem>

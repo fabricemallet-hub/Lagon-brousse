@@ -4,18 +4,20 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
 /**
- * HOOK SIMULATEUR v77.0 : Gère l'état et les commandes de simulation tactique.
- * Ajout de la gestion du décalage temporel (Time Offset) pour les tests de seuils.
+ * HOOK SIMULATEUR v78.0 : "Sandbox Tactique Totale"
+ * Gère l'état et les commandes de simulation GPS, vitesse et batterie.
  */
 export function useSimulator() {
   const [isActive, setIsActive] = useState(false);
   const [isGpsCut, setIsGpsCut] = useState(false);
   const [isComCut, setIsComCut] = useState(false);
-  const [simSpeed, setSimSpeed] = useState(15);
-  const [simAccuracy, setSimAccuracy] = useState(5);
-  const [simPos, setSimPos] = useState<{lat: number, lng: number} | null>(null);
+  const [isTeleportMode, setIsTeleportMode] = useState(false);
   
-  // Décalage temporel en minutes (pour simuler le passé)
+  // États simulés
+  const [simSpeed, setSimSpeed] = useState(0);
+  const [simAccuracy, setSimAccuracy] = useState(5);
+  const [simBattery, setSimBattery] = useState(100);
+  const [simPos, setSimPos] = useState<{lat: number, lng: number} | null>(null);
   const [timeOffset, setTimeOffset] = useState(0);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -30,45 +32,41 @@ export function useSimulator() {
     setIsActive(false);
     setIsGpsCut(false);
     setIsComCut(false);
+    setIsTeleportMode(false);
+    setSimSpeed(0);
     setTimeOffset(0);
     setSimPos(null);
     if (timerRef.current) clearInterval(timerRef.current);
   }, []);
 
-  const teleport = useCallback((newPos: {lat: number, lng: number}) => {
-    setSimPos(newPos);
-    setIsActive(true);
-  }, []);
-
-  const nudge = useCallback((anchorPos: {lat: number, lng: number} | null, radius: number) => {
-    if (!anchorPos) return;
-    const degPerMeter = 1 / 111320;
-    const nudgeDist = radius * 0.9;
-    const angle = Math.random() * Math.PI * 2;
-    const offsetLat = Math.cos(angle) * (nudgeDist * degPerMeter);
-    const offsetLng = Math.sin(angle) * (nudgeDist * degPerMeter);
-    setSimPos({ lat: anchorPos.lat + offsetLat, lng: anchorPos.lng + offsetLng });
-    setIsActive(true);
-  }, []);
+  const teleport = useCallback((lat: number, lng: number) => {
+    setSimPos({ lat, lng });
+    if (!isActive) setIsActive(true);
+    setIsTeleportMode(false);
+  }, [isActive]);
 
   const forceDrift = useCallback((anchorPos: {lat: number, lng: number} | null, radius: number) => {
     if (!anchorPos) return;
     const degPerMeter = 1 / 111320;
-    const driftDist = radius + 30;
-    const angle = Math.random() * Math.PI * 2;
+    const driftDist = radius + 20; // Juste assez pour sortir
+    const angle = 45 * (Math.PI / 180);
     const offsetLat = Math.cos(angle) * (driftDist * degPerMeter);
     const offsetLng = Math.sin(angle) * (driftDist * degPerMeter);
     setSimPos({ lat: anchorPos.lat + offsetLat, lng: anchorPos.lng + offsetLng });
+    setSimSpeed(1); // Faible vitesse pour simuler la dérive
     setIsActive(true);
   }, []);
 
+  // Boucle de mouvement automatique (vitesse > 0)
   useEffect(() => {
     if (isActive && simSpeed > 0 && !isGpsCut) {
         timerRef.current = setInterval(() => {
             setSimPos(prev => {
                 if (!prev) return prev;
-                const degPerSecAt15Kts = 0.00007; 
-                const step = (simSpeed / 15) * degPerSecAt15Kts;
+                // Calcul du déplacement par seconde : 1 nds = 0.514 m/s
+                const metersPerSec = simSpeed * 0.514444;
+                const degPerMeter = 1 / 111320;
+                const step = metersPerSec * degPerMeter;
                 return { lat: prev.lat + step, lng: prev.lng + step };
             });
         }, 1000);
@@ -87,19 +85,22 @@ export function useSimulator() {
     setIsGpsCut,
     isComCut,
     setIsComCut,
+    isTeleportMode,
+    setIsTeleportMode,
     simSpeed,
     setSimSpeed,
     simAccuracy,
     setSimAccuracy,
+    simBattery,
+    setSimBattery,
     simPos,
     setSimPos,
     teleport,
     forceDrift,
-    nudge,
     timeOffset,
     setTimeOffset
   }), [
-    isActive, simPos, simSpeed, simAccuracy, isGpsCut, isComCut, timeOffset,
-    startSim, stopSim, teleport, forceDrift, nudge, setTimeOffset
+    isActive, simPos, simSpeed, simAccuracy, simBattery, isGpsCut, isComCut, isTeleportMode, timeOffset,
+    startSim, stopSim, teleport, forceDrift, setTimeOffset
   ]);
 }

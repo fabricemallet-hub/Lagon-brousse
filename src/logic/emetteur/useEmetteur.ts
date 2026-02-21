@@ -11,7 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v77.0 : "Mode Labo & Time Shifting"
+ * LOGIQUE ÉMETTEUR (A) v78.0 : "Sandbox & Multi-Source GPS"
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -80,7 +80,13 @@ export function useEmetteur(
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
+  // ÉCOUTEUR BATTERIE (Réel vs Simulé)
   useEffect(() => {
+    if (simulator?.isActive) {
+        setBattery({ level: simulator.simBattery / 100, charging: false });
+        return;
+    }
+
     if (typeof window === 'undefined' || !('getBattery' in navigator)) return;
     let batteryObj: any = null;
     const updateBatteryState = () => { if (batteryObj) setBattery({ level: batteryObj.level, charging: batteryObj.charging }); };
@@ -95,7 +101,7 @@ export function useEmetteur(
         batteryObj.removeEventListener('chargingchange', updateBatteryState);
       }
     };
-  }, []);
+  }, [simulator?.isActive, simulator?.simBattery]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -133,7 +139,7 @@ export function useEmetteur(
 
     setTechLogs(prev => {
         const lastLog = prev[0];
-        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE' || label === 'MOUILLAGE AUTO' || label === 'RESET' || label === 'LABO';
+        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE' || label === 'MOUILLAGE AUTO' || label === 'RESET' || label === 'LABO' || label === 'SANDBOX';
 
         if (!statusChanged && label === 'AUTO') {
             const duration = differenceInMinutes(now, lastLog.time);
@@ -234,7 +240,7 @@ export function useEmetteur(
   }, [updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, toast]);
 
   const handlePositionLogic = useCallback((lat: number, lng: number, speed: number, heading: number, acc: number) => {
-    const knotSpeed = speed * 1.94384;
+    const knotSpeed = speed;
     let nextStatus = vesselStatusRef.current;
 
     if (knotSpeed > 5) {
@@ -286,6 +292,19 @@ export function useEmetteur(
     });
   }, [addTechLog, updateVesselInFirestore]);
 
+  // ÉCOUTEUR POSITION SIMULÉE
+  useEffect(() => {
+    if (simulator?.isActive && simulator?.simPos) {
+        handlePositionLogic(
+            simulator.simPos.lat, 
+            simulator.simPos.lng, 
+            simulator.simSpeed, 
+            0, 
+            simulator.simAccuracy
+        );
+    }
+  }, [simulator?.isActive, simulator?.simPos, simulator?.simSpeed, simulator?.simAccuracy, handlePositionLogic]);
+
   useEffect(() => {
     if (isSharing) {
         heartbeatIntervalRef.current = setInterval(() => {
@@ -293,7 +312,7 @@ export function useEmetteur(
             const lastPos = lastHeartbeatPosRef.current;
             const currentStatus = vesselStatusRef.current;
             
-            if (nowPos && lastPos && currentStatus === 'moving') {
+            if (nowPos && lastPos && currentStatus === 'moving' && !simulator?.isActive) {
                 const dist = getDistance(nowPos.lat, nowPos.lng, lastPos.lat, lastPos.lng);
                 if (dist < mooringRadiusRef.current) {
                     vesselStatusRef.current = 'stationary';
@@ -312,7 +331,7 @@ export function useEmetteur(
         if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
     }
     return () => { if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current); };
-  }, [isSharing, addTechLog, updateVesselInFirestore]);
+  }, [isSharing, addTechLog, updateVesselInFirestore, simulator?.isActive]);
 
   const startSharing = useCallback(() => {
     if (!navigator.geolocation || !user || !firestore) return;
@@ -322,6 +341,7 @@ export function useEmetteur(
     addTechLog('LANCEMENT', 'Initialisation en cours...');
 
     navigator.geolocation.getCurrentPosition((pos) => {
+        if (simulator?.isActive) return;
         const { latitude, longitude } = pos.coords;
         setCurrentPos({ lat: latitude, lng: longitude });
         lastHeartbeatPosRef.current = { lat: latitude, lng: longitude };
@@ -334,13 +354,13 @@ export function useEmetteur(
             heading: pos.coords.heading || 0
         }, true);
 
-        handlePositionLogic(latitude, longitude, pos.coords.speed || 0, pos.coords.heading || 0, pos.coords.accuracy);
+        handlePositionLogic(latitude, longitude, (pos.coords.speed || 0) * 1.94384, pos.coords.heading || 0, pos.coords.accuracy);
     });
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         if (simulator?.isActive) return;
-        handlePositionLogic(pos.coords.latitude, pos.coords.longitude, pos.coords.speed || 0, pos.coords.heading || 0, pos.coords.accuracy);
+        handlePositionLogic(pos.coords.latitude, pos.coords.longitude, (pos.coords.speed || 0) * 1.94384, pos.coords.heading || 0, pos.coords.accuracy);
       },
       () => toast({ variant: 'destructive', title: "Signal GPS perdu" }),
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
