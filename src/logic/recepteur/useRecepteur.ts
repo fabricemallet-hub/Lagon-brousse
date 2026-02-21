@@ -18,7 +18,7 @@ export function useRecepteur(vesselId?: string) {
   const [audioAuthorized, setAudioAuthorized] = useState(false);
   const silentAudioRef = useRef<HTMLAudioElement | null>(null);
   
-  const [vesselPrefs, setVesselPrefs] = useState<VesselPrefs>({
+  const defaultPrefs: VesselPrefs = {
     volume: 0.8,
     isNotifyEnabled: true,
     batteryThreshold: 50,
@@ -32,7 +32,9 @@ export function useRecepteur(vesselId?: string) {
       tactical: { enabled: true, sound: 'gong-sms', loop: true },
       battery: { enabled: true, sound: 'alerte urgence', loop: false },
     }
-  });
+  };
+
+  const [vesselPrefs, setVesselPrefs] = useState<VesselPrefs>(defaultPrefs);
 
   const soundsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sound_library'), orderBy('label', 'asc')) : null, [firestore]);
   const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
@@ -42,7 +44,15 @@ export function useRecepteur(vesselId?: string) {
 
   useEffect(() => {
     if (profile?.vesselPrefs) {
-      setVesselPrefs(profile.vesselPrefs);
+      // MERGE INTELLIGENT pour éviter les crashs si Firestore a des champs manquants
+      setVesselPrefs(prev => ({
+        ...prev,
+        ...profile.vesselPrefs,
+        alerts: {
+          ...prev.alerts,
+          ...(profile.vesselPrefs.alerts || {})
+        }
+      }));
     }
   }, [profile]);
 

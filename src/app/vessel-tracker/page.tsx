@@ -381,7 +381,7 @@ export default function VesselTrackerPage() {
                           <div className="space-y-4 pt-4 border-t">
                               <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Réglages Sons Individuels</p>
                               <div className="grid gap-3">
-                                  {Object.entries(recepteur.vesselPrefs.alerts).map(([key, config]) => (
+                                  {Object.entries(recepteur.vesselPrefs?.alerts || {}).map(([key, config]) => (
                                       <div key={key} className="p-3 border-2 rounded-xl space-y-3 bg-slate-50/50">
                                           <div className="flex items-center justify-between">
                                               <Label className="text-[9px] font-black uppercase text-slate-700 flex items-center gap-2">
