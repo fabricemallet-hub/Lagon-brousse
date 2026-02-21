@@ -6,7 +6,7 @@ import { useEmetteur } from '@/logic/emetteur/useEmetteur';
 import { useRecepteur } from '@/logic/recepteur/useRecepteur';
 import { useFlotte } from '@/logic/flotteC/useFlotte';
 import { GoogleMap, OverlayView, Polyline, Circle } from '@react-google-maps/api';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -127,8 +127,7 @@ export default function VesselTrackerPage() {
   // SYNC TACTIQUE
   useEffect(() => {
     const ids = [];
-    if (emetteur.isSharing) ids.push(emetteur.sharingId || 'MASTER');
-    if (emetteur.customSharingId) ids.push(emetteur.sharingId);
+    if (emetteur.isSharing) ids.push(emetteur.sharingId);
     const unsub = mapCore.syncTacticalMarkers(ids);
     return () => unsub();
   }, [emetteur.isSharing, emetteur.sharingId, mapCore]);
@@ -155,8 +154,8 @@ export default function VesselTrackerPage() {
     const nickname = (emetteur.vesselNickname || 'Navire').toUpperCase();
     const type = 'MAYDAY';
     const customText = (emetteur.isCustomMessageEnabled && emetteur.vesselSmsMessage) ? emetteur.vesselSmsMessage : "Demande assistance immédiate.";
-    return `[${nickname}] ${customText} [${type}] Position : https://www.google.com/maps?q=-22.27,166.45`;
-  }, [emetteur.vesselNickname, emetteur.isCustomMessageEnabled, emetteur.vesselSmsMessage]);
+    return `[${nickname}] ${customText} [${type}] Position : https://www.google.com/maps?q=${emetteur.currentPos?.lat || 0},${emetteur.currentPos?.lng || 0}`;
+  }, [emetteur.vesselNickname, emetteur.isCustomMessageEnabled, emetteur.vesselSmsMessage, emetteur.currentPos]);
 
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
@@ -427,9 +426,10 @@ export default function VesselTrackerPage() {
                       </AccordionTrigger>
                       <AccordionContent className="p-0">
                           <Tabs defaultValue="tactical" className="w-full">
-                              <TabsList className="grid w-full grid-cols-2 h-10 rounded-none bg-muted/20 border-y">
-                                  <TabsTrigger value="tactical" className="text-[10px] font-black uppercase">Tactique (Carte)</TabsTrigger>
-                                  <TabsTrigger value="technical" className="text-[10px] font-black uppercase">Technique (Boîte Noire)</TabsTrigger>
+                              <TabsList className="grid w-full grid-cols-3 h-10 rounded-none bg-muted/20 border-y">
+                                  <TabsTrigger value="tactical" className="text-[10px] font-black uppercase">Tactique</TabsTrigger>
+                                  <TabsTrigger value="technical" className="text-[10px] font-black uppercase">Technique</TabsTrigger>
+                                  <TabsTrigger value="settings" className="text-[10px] font-black uppercase text-primary">Réglages Sons</TabsTrigger>
                               </TabsList>
                               
                               <TabsContent value="tactical" className="m-0 bg-white">
@@ -447,12 +447,17 @@ export default function VesselTrackerPage() {
                                           </Button>
                                       </div>
                                       <ScrollArea className="h-40 border-t pt-2">
-                                          {emetteur.tacticalLogs.map((log, i) => (
-                                              <div key={i} className="p-2 border-b flex justify-between items-center text-[10px] cursor-pointer hover:bg-muted/50" onClick={() => mapCore.handleRecenter(log.pos)}>
-                                                  <span className="font-black uppercase text-primary">{log.type}</span>
-                                                  <span className="font-bold opacity-40">{format(log.time, 'HH:mm')}</span>
-                                              </div>
-                                          ))}
+                                          <div className="space-y-1">
+                                            {emetteur.tacticalLogs.map((log, i) => (
+                                                <div key={i} className="p-2 border-b flex justify-between items-center text-[10px] cursor-pointer hover:bg-muted/50" onClick={() => mapCore.handleRecenter(log.pos)}>
+                                                    <span className="font-black uppercase text-primary flex items-center gap-2">
+                                                        {log.type === 'PHOTO' ? <Camera className="size-3"/> : <Fish className="size-3"/>}
+                                                        {log.type}
+                                                    </span>
+                                                    <span className="font-bold opacity-40">{format(log.time, 'HH:mm')}</span>
+                                                </div>
+                                            ))}
+                                          </div>
                                       </ScrollArea>
                                   </div>
                               </TabsContent>
@@ -469,13 +474,93 @@ export default function VesselTrackerPage() {
                                       <div className="space-y-2">
                                           <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v40.0 prêt - En attente de signal GPS</div>
                                           {emetteur.techLogs.map((log, i) => (
-                                              <div key={i} className="p-2 border rounded-lg bg-white flex justify-between items-center text-[9px] shadow-sm">
+                                              <div key={i} className="p-2 border rounded-lg bg-white flex justify-between items-center text-[9px] shadow-sm cursor-pointer hover:bg-slate-100" onClick={() => log.pos && mapCore.handleRecenter(log.pos)}>
                                                   <span className="font-black uppercase">{log.label}</span>
                                                   <span className="font-bold opacity-40">{format(log.time, 'HH:mm:ss')}</span>
                                               </div>
                                           ))}
                                       </div>
                                   </ScrollArea>
+                              </TabsContent>
+
+                              <TabsContent value="settings" className="m-0 bg-white p-4 space-y-6">
+                                <div className="flex items-center justify-between bg-primary/5 p-3 rounded-xl border-2 border-primary/10">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-xs font-black uppercase">Signaux Sonores Globaux</Label>
+                                        <p className="text-[8px] font-bold text-muted-foreground uppercase">Activer toutes les alertes audio</p>
+                                    </div>
+                                    <Switch checked={recepteur.vesselPrefs.isNotifyEnabled} onCheckedChange={v => recepteur.savePrefs({ isNotifyEnabled: v })} />
+                                </div>
+
+                                <div className="space-y-3">
+                                    <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                                        <Volume2 className="size-3" /> Volume Général ({Math.round(recepteur.vesselPrefs.volume * 100)}%)
+                                    </Label>
+                                    <Slider value={[recepteur.vesselPrefs.volume * 100]} max={100} step={1} onValueChange={v => recepteur.savePrefs({ volume: v[0] / 100 })} />
+                                </div>
+
+                                <div className="space-y-4 p-4 border-2 rounded-2xl bg-slate-50">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Timer className="size-3" /> Veille Stratégique</Label>
+                                        <Switch checked={recepteur.vesselPrefs.isWatchEnabled} onCheckedChange={v => recepteur.savePrefs({ isWatchEnabled: v })} />
+                                    </div>
+                                    <div className={cn("space-y-4", !recepteur.vesselPrefs.isWatchEnabled && "opacity-40 pointer-events-none")}>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-[9px] font-black uppercase"><span>Seuil d'immobilité</span><span>{recepteur.vesselPrefs.watchDuration >= 60 ? `${Math.floor(recepteur.vesselPrefs.watchDuration / 60)}h` : `${recepteur.vesselPrefs.watchDuration}m`}</span></div>
+                                            <Slider value={[recepteur.vesselPrefs.watchDuration]} min={60} max={1440} step={60} onValueChange={v => recepteur.savePrefs({ watchDuration: v[0] })} />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Select value={recepteur.vesselPrefs.watchSound} onValueChange={v => recepteur.savePrefs({ watchSound: v })}>
+                                                <SelectTrigger className="h-9 text-[10px] font-black uppercase w-full bg-white border-2">
+                                                    <SelectValue placeholder="Son..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {recepteur.availableSounds.map(s => <SelectItem key={s.id} value={s.label} className="text-[10px] uppercase font-black">{s.label}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                            <Button variant="ghost" size="icon" className="h-9 w-9 border-2" onClick={() => recepteur.playSound('watch')}><Play className="size-3" /></Button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase text-red-600 flex items-center gap-2"><Battery className="size-3" /> Seuil Batterie Faible</Label>
+                                    <div className="flex items-center gap-4">
+                                        <Slider className="flex-1" value={[recepteur.vesselPrefs.batteryThreshold]} min={5} max={90} step={5} onValueChange={v => recepteur.savePrefs({ batteryThreshold: v[0] })} />
+                                        <Badge variant="outline" className="font-black text-xs">{recepteur.vesselPrefs.batteryThreshold}%</Badge>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 pt-2 border-t border-dashed">
+                                    <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Réglages Sons Individuels</p>
+                                    <div className="grid gap-3">
+                                        {Object.entries(recepteur.vesselPrefs.alerts || {}).map(([key, config]) => (
+                                            <div key={key} className="p-3 border-2 rounded-xl space-y-3 bg-slate-50/50">
+                                                <div className="flex items-center justify-between">
+                                                    <Label className="text-[9px] font-black uppercase text-slate-700 flex items-center gap-2">
+                                                        <Bell className="size-3" /> {key === 'moving' ? 'MOUVEMENT' : key === 'stationary' ? 'MOUILLAGE' : key === 'offline' ? 'SIGNAL PERDU' : key === 'assistance' ? 'ASSISTANCE' : key === 'tactical' ? 'SIGNAL TACTIQUE' : 'BATTERIE FAIBLE'}
+                                                    </Label>
+                                                    <Switch checked={config.enabled} onCheckedChange={v => recepteur.savePrefs({ alerts: { ...recepteur.vesselPrefs.alerts, [key]: { ...config, enabled: v } } })} className="scale-75" />
+                                                </div>
+                                                <div className={cn("flex items-center gap-2", !config.enabled && "opacity-40")}>
+                                                    <Select value={config.sound} onValueChange={v => recepteur.savePrefs({ alerts: { ...recepteur.vesselPrefs.alerts, [key]: { ...config, sound: v } } })}>
+                                                        <SelectTrigger className="h-8 text-[9px] font-black uppercase flex-1 bg-white">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {recepteur.availableSounds.map(s => <SelectItem key={s.id} value={s.label} className="text-[9px] font-black uppercase">{s.label}</SelectItem>)}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <div className="flex items-center gap-1 bg-white border-2 rounded-lg px-2 h-8">
+                                                        <span className="text-[8px] font-black uppercase text-slate-400">Loop</span>
+                                                        <Switch checked={config.loop} onCheckedChange={v => recepteur.savePrefs({ alerts: { ...recepteur.vesselPrefs.alerts, [key]: { ...config, loop: v } } })} className="scale-50" />
+                                                    </div>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 border-2" onClick={() => recepteur.playSound(key as any)}><Play className="size-3" /></Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                               </TabsContent>
                           </Tabs>
                       </AccordionContent>
