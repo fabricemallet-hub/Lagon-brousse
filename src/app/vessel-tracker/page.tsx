@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { useMapCore, type WindyLayer } from '@/logic/shared/useMapCore';
+import { useMapCore } from '@/logic/shared/useMapCore';
 import { useSimulator } from '@/logic/shared/useSimulator';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
 import { useRecepteur } from '@/logic/recepteur/useRecepteur';
@@ -90,7 +90,7 @@ import {
   CloudLightning,
   Sun
 } from 'lucide-react';
-import { cn, getDistance } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -317,7 +317,7 @@ export default function VesselTrackerPage() {
     <div className="w-full space-y-4 pb-32 px-1 relative">
       {recepteur.isAlarmActive && (
         <Button 
-            className="fixed top-2 left-1/2 -translate-x-1/2 z-[10000] h-14 bg-red-600 hover:bg-red-700 text-white font-black uppercase shadow-2xl animate-bounce gap-3 px-8 rounded-full border-4 border-white"
+            className="fixed top-2 left-1/2 -translate-x-1/2 z-[10008] h-14 bg-red-600 hover:bg-red-700 text-white font-black uppercase shadow-2xl animate-bounce gap-3 px-8 rounded-full border-4 border-white transition-all active:scale-95"
             onClick={recepteur.stopAllAlarms}
         >
             <Volume2 className="size-6 animate-pulse" /> ARRÊTER LE SON
@@ -537,7 +537,13 @@ export default function VesselTrackerPage() {
                             </div>
                         </div>
 
-                        <Button className="w-full h-12 font-black uppercase text-[10px] bg-red-600 hover:bg-red-700" onClick={simulator.stopSim}>
+                        <Button 
+                            className="w-full h-12 font-black uppercase text-[10px] bg-red-600 hover:bg-red-700" 
+                            onClick={() => {
+                                simulator.stopSim();
+                                recepteur.stopAllAlarms();
+                            }}
+                        >
                             Désactiver Simulation
                         </Button>
                     </div>
@@ -635,7 +641,10 @@ export default function VesselTrackerPage() {
                                   <Button 
                                       variant="destructive" 
                                       className="w-full h-16 font-black uppercase text-xs tracking-widest shadow-xl rounded-2xl gap-3 border-4 border-white/20 transition-all active:scale-95" 
-                                      onClick={emetteur.stopSharing}
+                                      onClick={() => {
+                                          emetteur.stopSharing();
+                                          recepteur.stopAllAlarms();
+                                      }}
                                   >
                                       <X className="size-6 bg-white text-red-600 rounded-full p-1" /> ARRÊTER LE PARTAGE
                                   </Button>
@@ -895,7 +904,7 @@ export default function VesselTrackerPage() {
                                   </div>
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v62.0 prêt - Audio Débloqué</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v63.0 prêt - Audio Débloqué</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className="p-2 border rounded-lg bg-white flex justify-between items-center text-[9px] shadow-sm cursor-pointer hover:bg-slate-100" onClick={() => log.pos && mapCore.handleRecenter(log.pos)}>
                                                   <span className="font-black uppercase">{log.label}</span>
@@ -988,14 +997,14 @@ export default function VesselTrackerPage() {
 
                                   <div className="space-y-3 pt-2 border-t border-dashed">
                                       <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                                          <HistoryIcon className="size-3" /> Réglages Individuels
+                                          <HistoryIcon className="size-3" /> Réglages Individuels (Trigger Logic)
                                       </p>
                                       <div className="grid gap-3">
                                           {Object.entries(recepteur.vesselPrefs.alerts || {}).map(([key, config]) => (
                                               <div key={key} className="p-3 border-2 rounded-xl space-y-3 bg-slate-50/50 shadow-sm">
                                                   <div className="flex items-center justify-between">
                                                       <Label className="text-[9px] font-black uppercase text-slate-700 flex items-center gap-2">
-                                                          <Bell className="size-3" /> {key === 'moving' ? 'MOUVEMENT' : key === 'stationary' ? 'MOUILLAGE' : key === 'offline' ? 'SIGNAL PERDU' : key === 'assistance' ? 'ASSISTANCE' : key === 'tactical' ? 'SIGNAL TACTIQUE' : 'BATTERIE FAIBLE'}
+                                                          <Bell className="size-3" /> {key === 'moving' ? 'MOUVEMENT' : key === 'stationary' ? 'MOUILLAGE / DÉRIVE' : key === 'offline' ? 'SIGNAL PERDU' : key === 'assistance' ? 'ASSISTANCE' : key === 'tactical' ? 'SIGNAL TACTIQUE' : 'BATTERIE FAIBLE'}
                                                       </Label>
                                                       <Switch checked={config.enabled} onCheckedChange={v => recepteur.updateLocalPrefs({ alerts: { ...recepteur.vesselPrefs.alerts, [key]: { ...config, enabled: v } } })} className="scale-75" />
                                                   </div>

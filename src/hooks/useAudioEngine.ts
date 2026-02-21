@@ -3,38 +3,35 @@
 import { useState, useCallback, useRef } from 'react';
 
 /**
- * MOTEUR AUDIO v62.0
- * Gère le déblocage du flux audio sur mobile et la lecture des alarmes tactiques.
+ * MOTEUR AUDIO v63.0
+ * Gère le déblocage du flux audio sur mobile et la gestion des alarmes actives.
  */
 export function useAudioEngine() {
   const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isAlarmActive, setIsAlarmActive] = useState(false);
   const activeSoundsRef = useRef<Record<string, HTMLAudioElement>>({});
 
   /**
    * Débloque l'audio sur iOS/Android via une interaction utilisateur.
-   * Doit être appelé lors du clic sur "Lancer le partage" ou "Suivre".
    */
   const unlockAudio = useCallback(() => {
     if (isUnlocked || typeof window === 'undefined') return;
     
-    // Création d'un AudioContext silencieux pour réveiller le moteur
     const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
     if (AudioContextClass) {
       const ctx = new AudioContextClass();
+      if (ctx.state === 'suspended') ctx.resume();
+      
       const oscillator = ctx.createOscillator();
       const gainNode = ctx.createGain();
-      gainNode.gain.value = 0; // Silencieux
+      gainNode.gain.value = 0;
       oscillator.connect(gainNode);
       gainNode.connect(ctx.destination);
       oscillator.start(0);
       oscillator.stop(0.1);
       
-      if (ctx.state === 'suspended') {
-        ctx.resume();
-      }
-      
       setIsUnlocked(true);
-      console.log("AudioEngine: Unlocked for alerts");
+      console.log("AudioEngine: Unlocked by user interaction");
     }
   }, [isUnlocked]);
 
@@ -47,18 +44,22 @@ export function useAudioEngine() {
       audio.currentTime = 0;
     });
     activeSoundsRef.current = {};
+    setIsAlarmActive(false);
   }, []);
 
   /**
    * Joue un son avec gestion du volume et du bouclage.
    */
   const play = useCallback((id: string, url: string, volume: number = 1, loop: boolean = false) => {
-    // Si le son tourne déjà en boucle, on ne le relance pas
+    if (!isUnlocked) {
+        console.warn(`AudioEngine: Blocked - Unlock required for ${id}`);
+        return;
+    }
+
     if (activeSoundsRef.current[id] && activeSoundsRef.current[id].loop && !activeSoundsRef.current[id].paused) {
         return;
     }
 
-    // Arrête l'ancienne instance si elle existe
     if (activeSoundsRef.current[id]) {
       activeSoundsRef.current[id].pause();
     }
@@ -67,8 +68,10 @@ export function useAudioEngine() {
     audio.volume = Math.max(0, Math.min(1, volume));
     audio.loop = loop;
     
-    audio.play().catch(e => {
-        console.warn(`AudioEngine: Lecture bloquée pour ${id}. Attente interaction.`, e);
+    audio.play().then(() => {
+        setIsAlarmActive(true);
+    }).catch(e => {
+        console.warn(`AudioEngine: Play failed for ${id}`, e);
     });
 
     activeSoundsRef.current[id] = audio;
@@ -76,9 +79,12 @@ export function useAudioEngine() {
     audio.onended = () => {
       if (!loop) {
         delete activeSoundsRef.current[id];
+        if (Object.keys(activeSoundsRef.current).length === 0) {
+            setIsAlarmActive(false);
+        }
       }
     };
-  }, []);
+  }, [isUnlocked]);
 
   /**
    * Arrête un son spécifique.
@@ -87,8 +93,11 @@ export function useAudioEngine() {
     if (activeSoundsRef.current[id]) {
       activeSoundsRef.current[id].pause();
       delete activeSoundsRef.current[id];
+      if (Object.keys(activeSoundsRef.current).length === 0) {
+          setIsAlarmActive(false);
+      }
     }
   }, []);
 
-  return { unlockAudio, play, stop, stopAll, isUnlocked };
+  return { unlockAudio, play, stop, stopAll, isUnlocked, isAlarmActive };
 }
