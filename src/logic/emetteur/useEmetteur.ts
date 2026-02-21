@@ -12,7 +12,7 @@ import { getDistance } from '@/lib/utils';
 /**
  * LOGIQUE ÉMETTEUR (A) : "Le Cerveau"
  * Gère l'identité, le partage Firestore, l'historique et les changements de statut dynamiques.
- * v58.1 : Fix boucle de rendu infinie via refs pour callbacks.
+ * v58.2 : Fix boucle infinie par stabilisation des callbacks via Refs.
  */
 export function useEmetteur(
     onPositionUpdate?: (lat: number, lng: number) => void, 
@@ -37,7 +37,6 @@ export function useEmetteur(
   const [idsHistory, setIdsHistory] = useState<{ vId: string, fId: string }[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
-  // SMS & Urgence Settings
   const [emergencyContact, setEmergencyContact] = useState('');
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
@@ -49,15 +48,15 @@ export function useEmetteur(
   const watchIdRef = useRef<number | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
   const lastGpsCutRef = useRef<boolean>(false);
+  
+  // Pattern Latest Ref pour éviter les dépendances changeantes dans les callbacks
+  const currentPosRef = useRef(currentPos);
+  useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
 
-  // Sécurisation des callbacks via Ref pour briser les boucles de rendu
   const onPositionUpdateRef = useRef(onPositionUpdate);
   const onStopCleanupRef = useRef(onStopCleanup);
-
-  useEffect(() => {
-    onPositionUpdateRef.current = onPositionUpdate;
-    onStopCleanupRef.current = onStopCleanup;
-  }, [onPositionUpdate, onStopCleanup]);
+  useEffect(() => { onPositionUpdateRef.current = onPositionUpdate; }, [onPositionUpdate]);
+  useEffect(() => { onStopCleanupRef.current = onStopCleanup; }, [onStopCleanup]);
 
   // CHARGEMENT PERSISTANCE LOCALE
   useEffect(() => {
@@ -92,18 +91,10 @@ export function useEmetteur(
     }
   }, []);
 
-  // Persistance du statut et du rayon
   useEffect(() => {
     if (vesselStatus) localStorage.setItem('lb_vessel_status', vesselStatus);
     localStorage.setItem('lb_mooring_radius', mooringRadius.toString());
   }, [vesselStatus, mooringRadius]);
-
-  const saveSmsSettings = useCallback(() => {
-    localStorage.setItem('lb_emergency_contact', emergencyContact);
-    localStorage.setItem('lb_vessel_sms_message', vesselSmsMessage);
-    localStorage.setItem('lb_emergency_enabled', String(isEmergencyEnabled));
-    toast({ title: "Paramètres SMS sauvegardés" });
-  }, [emergencyContact, vesselSmsMessage, isEmergencyEnabled, toast]);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
@@ -113,11 +104,11 @@ export function useEmetteur(
         label: label.toUpperCase(),
         details: details || '',
         time: new Date(),
-        pos: currentPos
+        pos: currentPosRef.current
     };
     setTechLogs(prev => [logEntry, ...prev].slice(0, 50));
     addDoc(collection(firestore, 'vessels', sharingId, 'tech_logs'), { ...logEntry, time: serverTimestamp() }).catch(() => {});
-  }, [firestore, sharingId, currentPos]);
+  }, [firestore, sharingId]);
 
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>) => {
     if (!user || !firestore || !isSharing) return;
@@ -161,8 +152,6 @@ export function useEmetteur(
 
     setCurrentPos({ lat, lng });
     setAccuracy(acc);
-    
-    // Utilisation de la ref pour briser la boucle infinie
     onPositionUpdateRef.current?.(lat, lng);
 
     if (simulator.isGpsCut && !lastGpsCutRef.current) {
@@ -254,7 +243,7 @@ export function useEmetteur(
         }
 
         updateVesselInFirestore({ 
-            location: { latitude: longitude, longitude: latitude }, // Note: checking order lat/lng based on your interface
+            location: { latitude: longitude, longitude: latitude }, 
             status: nextStatus, 
             speed: Math.round(knotSpeed), 
             heading: heading || 0,

@@ -200,7 +200,6 @@ export default function VesselTrackerPage() {
   const mapCore = useMapCore();
   const simulator = useSimulator();
 
-  // Callbacks mémorisés pour éviter les boucles de rendu
   const handlePositionUpdate = useCallback((lat: number, lng: number) => {
     mapCore.updateBreadcrumbs(lat, lng);
     if (mapCore.isFollowMode && mapCore.googleMap) {
@@ -227,7 +226,9 @@ export default function VesselTrackerPage() {
   }, [user, firestore]);
   const { data: profile } = useDoc<UserAccount>(userDocRef);
 
-  const savedVesselIds = profile?.savedVesselIds || [];
+  // Stabilisation de la liste des IDs pour éviter la boucle infinie de requête vessels
+  const savedVesselIds = useMemo(() => profile?.savedVesselIds || [], [profile?.savedVesselIds]);
+  
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     const ids = [...savedVesselIds];
