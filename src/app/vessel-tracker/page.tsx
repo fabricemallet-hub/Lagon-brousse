@@ -51,6 +51,8 @@ import {
   Zap, 
   AlertTriangle,
   BatteryFull, 
+  BatteryCharging,
+  WifiOff,
   History as HistoryIcon, 
   MapPin, 
   X, 
