@@ -48,7 +48,9 @@ import {
   Unlock, 
   Save, 
   Battery,
-  MessageSquare
+  MessageSquare,
+  CheckCircle2,
+  Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -59,7 +61,6 @@ const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 export default function VesselTrackerPage() {
   const [appMode, setAppMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   
-  // 1. Initialisation des pôles isolés (Protection v40)
   const mapCore = useMapCore();
   const emetteur = useEmetteur(mapCore.updateBreadcrumbs);
   const recepteur = useRecepteur(emetteur.customSharingId);
@@ -67,18 +68,19 @@ export default function VesselTrackerPage() {
   
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  // Forcer le redimensionnement de la carte lors du changement de mode
+  // Synchronisation LED Sync
+  const [isLedActive, setIsLedActive] = useState(false);
   useEffect(() => {
-    if (mapCore.googleMap) {
-        setTimeout(() => {
-            google.maps.event.trigger(mapCore.googleMap, 'resize');
-        }, 300);
+    if (emetteur.lastSyncTime > 0) {
+      setIsLedActive(true);
+      const timer = setTimeout(() => setIsLedActive(false), 1500);
+      return () => clearTimeout(timer);
     }
-  }, [mapCore.viewMode, mapCore.googleMap]);
+  }, [emetteur.lastSyncTime]);
 
   return (
     <div className="w-full space-y-4 pb-32 px-1">
-      {/* SÉLECTEUR DE MODE GLOBAL - RESTAURATION FLOTTE (C) */}
+      {/* SÉLECTEUR DE MODE GLOBAL */}
       <div className="flex bg-slate-900 text-white p-1 rounded-xl shadow-lg border-2 border-primary/20 sticky top-0 z-[100]">
           <Button 
             variant={appMode === 'sender' ? 'default' : 'ghost'} 
@@ -105,9 +107,9 @@ export default function VesselTrackerPage() {
 
       {/* SÉLECTEUR DE MODE CARTE */}
       <div className="flex bg-muted/30 p-1 rounded-xl border relative z-20">
-          <Button variant={mapCore.viewMode === 'alpha' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('alpha')}>Alpha</Button>
-          <Button variant={mapCore.viewMode === 'beta' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('beta')}>Béta</Button>
-          <Button variant={mapCore.viewMode === 'gamma' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('gamma')}>Gamma</Button>
+          <Button variant={mapCore.viewMode === 'alpha' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('alpha')}>Maps</Button>
+          <Button variant={mapCore.viewMode === 'beta' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('beta')}>Météo</Button>
+          <Button variant={mapCore.viewMode === 'gamma' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-10" onClick={() => mapCore.setViewMode('gamma')}>Windy</Button>
       </div>
 
       {/* CONTENEUR CARTE */}
@@ -121,7 +123,7 @@ export default function VesselTrackerPage() {
                 onDragStart={() => mapCore.setIsFollowMode(false)}
                 options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
             >
-                {/* POSITION RÉELLE (ÉMETTEUR) */}
+                {/* POSITION RÉELLE */}
                 {emetteur.currentPos && (
                     <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -50%)' }} className="relative">
@@ -133,7 +135,7 @@ export default function VesselTrackerPage() {
                     </OverlayView>
                 )}
 
-                {/* BREADCRUMBS (Trace 30 min) */}
+                {/* BREADCRUMBS */}
                 {mapCore.breadcrumbs.length > 1 && (
                     <Polyline path={mapCore.breadcrumbs} options={{ strokeColor: "#3b82f6", strokeOpacity: 0.6, strokeWeight: 2 }} />
                 )}
@@ -174,130 +176,137 @@ export default function VesselTrackerPage() {
         </div>
       </div>
 
-      {/* PANNEAUX DE CONTRÔLE SELON MODE */}
+      {/* PANNEAUX DE CONTRÔLE */}
       <div className="grid grid-cols-1 gap-4">
           {appMode === 'sender' && (
               <div className="space-y-4 animate-in fade-in slide-in-from-left-2">
-                  {emetteur.isSharing ? (
-                      <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-2">
-                              <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-indigo-50 text-indigo-700 shadow-sm" onClick={() => emetteur.setManualStatus('returning', 'RETOUR MAISON')}>
-                                <Navigation className="size-4 mr-2" /> Retour Maison
-                              </Button>
-                              <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-green-50 text-green-700 shadow-sm" onClick={() => emetteur.setManualStatus('landed', 'À TERRE')}>
-                                <Home className="size-4 mr-2" /> Home (À terre)
-                              </Button>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                              <Button variant="destructive" className="h-14 font-black text-[10px] shadow-lg" onClick={() => flotte.triggerEmergency('MAYDAY', emetteur.emergencyContact, emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0)}>MAYDAY</Button>
-                              <Button variant="secondary" className="h-14 font-black text-[10px] border-2 border-orange-200 shadow-lg" onClick={() => flotte.triggerEmergency('PANPAN', emetteur.emergencyContact, emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0)}>PANPAN</Button>
-                              <Button variant="outline" className="h-14 font-black text-[10px] bg-red-50 text-red-600 animate-pulse border-2 shadow-lg" onClick={() => emetteur.setManualStatus('emergency', 'ASSISTANCE')}>ASSISTANCE</Button>
-                          </div>
-                          
-                          <div className="grid grid-cols-4 gap-2">
-                              <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => flotte.addTacticalLog('THON', emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0)}>
-                                <Target className="size-4 text-red-600"/> THON
-                              </Button>
-                              <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => flotte.addTacticalLog('TAZARD', emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0)}>
-                                <Fish className="size-4 text-emerald-600"/> TAZARD
-                              </Button>
-                              <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => flotte.addTacticalLog('OISEAUX', emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0)}>
-                                <Bird className="size-4 text-slate-500"/> OISEAUX
-                              </Button>
-                              <Button variant="secondary" className="h-12 flex-col gap-1 font-black text-[8px] border-2 shadow-sm" onClick={() => photoInputRef.current?.click()}>
-                                <Camera className="size-4 text-primary"/> PRISE
-                              </Button>
-                          </div>
-                          
-                          <input type="file" accept="image/*" capture="environment" ref={photoInputRef} className="hidden" onChange={e => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = (ev) => flotte.addTacticalLog('PHOTO', emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0, ev.target?.result as string);
-                                  reader.readAsDataURL(file);
-                              }
-                          }} />
-                          
-                          <Button variant="destructive" className="w-full h-16 font-black uppercase tracking-widest shadow-xl rounded-2xl border-2 border-white/20" onClick={emetteur.stopSharing}>
-                            <X className="size-5 mr-2" /> Arrêter le partage
-                          </Button>
-                      </div>
-                  ) : (
-                      <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
-                          <CardHeader className="bg-primary/5 p-4 border-b">
+                  <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
+                      <CardHeader className="bg-primary/5 p-4 border-b">
+                        <div className="flex items-center justify-between">
                             <CardTitle className="text-xs font-black uppercase flex items-center gap-2">
                                 <Navigation className="size-4 text-primary" /> Identité & Partage GPS
                             </CardTitle>
-                          </CardHeader>
-                          <CardContent className="p-4 space-y-4">
-                              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Surnom du Navire</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: BLACK PEARL" className="h-11 border-2 font-black uppercase" /></div>
-                              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Navire (Partage Direct)</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ID UNIQUE" className="h-11 border-2 font-black uppercase text-center tracking-widest" /></div>
-                              <Button className="w-full h-14 font-black uppercase tracking-widest shadow-xl" onClick={emetteur.startSharing}>Lancer le Partage GPS</Button>
-                          </CardContent>
-                      </Card>
-                  )}
+                            {emetteur.isSharing && (
+                                <div className="flex items-center gap-2">
+                                    <div className={cn(
+                                        "size-2.5 rounded-full bg-green-500 transition-all shadow-sm",
+                                        isLedActive ? "opacity-100 scale-125 shadow-[0_0_8px_rgba(34,197,94,0.8)]" : "opacity-30 scale-100"
+                                    )} />
+                                    <span className="text-[8px] font-black text-green-600 uppercase">Sync Active</span>
+                                </div>
+                            )}
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4 space-y-4">
+                          {!emetteur.isSharing ? (
+                              <div className="space-y-4">
+                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Surnom du Navire</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-11 border-2 font-black uppercase" /></div>
+                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Navire (Partage Direct)</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ID UNIQUE" className="h-11 border-2 font-black uppercase text-center tracking-widest" /></div>
+                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Flotte C (Communautaire)</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="ID GROUPE" className="h-11 border-2 font-black uppercase text-center tracking-widest" /></div>
+                                  <Button className="w-full h-14 font-black uppercase tracking-widest shadow-xl text-base" onClick={emetteur.startSharing}>Lancer le Partage GPS</Button>
+                              </div>
+                          ) : (
+                              <div className="space-y-4">
+                                  <div className="p-4 bg-primary/10 rounded-xl border-2 border-primary/20 flex flex-col items-center text-center gap-1">
+                                      <p className="text-[10px] font-black uppercase text-primary">Navire en cours de partage</p>
+                                      <p className="text-xl font-black uppercase">{emetteur.sharingId}</p>
+                                      <Badge variant="outline" className="bg-green-500 text-white border-none text-[8px] animate-pulse">EN LIGNE</Badge>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-2">
+                                      <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-indigo-50 text-indigo-700 shadow-sm" onClick={() => emetteur.setManualStatus('returning', 'RETOUR MAISON')}>
+                                        <Navigation className="size-4 mr-2" /> Retour Maison
+                                      </Button>
+                                      <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-green-50 text-green-700 shadow-sm" onClick={() => emetteur.setManualStatus('landed', 'À TERRE')}>
+                                        <Home className="size-4 mr-2" /> Home (À terre)
+                                      </Button>
+                                  </div>
+
+                                  <div className="grid grid-cols-4 gap-2">
+                                      <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => flotte.addTacticalLog('THON', emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0)}>
+                                        <Target className="size-4 text-red-600"/> THON
+                                      </Button>
+                                      <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => flotte.addTacticalLog('TAZARD', emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0)}>
+                                        <Fish className="size-4 text-emerald-600"/> TAZARD
+                                      </Button>
+                                      <Button variant="outline" className="h-12 flex-col gap-1 font-black text-[8px] border-2" onClick={() => flotte.addTacticalLog('OISEAUX', emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0)}>
+                                        <Bird className="size-4 text-slate-500"/> OISEAUX
+                                      </Button>
+                                      <Button variant="secondary" className="h-12 flex-col gap-1 font-black text-[8px] border-2 shadow-sm" onClick={() => photoInputRef.current?.click()}>
+                                        <Camera className="size-4 text-primary"/> PRISE
+                                      </Button>
+                                  </div>
+
+                                  <Button variant="destructive" className="w-full h-16 font-black uppercase tracking-widest shadow-xl rounded-2xl border-2 border-white/20" onClick={emetteur.stopSharing}>
+                                    <X className="size-5 mr-2" /> Arrêter le partage
+                                  </Button>
+                              </div>
+                          )}
+                      </CardContent>
+                  </Card>
+
+                  <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="id-history" className="border-none">
+                          <AccordionTrigger className="h-12 bg-white px-4 rounded-xl border-2 shadow-sm hover:no-underline">
+                              <div className="flex items-center gap-2 font-black uppercase text-[10px] text-slate-700">
+                                <HistoryIcon className="size-4 text-primary" /> Historique des IDs
+                              </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="pt-2 space-y-2">
+                              <div className="grid grid-cols-1 gap-2 p-2 bg-muted/10 rounded-xl">
+                                  <p className="text-[8px] font-black uppercase text-muted-foreground ml-1">Derniers navires</p>
+                                  {emetteur.vesselHistory.map(id => (
+                                      <div key={id} className="flex items-center justify-between p-2 bg-white border rounded-lg shadow-sm">
+                                          <code className="text-xs font-black text-primary">{id}</code>
+                                          <div className="flex gap-1">
+                                              <Button variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase" onClick={() => emetteur.setCustomSharingId(id)}>Utiliser</Button>
+                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => emetteur.deleteFromHistory('vessel', id)}><Trash2 className="size-3" /></Button>
+                                          </div>
+                                      </div>
+                                  ))}
+                                  {emetteur.vesselHistory.length === 0 && <p className="text-center py-4 text-[9px] italic opacity-40">Aucun historique</p>}
+                              </div>
+                          </AccordionContent>
+                      </AccordionItem>
+                  </Accordion>
               </div>
           )}
 
           {appMode === 'receiver' && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-2">
-                  <Card className="border-2 shadow-lg rounded-2xl overflow-hidden flex flex-col min-h-[400px]">
-                      <Tabs defaultValue="tech" className="flex flex-col h-full">
+              <div className="space-y-4 animate-in fade-in">
+                  <Card className="border-2 shadow-lg rounded-2xl overflow-hidden min-h-[400px]">
+                      <Tabs defaultValue="tech">
                           <TabsList className="grid grid-cols-2 h-12 bg-muted/30 border-b">
-                              <TabsTrigger value="tech" className="font-black uppercase text-[10px] gap-2"><Battery className="size-3" /> Technique</TabsTrigger>
-                              <TabsTrigger value="pref" className="font-black uppercase text-[10px] gap-2"><Settings className="size-3" /> Réglages</TabsTrigger>
+                              <TabsTrigger value="tech" className="font-black uppercase text-[10px]">Technique</TabsTrigger>
+                              <TabsTrigger value="pref" className="font-black uppercase text-[10px]">Réglages</TabsTrigger>
                           </TabsList>
-                          
-                          <TabsContent value="tech" className="flex-1 p-0 m-0">
+                          <TabsContent value="tech" className="p-0 m-0">
                               <ScrollArea className="h-[350px]">
                                   <div className="p-3 space-y-2">
-                                      <div className="flex items-center justify-between px-1 mb-2">
-                                          <span className="text-[9px] font-black uppercase text-muted-foreground">Historique Télémétrie</span>
-                                          <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase text-destructive border-2 border-dashed" onClick={mapCore.clearBreadcrumbs}>Vider trace</Button>
-                                      </div>
                                       {recepteur.techLogs.length > 0 ? recepteur.techLogs.map((log, i) => (
-                                          <div key={i} className="p-3 bg-slate-50 border-2 rounded-xl flex items-center justify-between shadow-sm">
+                                          <div key={i} className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm">
                                               <div className="flex flex-col">
-                                                <span className={cn("font-black text-[10px] uppercase", 
-                                                    log.status === 'stationary' ? 'text-orange-600' : 
-                                                    log.status === 'moving' ? 'text-blue-600' : 'text-slate-600'
-                                                )}>
-                                                    {log.status === 'stationary' ? 'AU MOUILLAGE' : 'EN MOUVEMENT'}
-                                                </span>
-                                                <span className="text-[8px] font-bold opacity-40 uppercase">{log.time ? format(log.time.toDate(), 'HH:mm:ss', {locale: fr}) : '...'}</span>
+                                                <span className="font-black text-[10px] uppercase text-primary">{log.status}</span>
+                                                <span className="text-[8px] font-bold opacity-40">{log.time ? format(log.time.toDate(), 'HH:mm:ss') : '...'}</span>
                                               </div>
-                                              <div className="text-right flex items-center gap-3">
-                                                  <div className="flex flex-col items-end">
-                                                      <span className="text-[9px] font-black text-slate-500">ACC: {log.accuracy || '0'}m</span>
-                                                      <div className="flex items-center gap-1.5">
-                                                          <span className="text-[9px] font-black">{log.batteryLevel}%</span>
-                                                          <Battery className={cn("size-3", log.batteryLevel < 20 ? "text-red-500" : "text-green-600")} />
-                                                      </div>
-                                                  </div>
+                                              <div className="flex items-center gap-2">
+                                                  <span className="text-[9px] font-black">{log.batteryLevel}%</span>
+                                                  <BatteryIcon level={log.batteryLevel / 100} charging={log.isCharging} />
                                               </div>
                                           </div>
-                                      )) : (
-                                          <div className="py-20 text-center opacity-20 flex flex-col items-center">
-                                              <RefreshCw className="size-8 mb-2" />
-                                              <p className="text-[10px] font-black uppercase">En attente de données...</p>
-                                          </div>
-                                      )}
+                                      )) : <div className="py-20 text-center opacity-20"><RefreshCw className="size-8 mx-auto mb-2" /><p className="text-[10px] font-black uppercase">Attente de données...</p></div>}
                                   </div>
                               </ScrollArea>
                           </TabsContent>
-
-                          <TabsContent value="pref" className="p-4 space-y-6">
+                          <TabsContent value="pref" className="p-4 space-y-4">
                               <div className="space-y-4">
-                                  <div className="flex justify-between items-center"><Label className="text-[10px] font-black uppercase">Volume alertes</Label><span className="text-[10px] font-black">{Math.round(recepteur.vesselPrefs.volume * 100)}%</span></div>
+                                  <Label className="text-[10px] font-black uppercase">Volume alertes</Label>
                                   <Slider value={[recepteur.vesselPrefs.volume * 100]} max={100} onValueChange={v => recepteur.savePrefs({ volume: v[0] / 100 })} />
-                                  <div className="grid gap-2 pt-2">
+                                  <div className="grid gap-2">
                                       {Object.keys(recepteur.vesselPrefs.sounds).map(key => (
-                                          <div key={key} className="flex items-center justify-between p-3 bg-muted/10 rounded-xl border">
+                                          <div key={key} className="flex items-center justify-between p-2 bg-muted/10 rounded-lg">
                                               <span className="text-[10px] font-black uppercase">{key}</span>
-                                              <div className="flex items-center gap-3">
-                                                  <Button variant="ghost" size="icon" className="h-8 w-8 border bg-white" onClick={() => recepteur.playSound(recepteur.vesselPrefs.sounds[key as keyof typeof recepteur.vesselPrefs.sounds])}><Play className="size-3 text-primary" /></Button>
-                                                  <Switch checked={recepteur.vesselPrefs.notifyEnabled} onCheckedChange={v => recepteur.savePrefs({ notifyEnabled: v })} />
-                                              </div>
+                                              <Switch checked={recepteur.vesselPrefs.notifyEnabled} onCheckedChange={v => recepteur.savePrefs({ notifyEnabled: v })} />
                                           </div>
                                       ))}
                                   </div>
@@ -309,46 +318,28 @@ export default function VesselTrackerPage() {
           )}
 
           {appMode === 'fleet' && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                  <Card className="border-2 shadow-lg rounded-2xl overflow-hidden min-h-[400px] flex flex-col">
+              <div className="space-y-4 animate-in fade-in">
+                  <Card className="border-2 shadow-lg rounded-2xl overflow-hidden min-h-[400px]">
                       <CardHeader className="bg-slate-900 text-white p-4">
-                          <CardTitle className="text-xs font-black uppercase flex items-center gap-2">
-                              <Users className="size-4 text-primary" /> Journal Tactique de Flotte
-                          </CardTitle>
+                          <CardTitle className="text-xs font-black uppercase">Journal Tactique Flotte</CardTitle>
                       </CardHeader>
-                      <ScrollArea className="flex-1">
+                      <ScrollArea className="h-[350px]">
                           <div className="p-3 space-y-3">
-                              {flotte.tacticalLogs.length > 0 ? flotte.tacticalLogs.map((log, i) => (
-                                  <div key={i} onClick={() => mapCore.handleRecenter({ lat: log.lat, lng: log.lng })} className="p-3 bg-white border-2 rounded-2xl flex items-center justify-between cursor-pointer active:scale-95 shadow-sm hover:border-primary/30 transition-all">
+                              {flotte.tacticalLogs.map((log, i) => (
+                                  <div key={i} className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm">
                                       <div className="flex items-center gap-3">
-                                          {log.photoUrl ? (
-                                              <div className="size-12 rounded-xl border overflow-hidden shadow-inner">
-                                                  <img src={log.photoUrl} className="size-full object-cover" alt=""/>
-                                              </div>
-                                          ) : (
-                                              <div className="p-2.5 bg-primary/10 rounded-xl">
-                                                  <Fish className="size-5 text-primary"/>
-                                              </div>
-                                          )}
+                                          <div className="p-2 bg-primary/10 rounded-lg"><Fish className="size-4 text-primary"/></div>
                                           <div className="flex flex-col">
-                                              <div className="flex items-center gap-2">
-                                                  <span className="font-black text-xs uppercase text-primary">{log.type}</span>
-                                                  <Badge variant="outline" className="text-[7px] font-black uppercase h-3.5 px-1">{log.sender}</Badge>
-                                              </div>
-                                              <span className="text-[8px] font-bold opacity-40 uppercase">{log.time ? format(log.time.toDate(), 'HH:mm', {locale: fr}) : '...'}</span>
+                                              <span className="font-black text-xs uppercase text-primary">{log.type}</span>
+                                              <span className="text-[8px] font-bold opacity-40 uppercase">{log.sender}</span>
                                           </div>
                                       </div>
-                                      <div className="text-right border-l pl-3 border-dashed">
+                                      <div className="text-right">
                                           <p className="text-[10px] font-black text-blue-600">{log.wind} ND</p>
-                                          <p className="text-[10px] font-black text-orange-600">{log.temp}°C</p>
+                                          <p className="text-[8px] font-bold opacity-40">{log.time ? format(log.time.toDate(), 'HH:mm') : '...'}</p>
                                       </div>
                                   </div>
-                              )) : (
-                                  <div className="py-24 text-center opacity-20 flex flex-col items-center">
-                                      <HistoryIcon className="size-10 mb-2" />
-                                      <p className="text-[10px] font-black uppercase tracking-widest">Aucune prise partagée</p>
-                                  </div>
-                              )}
+                              ))}
                           </div>
                       </ScrollArea>
                   </Card>
@@ -356,88 +347,32 @@ export default function VesselTrackerPage() {
           )}
       </div>
 
-      {/* ACCORDÉON RÉGLAGES SYSTÈME (A & B) */}
-      <Accordion type="single" collapsible className="w-full">
-          <AccordionItem value="prefs" className="border-none">
-              <AccordionTrigger className="h-14 bg-white px-4 rounded-2xl border-2 shadow-sm hover:no-underline">
-                  <div className="flex items-center gap-2 font-black uppercase text-[10px] text-slate-700">
-                    <Settings className="size-4 text-primary" /> Sons, Rayon & SMS d'Urgence
-                  </div>
-              </AccordionTrigger>
-              <AccordionContent className="pt-4 space-y-4">
-                  <Card className="border-2 p-5 space-y-6 bg-white rounded-3xl shadow-inner">
-                      {/* MOUILLAGE (Émetteur uniquement) */}
-                      {appMode === 'sender' && (
-                          <div className="space-y-4 pb-4 border-b border-dashed">
-                              <div className="flex justify-between items-center">
-                                <Label className="text-[10px] font-black uppercase text-primary flex items-center gap-2">
-                                    <Anchor className="size-3" /> Rayon de Mouillage
-                                </Label>
-                                <Badge variant="outline" className="font-black bg-primary/5 text-primary border-primary/20">{emetteur.mooringRadius}m</Badge>
-                              </div>
-                              <Slider value={[emetteur.mooringRadius]} min={10} max={200} step={10} onValueChange={v => emetteur.setMooringRadius(v[0])} />
-                              <p className="text-[8px] font-bold text-muted-foreground italic px-1 text-center">Déclenche une alerte sonore si le navire sort du cercle bleu.</p>
-                          </div>
-                      )}
+      <input type="file" accept="image/*" capture="environment" ref={photoInputRef} className="hidden" onChange={e => {
+          const file = e.target.files?.[0];
+          if (file) {
+              const reader = new FileReader();
+              reader.onload = (ev) => flotte.addTacticalLog('PHOTO', emetteur.currentPos?.lat || 0, emetteur.currentPos?.lng || 0, ev.target?.result as string);
+              reader.readAsDataURL(file);
+          }
+      }} />
 
-                      {/* SMS D'URGENCE (Émetteur uniquement) */}
-                      {appMode === 'sender' && (
-                          <div className="space-y-4">
-                              <Label className="text-[10px] font-black uppercase flex items-center gap-2">
-                                <Phone className="size-3 text-red-600" /> Contact d'urgence (SMS)
-                              </Label>
-                              <div className="space-y-2">
-                                <Input value={emetteur.emergencyContact} onChange={e => emetteur.saveSmsSettings(e.target.value, emetteur.vesselSmsMessage)} placeholder="Numéro du contact à terre..." className="h-11 border-2 font-black text-center" />
-                                <Textarea value={emetteur.vesselSmsMessage} onChange={e => emetteur.saveSmsSettings(emetteur.emergencyContact, e.target.value)} placeholder="Message de détresse personnalisé..." className="border-2 font-medium min-h-[100px] text-xs leading-relaxed" />
-                              </div>
-                              <div className="p-3 bg-muted/20 rounded-xl border-2 border-dashed italic text-[9px] text-muted-foreground leading-relaxed">
-                                "Le point GPS Google Maps sera automatiquement ajouté à la fin de votre message."
-                              </div>
-                          </div>
-                      )}
-
-                      {/* SECTION RÉGLAGES B (Si on veut les voir ici aussi) */}
-                      {appMode === 'receiver' && (
-                          <div className="text-center py-4 text-[10px] font-black uppercase text-muted-foreground opacity-40">
-                            Utilisez l'onglet RÉGLAGES du panneau technique ci-dessus.
-                          </div>
-                      )}
-                  </Card>
-              </AccordionContent>
-          </AccordionItem>
-      </Accordion>
-
-      {/* ANNUAIRE MARITIME */}
-      <Card className="border-2 shadow-sm bg-muted/5 rounded-2xl overflow-hidden">
-          <CardHeader className="p-4 pb-2 border-b bg-muted/10">
-            <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-600">
-                <Phone className="size-3 text-primary" /> Annuaire de Sécurité NC
-            </CardTitle>
-          </CardHeader>
+      {/* ANNUAIRE */}
+      <Card className="border-2 shadow-sm bg-muted/5">
+          <CardHeader className="p-4 pb-2 border-b"><CardTitle className="text-[10px] font-black uppercase flex items-center gap-2"><Phone className="size-3" /> Annuaire Maritime NC</CardTitle></CardHeader>
           <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <p className="text-[9px] font-black uppercase text-red-600 border-b border-red-100 pb-1">Urgences Vitales</p>
-                <div className="flex flex-col gap-1">
-                    <p className="text-xs font-black flex items-center justify-between">COSS Mer <span className="text-red-600">16</span></p>
-                    <p className="text-xs font-black flex items-center justify-between">SAMU Terre <span className="text-red-600">15</span></p>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[9px] font-black uppercase text-blue-600 border-b border-blue-100 pb-1">Météo & Services</p>
-                <div className="flex flex-col gap-1">
-                    <p className="text-xs font-black flex items-center justify-between">Météo Marine <span className="text-blue-600">36 67 36</span></p>
-                    <p className="text-xs font-black flex items-center justify-between">Phares & Balises <span className="text-blue-600">23 21 00</span></p>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[9px] font-black uppercase text-indigo-600 border-b border-indigo-100 pb-1">Ports & VHF</p>
-                <div className="flex flex-col gap-1">
-                    <p className="text-xs font-black flex items-center justify-between">Port Autonome <span className="text-indigo-600">VHF 12</span></p>
-                    <p className="text-xs font-black flex items-center justify-between">Port Moselle <span className="text-indigo-600">VHF 67</span></p>
-                </div>
-              </div>
+              <div className="space-y-2"><p className="text-[9px] font-black uppercase text-red-600 border-b pb-1">Urgences</p><p className="text-xs font-black">COSS Mer : 16</p><p className="text-xs font-black">SAMU Terre : 15</p></div>
+              <div className="space-y-2"><p className="text-[9px] font-black uppercase text-blue-600 border-b pb-1">Services</p><p className="text-xs font-black">Météo Marine : 36 67 36</p></div>
+              <div className="space-y-2"><p className="text-[9px] font-black uppercase text-indigo-600 border-b pb-1">VHF</p><p className="text-xs font-black">Port Autonome : Canal 12</p></div>
           </CardContent>
       </Card>
     </div>
   );
+}
+
+function BatteryIcon({ level, charging }: { level: number; charging: boolean }) {
+  const props = { className: 'w-4 h-4' };
+  if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
+  if (level < 0.2) return <BatteryLow {...props} className="text-red-500" />;
+  if (level < 0.6) return <BatteryMedium {...props} className="text-amber-500" />;
+  return <BatteryFull {...props} className="text-green-500" />;
 }
