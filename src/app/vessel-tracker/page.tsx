@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -18,7 +19,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   useUser, 
   useFirestore, 
@@ -406,6 +406,22 @@ export default function VesselTrackerPage() {
                     className={cn("h-9 px-5 text-[10px] font-black uppercase rounded-lg transition-all", mapCore.viewMode === 'gamma' ? "bg-primary text-white shadow-lg" : "text-white/60")}
                     onClick={() => mapCore.setViewMode('gamma')}
                 >WINDY</Button>
+
+                <div className="w-px h-4 bg-white/10 mx-1 self-center" />
+                
+                <Button 
+                    variant="ghost" size="sm" 
+                    className="h-9 px-3 text-[9px] font-black uppercase text-white/60 hover:text-white hover:bg-white/10 flex items-center gap-1.5"
+                    onClick={() => {
+                        mapCore.clearBreadcrumbs();
+                        if (!emetteur.isSharing || emetteur.vesselStatus !== 'stationary') {
+                            emetteur.setAnchorPos(null);
+                        }
+                        toast({ title: "TRACES EFFACÉES", description: "Historique visuel purgé." });
+                    }}
+                >
+                    <Trash2 className="size-3" /> EFFACER
+                </Button>
             </div>
         </div>
 
@@ -555,6 +571,7 @@ export default function VesselTrackerPage() {
                             onClick={() => {
                                 simulator.stopSim();
                                 recepteur.stopAllAlarms();
+                                mapCore.clearBreadcrumbs();
                             }}
                         >
                             Désactiver Simulation

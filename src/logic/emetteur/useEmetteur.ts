@@ -10,13 +10,12 @@ import { format } from 'date-fns';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) : "Le Cerveau"
- * Gère l'identité, le partage Firestore, l'historique et les changements de statut dynamiques.
- * v61.0 : Optimisation séparation Ancre/Navire + Détection dérive auto.
+ * LOGIQUE ÉMETTEUR (A) v65.0 : "Le Cerveau"
+ * Gère le nettoyage des ancres et le reset lors de l'arrêt.
  */
 export function useEmetteur(
-    onPositionUpdate?: (lat: number, lng: number) => void, 
-    onStopCleanup?: () => void,
+    handlePositionUpdate?: (lat: number, lng: number) => void, 
+    handleStopCleanup?: () => void,
     simulator?: any
 ) {
   const { user } = useUser();
@@ -53,10 +52,10 @@ export function useEmetteur(
   const currentPosRef = useRef(currentPos);
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
 
-  const onPositionUpdateRef = useRef(onPositionUpdate);
-  const onStopCleanupRef = useRef(onStopCleanup);
-  useEffect(() => { onPositionUpdateRef.current = onPositionUpdate; }, [onPositionUpdate]);
-  useEffect(() => { onStopCleanupRef.current = onStopCleanup; }, [onStopCleanup]);
+  const handlePositionUpdateRef = useRef(handlePositionUpdate);
+  const handleStopCleanupRef = useRef(handleStopCleanup);
+  useEffect(() => { handlePositionUpdateRef.current = handlePositionUpdate; }, [handlePositionUpdate]);
+  useEffect(() => { handleStopCleanupRef.current = handleStopCleanup; }, [handleStopCleanup]);
 
   // CHARGEMENT PERSISTANCE LOCALE
   useEffect(() => {
@@ -195,7 +194,7 @@ export function useEmetteur(
 
     setCurrentPos({ lat, lng });
     setAccuracy(acc);
-    onPositionUpdateRef.current?.(lat, lng);
+    handlePositionUpdateRef.current?.(lat, lng);
 
     if (simulator.isGpsCut && !lastGpsCutRef.current) {
         addTechLog('ALERTE GPS', 'Signal dégradé (>500m)');
@@ -204,7 +203,6 @@ export function useEmetteur(
         lastGpsCutRef.current = false;
     }
 
-    // Le statut est géré par l'effet de détection de dérive ci-dessus
     if (vesselStatus === 'moving') {
         const nextStatus = speed < 0.2 ? 'stationary' : 'moving';
         if (nextStatus !== vesselStatus) setVesselStatus(nextStatus);
@@ -252,7 +250,7 @@ export function useEmetteur(
         setAccuracy(Math.round(acc));
         setCurrentPos(newPos);
         setCurrentHeading(heading || 0);
-        onPositionUpdateRef.current?.(latitude, longitude);
+        handlePositionUpdateRef.current?.(latitude, longitude);
 
         updateVesselInFirestore({ 
             location: { latitude: latitude, longitude: longitude }, 
@@ -283,7 +281,7 @@ export function useEmetteur(
     setCurrentPos(null);
     setAnchorPos(null);
     isEmergencySmsSentRef.current = false;
-    onStopCleanupRef.current?.();
+    handleStopCleanupRef.current?.(); // Déclenche mapCore.clearBreadcrumbs
     toast({ title: "Partage arrêté" });
   }, [firestore, sharingId, toast]);
 

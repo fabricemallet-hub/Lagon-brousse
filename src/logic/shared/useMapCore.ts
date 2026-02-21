@@ -25,7 +25,8 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v60.0 : Gestion de la carte, des calques météo et des alertes visuelles.
+ * HOOK PARTAGÉ v65.0 : Gestion de la carte, des calques météo et du nettoyage visuel.
+ * Règle de l'Ancre Unique et Effacement des Traces.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
