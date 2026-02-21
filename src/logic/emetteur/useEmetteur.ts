@@ -10,8 +10,8 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v70.0 : "Moteur Autonome avec Purge Totale"
- * Gère les transitions automatiques et la purge radicale des données au départ.
+ * LOGIQUE ÉMETTEUR (A) v71.0 : "Moteur Tactique & Énergie"
+ * Gère les transitions automatiques, la purge et la surveillance batterie.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -47,8 +47,7 @@ export function useEmetteur(
   
   const watchIdRef = useRef<number | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
-  const lastGpsCutRef = useRef<boolean>(false);
-  const isEmergencySmsSentRef = useRef<boolean>(false);
+  const isBatteryAlertSentRef = useRef<boolean>(false);
   
   const currentPosRef = useRef(currentPos);
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
@@ -113,6 +112,24 @@ export function useEmetteur(
       try {
         const b: any = await (navigator as any).getBattery();
         batteryInfo = { batteryLevel: Math.round(b.level * 100), isCharging: b.charging };
+        
+        // LOGIQUE SÉCURITÉ BATTERIE FAIBLE (< 10%)
+        if (batteryInfo.batteryLevel < 10 && !isBatteryAlertSentRef.current) {
+            isBatteryAlertSentRef.current = true;
+            addTechLog('ALERTE ÉNERGIE', `Batterie critique: ${batteryInfo.batteryLevel}%`);
+            // Store last safe position for rescue
+            if (currentPosRef.current) {
+                updateDoc(doc(firestore, 'vessels', sharingId), {
+                    lastSafePos: {
+                        latitude: currentPosRef.current.lat,
+                        longitude: currentPosRef.current.lng,
+                        timestamp: serverTimestamp()
+                    }
+                }).catch(() => {});
+            }
+        } else if (batteryInfo.batteryLevel >= 10) {
+            isBatteryAlertSentRef.current = false;
+        }
       } catch (e) {}
     }
 
@@ -134,7 +151,7 @@ export function useEmetteur(
           lastSentStatusRef.current = data.status || lastSentStatusRef.current;
       })
       .catch(() => {});
-  }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId, mooringRadius, simulator?.isComCut]);
+  }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId, mooringRadius, simulator?.isComCut, addTechLog]);
 
   const triggerEmergency = useCallback((type: 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE' | 'DÉRIVE') => {
     if (!isSharing) return;
@@ -251,10 +268,6 @@ export function useEmetteur(
     );
   }, [user, firestore, sharingId, customSharingId, customFleetId, vesselNickname, simulator?.isActive, addTechLog, handlePositionLogic, toast]);
 
-  /**
-   * PURGE RADICALE v70.0
-   * Supprime les journaux distants et notifie les récepteurs de la sortie du groupe.
-   */
   const stopSharing = useCallback(async () => {
     if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     watchIdRef.current = null;
@@ -264,17 +277,14 @@ export function useEmetteur(
       const ref = doc(firestore, 'vessels', sharingId);
       const batch = writeBatch(firestore);
       
-      // 1. Purge physique des marqueurs tactiques pour vider les cartes de la flotte
       const tactCol = collection(firestore, 'vessels', sharingId, 'tactical_logs');
       const tactSnap = await getDocs(tactCol);
       tactSnap.forEach(d => batch.delete(d.ref));
       
-      // 2. Purge physique des journaux techniques
       const techCol = collection(firestore, 'vessels', sharingId, 'tech_logs');
       const techSnap = await getDocs(techCol);
       techSnap.forEach(d => batch.delete(d.ref));
       
-      // 3. Notification de départ et réinitialisation globale
       batch.set(ref, { 
         isSharing: false, 
         lastActive: serverTimestamp(),
@@ -294,7 +304,6 @@ export function useEmetteur(
     setTacticalLogs([]);
     lastSentStatusRef.current = null;
     
-    // Nettoyage de la carte locale
     handleStopCleanupRef.current?.(); 
     
     toast({ 
@@ -309,13 +318,11 @@ export function useEmetteur(
     if (firestore && sharingId) {
         const vRef = doc(firestore, 'vessels', sharingId);
         
-        // Signal de purge aux récepteurs
         await updateDoc(vRef, {
             historyClearedAt: serverTimestamp(),
             tacticalClearedAt: serverTimestamp()
         });
         
-        // Purge physique des collections Firestore
         const batch = writeBatch(firestore);
         
         const tactCol = collection(firestore, 'vessels', sharingId, 'tactical_logs');
@@ -328,7 +335,6 @@ export function useEmetteur(
         
         await batch.commit();
     }
-    // Nettoyage visuel carte
     handleStopCleanupRef.current?.();
     toast({ title: "JOURNAUX PURGÉS", description: "Données locales et distantes réinitialisées." });
   }, [firestore, sharingId, toast]);

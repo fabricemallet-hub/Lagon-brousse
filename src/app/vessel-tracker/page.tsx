@@ -88,9 +88,10 @@ import {
   Thermometer,
   CloudLightning,
   Sun,
-  Move
+  Move,
+  Copy
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getDistance } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -124,8 +125,8 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
   const props = { className: cn("size-4", className) };
   if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
-  if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
-  if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
+  if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600 animate-pulse")} />;
+  if (level <= 50) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
   return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
 };
 
@@ -137,46 +138,65 @@ const VesselMarker = ({ vessel, isMe = false }: { vessel: VesselStatus, isMe?: b
     const heading = vessel.heading || 0;
     
     let Icon = Navigation;
-    let bgColor = 'bg-blue-600';
+    let bgColor = 'bg-green-600'; // Default: Mouvement
     let animationClass = '';
     let iconClass = 'size-4 text-white';
+    let statusLabel = 'EN ROUTE';
 
     switch (status) {
         case 'stationary':
-            Icon = Navigation; 
+            Icon = Anchor; 
             bgColor = 'bg-blue-600';
+            statusLabel = 'MOUILLAGE';
             break;
         case 'drifting':
-            Icon = Navigation;
+            Icon = AlertTriangle;
             bgColor = 'bg-red-600';
             animationClass = 'animate-blink-red';
+            statusLabel = 'DÉRIVE';
             break;
         case 'emergency':
             Icon = ShieldAlert;
             bgColor = 'bg-red-600';
             animationClass = 'animate-pulse-red';
+            statusLabel = 'MAYDAY';
             break;
         case 'returning':
             Icon = Navigation;
-            bgColor = 'bg-indigo-600';
+            bgColor = 'bg-green-600';
+            statusLabel = 'RETOUR';
             break;
         case 'landed':
             Icon = Home;
             bgColor = 'bg-green-600';
+            statusLabel = 'À TERRE';
             break;
         case 'moving':
         default:
             Icon = Navigation;
-            bgColor = 'bg-blue-600';
+            bgColor = 'bg-green-600';
+            statusLabel = 'MOUVEMENT';
             break;
     }
 
     return (
         <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 group cursor-pointer z-[1000]">
-            <div className="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap flex items-center gap-2">
-                <span className="truncate max-w-[80px]">{vessel.displayName || vessel.id}</span>
-                {isMe && <Badge className="bg-primary text-white text-[7px] h-3 px-1">MOI</Badge>}
-                <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} className="size-2.5" />
+            <div className="flex flex-col items-center">
+                <div className="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap flex flex-col items-center gap-0.5 min-w-[80px]">
+                    <div className="flex items-center gap-2 w-full justify-between">
+                        <span className="truncate max-w-[60px]">{vessel.displayName || vessel.id}</span>
+                        <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} className="size-3" />
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5 border-t border-white/10 pt-0.5 w-full justify-center">
+                        <span className={cn("text-[7px] font-black uppercase tracking-tighter", 
+                            status === 'moving' ? "text-green-400" : 
+                            status === 'stationary' ? "text-blue-400" : 
+                            "text-red-400"
+                        )}>
+                            {statusLabel}
+                        </span>
+                    </div>
+                </div>
             </div>
             <div 
                 className={cn(
@@ -290,29 +310,24 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const smsPreview = useMemo(() => {
-    const nick = emetteur.vesselNickname || 'KOOLAPIK';
-    const msg = emetteur.vesselSmsMessage || 'Requiert assistance immédiate.';
-    const time = format(new Date(), 'HH:mm');
-    const acc = emetteur.accuracy || 0;
-    const pos = emetteur.currentPos;
-    const posUrl = pos 
-        ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` 
-        : "https://www.google.com/maps?q=-22.27,166.44";
-    
-    return `[${nick.toUpperCase()}] ${msg} [MAYDAY] à ${time}. Position (+/- ${acc}m) : ${posUrl}`;
-  }, [emetteur.vesselNickname, emetteur.vesselSmsMessage, emetteur.accuracy, emetteur.currentPos]);
-
-  const centerLat = mapCore.googleMap?.getCenter()?.lat() || INITIAL_CENTER.lat;
-  const centerLng = mapCore.googleMap?.getCenter()?.lng() || INITIAL_CENTER.lng;
-  const currentZoom = mapCore.googleMap?.getZoom() || 11;
+  const handleCopyLogEntry = (log: any) => {
+    if (!log.pos) return;
+    const time = format(log.time, 'HH:mm:ss');
+    const text = `Lat: ${log.pos.lat.toFixed(6)}, Lng: ${log.pos.lng.toFixed(6)} - [${log.label}] à ${time} - Lien: https://www.google.com/maps?q=${log.pos.lat},${log.pos.lng}`;
+    navigator.clipboard.writeText(text).then(() => {
+        toast({ title: "POSITION COPIÉE", description: "Format prêt pour SMS/WhatsApp" });
+    });
+  };
 
   const windyUrl = useMemo(() => {
+    const centerLat = mapCore.googleMap?.getCenter()?.lat() || INITIAL_CENTER.lat;
+    const centerLng = mapCore.googleMap?.getCenter()?.lng() || INITIAL_CENTER.lng;
+    const currentZoom = mapCore.googleMap?.getZoom() || 11;
     const layer = mapCore.windyLayer === 'wind' ? 'wind' : 
                   mapCore.windyLayer === 'temp' ? 'temp' : 
                   mapCore.windyLayer === 'waves' ? 'waves' : 'wind';
     return `https://embed.windy.com/embed2.html?lat=${centerLat}&lon=${centerLng}&zoom=${currentZoom}&level=surface&overlay=${layer}&menu=&message=&marker=&calendar=&pressure=&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1`;
-  }, [centerLat, centerLng, currentZoom, mapCore.windyLayer]);
+  }, [mapCore.googleMap, mapCore.windyLayer]);
 
   const handleStartSharingEnhanced = () => {
     recepteur.initAudio(); 
@@ -347,7 +362,7 @@ export default function VesselTrackerPage() {
 
       <div className="flex bg-slate-900 text-white p-1 rounded-xl shadow-lg border-2 border-primary/20 sticky top-0 z-[100]">
           <Button variant={appMode === 'sender' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setAppMode('sender'); recepteur.initAudio(); }}>Émetteur (A)</Button>
-          <Button variant={appMode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setMode('receiver'); recepteur.initAudio(); }}>Récepteur (B)</Button>
+          <Button variant={appMode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setAppMode('receiver'); recepteur.initAudio(); }}>Récepteur (B)</Button>
           <Button variant={appMode === 'fleet' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setAppMode('fleet'); recepteur.initAudio(); }}>Flotte (C)</Button>
       </div>
 
@@ -624,7 +639,8 @@ export default function VesselTrackerPage() {
                                           <p className="text-[9px] font-bold text-muted-foreground uppercase mt-1">Capitaine : {emetteur.vesselNickname}</p>
                                       </div>
                                   </div>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-3">
+                                      <BatteryIconComp level={emetteur.battery.level * 100} charging={emetteur.battery.charging} className="size-5" />
                                       <div className={cn("size-3 rounded-full bg-green-500 shadow-sm transition-all", isLedActive ? "scale-125 glow" : "opacity-30")} />
                                       <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 font-black text-[8px] uppercase h-5">LIVE</Badge>
                                   </div>
@@ -953,7 +969,7 @@ export default function VesselTrackerPage() {
                                   <ScrollArea className="h-48 border-t pt-2 shadow-inner">
                                       <div className="space-y-1">
                                         {emetteur.tacticalLogs.map((log, i) => (
-                                            <div key={i} className="p-3 border-b flex justify-between items-center text-[10px] cursor-pointer hover:bg-primary/5 active:bg-primary/10 transition-colors" onClick={() => mapCore.handleRecenter(log.pos)}>
+                                            <div key={i} className="p-3 border-b flex justify-between items-center text-[10px] cursor-pointer hover:bg-primary/5 active:bg-primary/10 transition-colors" onClick={() => handleCopyLogEntry(log)}>
                                                 <div className="flex items-center gap-3">
                                                     <div className="p-1.5 bg-primary/10 rounded-lg"><Fish className="size-3 text-primary"/></div>
                                                     <span className="font-black uppercase text-primary">{log.type}</span>
@@ -961,6 +977,7 @@ export default function VesselTrackerPage() {
                                                 <div className="flex items-center gap-3">
                                                     {log.wind && <span className="font-bold text-blue-600">{log.wind} ND</span>}
                                                     <span className="font-bold opacity-40">{format(log.time, 'HH:mm')}</span>
+                                                    <Copy className="size-3 opacity-20" />
                                                 </div>
                                             </div>
                                         ))}
@@ -971,18 +988,23 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <div className="flex items-center justify-between mb-4 bg-white p-3 rounded-xl border-2 shadow-sm">
                                       <div className="flex items-center gap-4">
-                                          <div className="flex items-center gap-1.5"><Battery className="size-3 text-slate-400" /><span className="text-[10px] font-black">{emetteur.accuracy}m</span></div>
-                                          <div className="flex items-center gap-1.5 border-l pl-4"><LocateFixed className="size-3 text-primary" /><span className="text-[10px] font-black uppercase text-primary">GPS FIX</span></div>
+                                          <div className="flex items-center gap-1.5"><LocateFixed className="size-3 text-primary" /><span className="text-[10px] font-black uppercase text-primary">GPS FIX</span></div>
                                       </div>
                                       <Button variant="ghost" size="sm" className="h-7 text-destructive text-[8px] font-black uppercase border border-destructive/10" onClick={emetteur.clearLogs}><Trash2 className="size-3 mr-1" /> Effacer</Button>
                                   </div>
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v70.0 prêt - Purge Auto Active</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v71.0 prêt - Purge Auto Active</div>
                                           {emetteur.techLogs.map((log, i) => (
-                                              <div key={i} className="p-2 border rounded-lg bg-white flex justify-between items-center text-[9px] shadow-sm cursor-pointer hover:bg-slate-100" onClick={() => log.pos && mapCore.handleRecenter(log.pos)}>
-                                                  <span className="font-black uppercase">{log.label}</span>
-                                                  <span className="font-bold opacity-40">{format(log.time, 'HH:mm:ss')}</span>
+                                              <div key={i} className="p-2 border rounded-lg bg-white flex justify-between items-center text-[9px] shadow-sm cursor-pointer hover:bg-slate-100" onClick={() => handleCopyLogEntry(log)}>
+                                                  <div className="flex flex-col gap-0.5">
+                                                      <span className={cn("font-black uppercase", log.label.includes('ÉNERGIE') ? 'text-red-600' : 'text-slate-800')}>{log.label}</span>
+                                                      <span className="text-[7px] opacity-40 font-bold">{log.details}</span>
+                                                  </div>
+                                                  <div className="flex items-center gap-2">
+                                                      <span className="font-bold opacity-40">{format(log.time, 'HH:mm:ss')}</span>
+                                                      <Copy className="size-3 opacity-20" />
+                                                  </div>
                                               </div>
                                           ))}
                                       </div>

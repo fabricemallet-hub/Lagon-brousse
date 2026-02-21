@@ -429,6 +429,7 @@ export interface VesselStatus {
   windDir?: number;
   wavesHeight?: number;
   lastWeatherUpdate?: any;
+  lastSafePos?: { latitude: number; longitude: number; timestamp: any };
 }
 
 export interface SoundLibraryEntry {
