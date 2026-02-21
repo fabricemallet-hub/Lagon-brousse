@@ -124,7 +124,7 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
 const BatteryLow = (props: any) => <Battery className={props.className} />;
 const BatteryMedium = (props: any) => <Battery className={props.className} />;
 
-// Composant de Marqueur de Navire Dynamique (v57.0)
+// Composant de Marqueur de Navire Dynamique
 const VesselMarker = ({ vessel, isMe = false }: { vessel: VesselStatus, isMe?: boolean }) => {
     const status = vessel.status || 'moving';
     const heading = vessel.heading || 0;
@@ -309,7 +309,7 @@ export default function VesselTrackerPage() {
       )}
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
-        {/* NAV-TÉLÉMETRIE FLOTTANTE (v57.0) */}
+        {/* NAV-TÉLÉMETRIE FLOTTANTE */}
         <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-[10006] flex bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-white/20 shadow-2xl">
             {['alpha', 'beta', 'gamma'].map((m) => (
                 <Button
@@ -531,17 +531,17 @@ export default function VesselTrackerPage() {
                               <div className="space-y-5">
                                   <div className="space-y-1.5">
                                       <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Mon Surnom</Label>
-                                      <Input value={vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg shadow-inner" />
+                                      <Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg shadow-inner" />
                                   </div>
                                   
                                   <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
                                         <Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Navire</Label>
-                                        <Input value={customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase tracking-widest bg-slate-50" />
+                                        <Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase tracking-widest bg-slate-50" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-[10px] font-black uppercase opacity-60 ml-1 text-indigo-600">ID Flotte C</Label>
-                                        <Input value={customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase tracking-widest bg-indigo-50/30" />
+                                        <Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase tracking-widest bg-indigo-50/30" />
                                     </div>
                                   </div>
 
