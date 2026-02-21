@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -98,7 +99,7 @@ export default function VesselTrackerPage() {
 
   const handleClearTrace = () => {
     mapCore.clearBreadcrumbs();
-    emetteur.addTechLog('TRACE RESET', 'Trace de parcours réinitialisée par l\'utilisateur');
+    emetteur.addTechLog('TRACE RESET', `Trace réinitialisée à ${format(new Date(), 'HH:mm')}`);
     toast({ title: "Trace effacée" });
   };
 
@@ -187,13 +188,13 @@ export default function VesselTrackerPage() {
             </GoogleMap>
         )}
         
-        {/* BOUTONS FLOTTANTS TACTIQUES */}
-        <div className="absolute top-4 left-4 z-[200] flex flex-col gap-2">
+        {/* BOUTONS FLOTTANTS TACTIQUES - Z-INDEX MAXIMAL */}
+        <div className="absolute top-4 left-4 z-[9999] flex flex-col gap-2">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>
                 {mapCore.isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}
             </Button>
         </div>
-        <div className="absolute top-4 right-4 z-[200] flex flex-col gap-2">
+        <div className="absolute top-4 right-4 z-[9999] flex flex-col gap-2">
             <Button 
                 onClick={() => mapCore.setIsFollowMode(!mapCore.isFollowMode)} 
                 className={cn("h-10 w-10 border-2 shadow-xl", mapCore.isFollowMode ? "bg-primary text-white" : "bg-white text-primary")}
@@ -374,7 +375,7 @@ export default function VesselTrackerPage() {
                                       <div key={id} className="flex items-center justify-between p-2 bg-white border rounded-lg shadow-sm">
                                           <code className="text-xs font-black text-primary">{id}</code>
                                           <div className="flex gap-1">
-                                              <Button variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase" onClick={() => emetteur.setCustomSharingId(id)}>Utiliser</Button>
+                                              <Button variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase" onClick={() => emetteur.handleSelectFromHistory(id)}>Utiliser</Button>
                                               <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => emetteur.deleteFromHistory(id)}><Trash2 className="size-3" /></Button>
                                           </div>
                                       </div>

@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { doc, setDoc, serverTimestamp, deleteDoc, collection, addDoc, query, orderBy } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, deleteDoc, collection, addDoc, query, orderBy, getDoc } from 'firebase/firestore';
 import type { VesselStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { getDistance } from '@/lib/utils';
@@ -160,6 +161,13 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     }
   }, []);
 
+  // Correction Double Cercle : Update dynamique quand le radius change
+  useEffect(() => {
+    if (anchorCircleRef.current) {
+      anchorCircleRef.current.setRadius(mooringRadius);
+    }
+  }, [mooringRadius]);
+
   const startSharing = () => {
     if (!navigator.geolocation || !user || !firestore) return;
     
@@ -236,7 +244,6 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
       await deleteDoc(doc(firestore, 'vessels', sharingId));
     }
     
-    // Purge complète
     clearMooring();
     onStopCleanup?.();
     
@@ -274,6 +281,12 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     toast({ title: label || "Statut mis à jour" });
   };
 
+  const handleSelectFromHistory = (id: string) => {
+    setCustomSharingId(id);
+    // On ne lance pas startSharing tout de suite pour laisser le choix à l'utilisateur
+    toast({ title: `ID ${id} chargé`, description: "Cliquez sur Lancer le Partage pour activer." });
+  };
+
   return {
     isSharing,
     startSharing,
@@ -294,6 +307,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     setCustomFleetId,
     vesselHistory,
     deleteFromHistory,
+    handleSelectFromHistory,
     lastSyncTime,
     techLogs,
     tacticalLogs,
