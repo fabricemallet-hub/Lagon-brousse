@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -111,8 +110,8 @@ export default function VesselTrackerPage() {
     () => mapCore.clearBreadcrumbs() 
   );
   
-  const recepteur = useRecepteur(emetteur.customSharingId);
-  const flotte = useFlotte(emetteur.customSharingId, emetteur.vesselNickname);
+  const recepteur = useRecepteur(emetteur.sharingId);
+  const flotte = useFlotte(emetteur.sharingId, emetteur.vesselNickname);
   
   const photoInputRef = useRef<HTMLInputElement>(null);
   const hasCenteredInitially = useRef(false);
@@ -128,11 +127,11 @@ export default function VesselTrackerPage() {
   // SYNC TACTIQUE
   useEffect(() => {
     const ids = [];
-    if (emetteur.isSharing) ids.push(emetteur.customSharingId.toUpperCase() || 'MASTER');
-    if (emetteur.customSharingId) ids.push(emetteur.customSharingId.toUpperCase());
+    if (emetteur.isSharing) ids.push(emetteur.sharingId || 'MASTER');
+    if (emetteur.customSharingId) ids.push(emetteur.sharingId);
     const unsub = mapCore.syncTacticalMarkers(ids);
     return () => unsub();
-  }, [emetteur.isSharing, emetteur.customSharingId, mapCore]);
+  }, [emetteur.isSharing, emetteur.sharingId, mapCore]);
 
   // LED Clignotante
   const [isLedActive, setIsLedActive] = useState(false);
@@ -276,7 +275,7 @@ export default function VesselTrackerPage() {
                       ) : (
                           <div className="space-y-4">
                               <div className="p-4 bg-primary/10 rounded-xl border-2 border-primary/20 text-center">
-                                  <p className="text-[10px] font-black uppercase text-primary">Navire : {sharingId}</p>
+                                  <p className="text-[10px] font-black uppercase text-primary">Navire : {emetteur.sharingId}</p>
                                   <Badge variant="outline" className="bg-green-500 text-white border-none animate-pulse mt-1">LIVE</Badge>
                               </div>
                               <div className="grid grid-cols-2 gap-2">
@@ -287,7 +286,7 @@ export default function VesselTrackerPage() {
                                       <Anchor className="size-4 mr-2" /> Mouillage
                                   </Button>
                               </div>
-                              <Button variant="destructive" className="w-full h-14 font-black uppercase rounded-xl border-2" onClick={emetteur.stopSharing}>Arrêter le partage</Button>
+                              <Button variant="destructive" className="w-full h-16 font-black uppercase rounded-xl border-2" onClick={emetteur.stopSharing}>Arrêter le partage</Button>
                           </div>
                       )}
                   </CardContent>

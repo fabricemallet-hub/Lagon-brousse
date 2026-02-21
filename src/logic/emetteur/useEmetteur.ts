@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -11,7 +10,7 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 
 /**
  * LOGIQUE ÉMETTEUR (A) : Envoi GPS, Gestion IDs, Historique, Journaux Technique & Tactique.
- * v51.0 : Ajout Logic de Détresse avec Toggle d'Annulation et SMS.
+ * v51.1 : Ajout Logic de Détresse avec Toggle d'Annulation et SMS.
  */
 export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => void, onStopCleanup?: () => void) {
   const { user } = useUser();
@@ -213,6 +212,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     setCustomSharingId,
     customFleetId,
     setCustomFleetId,
+    sharingId,
     vesselHistory,
     lastSyncTime,
     techLogs,
