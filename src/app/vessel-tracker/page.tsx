@@ -477,6 +477,22 @@ export default function VesselTrackerPage() {
                                         zIndex: 1
                                     }}
                                 />
+
+                                {/* LIGNE DE TENSION TACTIQUE - ANCRE VERS NAVIRE */}
+                                {(status === 'stationary' || status === 'drifting') && vessel.location && (
+                                    <Polyline
+                                        path={[
+                                            { lat: vessel.anchorLocation!.latitude, lng: vessel.anchorLocation!.longitude },
+                                            { lat: vessel.location.latitude, lng: vessel.location.longitude }
+                                        ]}
+                                        options={{
+                                            strokeColor: isDrifting ? (mapCore.isFlashOn ? '#ef4444' : '#3b82f6') : '#3b82f6',
+                                            strokeOpacity: 0.8,
+                                            strokeWeight: isMe ? 3 : 2,
+                                            zIndex: 2
+                                        }}
+                                    />
+                                )}
                             </React.Fragment>
                         );
                     })}
@@ -547,7 +563,7 @@ export default function VesselTrackerPage() {
                         <div className="space-y-3 pt-3 border-t border-dashed">
                             <Label className="text-[9px] font-black uppercase text-orange-600">Stress Test Mouillage</Label>
                             <div className="grid grid-cols-2 gap-2">
-                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-2" onClick={() => simulator.nudge(emetteur.anchorPos, emetteur.mooringRadius)}>Nudge (Dans cercle)</Button>
+                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-2" onClick={() => simulator.nudge(emetteur.anchorPos, emetteur.mooringRadius)}>Nudge (90% Rayon)</Button>
                                 <Button variant="destructive" className="h-10 text-[8px] font-black uppercase" onClick={() => simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius)}>Forcer Dérive</Button>
                             </div>
                         </div>

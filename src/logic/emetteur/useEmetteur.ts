@@ -10,8 +10,8 @@ import { format } from 'date-fns';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v65.0 : "Le Cerveau"
- * Gère le nettoyage des ancres et le reset lors de l'arrêt.
+ * LOGIQUE ÉMETTEUR (A) v66.0 : "Le Cerveau"
+ * Gère la détection de dérive avec filtre de précision GPS (3 relevés si précision faible).
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number) => void, 
@@ -48,6 +48,7 @@ export function useEmetteur(
   const lastSentStatusRef = useRef<string | null>(null);
   const lastGpsCutRef = useRef<boolean>(false);
   const isEmergencySmsSentRef = useRef<boolean>(false);
+  const consecutiveDriftCountRef = useRef<number>(0);
   
   const currentPosRef = useRef(currentPos);
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
@@ -161,20 +162,39 @@ export function useEmetteur(
     toast({ variant: "destructive", title: `ALERTE ${type}` });
   }, [isSharing, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, accuracy, toast]);
 
-  // LOGIQUE DE DÉTECTION DE DÉRIVE
+  // LOGIQUE DE DÉTECTION DE DÉRIVE v66.0 (AVEC FILTRE PRÉCISION)
   useEffect(() => {
     if (!isSharing || !currentPos || !anchorPos || (vesselStatus !== 'stationary' && vesselStatus !== 'drifting' && vesselStatus !== 'emergency')) return;
 
     const dist = getDistance(currentPos.lat, currentPos.lng, anchorPos.lat, anchorPos.lng);
-    
-    if (dist > mooringRadius) {
-        if (vesselStatus !== 'drifting' && vesselStatus !== 'emergency') {
-            setVesselStatus('drifting');
-            updateVesselInFirestore({ status: 'drifting', eventLabel: 'DÉRIVE DÉTECTÉE' });
-            addTechLog('ALERTE', `Sortie du rayon de sécurité (${Math.round(dist)}m)`);
-            triggerEmergency('DÉRIVE');
+    const radius = mooringRadius;
+    const acc = accuracy || 0;
+
+    if (dist > radius) {
+        // Filtre de précision GPS
+        if (acc <= 20) {
+            // Haute précision : Déclenchement immédiat
+            if (vesselStatus !== 'drifting' && vesselStatus !== 'emergency') {
+                setVesselStatus('drifting');
+                updateVesselInFirestore({ status: 'drifting', eventLabel: 'DÉRIVE DÉTECTÉE' });
+                addTechLog('ALERTE', `Dérive immédiate (Dist: ${Math.round(dist)}m | Acc: ${acc}m)`);
+                triggerEmergency('DÉRIVE');
+            }
+        } else {
+            // Basse précision : On attend 3 confirmations pour éviter les sauts GPS
+            consecutiveDriftCountRef.current++;
+            if (consecutiveDriftCountRef.current >= 3) {
+                if (vesselStatus !== 'drifting' && vesselStatus !== 'emergency') {
+                    setVesselStatus('drifting');
+                    updateVesselInFirestore({ status: 'drifting', eventLabel: 'DÉRIVE CONFIRMÉE' });
+                    addTechLog('ALERTE', `Dérive confirmée après 3 relevés (Acc: ${acc}m)`);
+                    triggerEmergency('DÉRIVE');
+                }
+            }
         }
     } else {
+        // Retour à l'intérieur du cercle
+        consecutiveDriftCountRef.current = 0;
         if (vesselStatus === 'drifting') {
             setVesselStatus('stationary');
             updateVesselInFirestore({ status: 'stationary', eventLabel: 'RETOUR DANS LE CERCLE' });
@@ -182,7 +202,7 @@ export function useEmetteur(
             isEmergencySmsSentRef.current = false;
         }
     }
-  }, [isSharing, currentPos, anchorPos, mooringRadius, vesselStatus, updateVesselInFirestore, addTechLog, triggerEmergency]);
+  }, [isSharing, currentPos, anchorPos, mooringRadius, vesselStatus, updateVesselInFirestore, addTechLog, triggerEmergency, accuracy]);
 
   // MODULE SIMULATION : Injection de données
   useEffect(() => {
@@ -281,6 +301,7 @@ export function useEmetteur(
     setCurrentPos(null);
     setAnchorPos(null);
     isEmergencySmsSentRef.current = false;
+    consecutiveDriftCountRef.current = 0;
     handleStopCleanupRef.current?.(); // Déclenche mapCore.clearBreadcrumbs
     toast({ title: "Partage arrêté" });
   }, [firestore, sharingId, toast]);
@@ -290,6 +311,7 @@ export function useEmetteur(
     if (st === 'moving' || st === 'returning' || st === 'landed') {
         setAnchorPos(null);
         isEmergencySmsSentRef.current = false;
+        consecutiveDriftCountRef.current = 0;
     } else if (st === 'stationary' && currentPosRef.current) {
         setAnchorPos(currentPosRef.current);
     }
