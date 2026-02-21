@@ -25,7 +25,7 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v59.0 : Gestion de la carte et des calques météo.
+ * HOOK PARTAGÉ v60.0 : Gestion de la carte, des calques météo et des alertes visuelles.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
@@ -36,11 +36,22 @@ export function useMapCore() {
   const [isFollowMode, setIsFollowMode] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
+  // Oscillateur pour le clignotement des alertes (1Hz)
+  const [isFlashOn, setIsFlashOn] = useState(true);
+  
   const [breadcrumbs, setBreadcrumbs] = useState<{ lat: number, lng: number, timestamp: number }[]>([]);
   const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
 
   const [tacticalMarkers, setTacticalMarkers] = useState<TacticalMarker[]>([]);
   const [isTacticalHidden, setIsTacticalHidden] = useState(false);
+
+  // Moteur de clignotement global
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsFlashOn(prev => !prev);
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (googleMap) {
@@ -163,6 +174,7 @@ export function useMapCore() {
     setIsFollowMode,
     isFullscreen,
     setIsFullscreen,
+    isFlashOn,
     breadcrumbs,
     updateBreadcrumbs,
     clearBreadcrumbs,
@@ -174,7 +186,7 @@ export function useMapCore() {
     isTacticalHidden,
     setIsTacticalHidden
   }), [
-    isGoogleLoaded, viewMode, switchViewMode, windyLayer, googleMap, isFollowMode, isFullscreen,
+    isGoogleLoaded, viewMode, switchViewMode, windyLayer, googleMap, isFollowMode, isFullscreen, isFlashOn,
     breadcrumbs, updateBreadcrumbs, clearBreadcrumbs, handleRecenter, saveMapState,
     tacticalMarkers, syncTacticalMarkers, isTacticalHidden
   ]);

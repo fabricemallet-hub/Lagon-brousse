@@ -4,7 +4,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
 /**
- * HOOK SIMULATEUR v59.0 : Gère l'état et les commandes de simulation tactique.
+ * HOOK SIMULATEUR v60.0 : Gère l'état et les commandes de simulation tactique.
  * Optimisé à 1Hz pour éviter les violations de performance.
  */
 export function useSimulator() {
@@ -51,7 +51,7 @@ export function useSimulator() {
   const forceDrift = useCallback((anchorPos: {lat: number, lng: number} | null, radius: number) => {
     if (!anchorPos) return;
     const degPerMeter = 1 / 111320;
-    const driftDist = radius + 15; // Sort de 15m
+    const driftDist = radius + 20; // Sort de 20m pour garantir le déclenchement de l'alarme
     setSimPos({ lat: anchorPos.lat + (driftDist * degPerMeter), lng: anchorPos.lng });
     setIsActive(true);
   }, []);
@@ -62,7 +62,8 @@ export function useSimulator() {
         timerRef.current = setInterval(() => {
             setSimPos(prev => {
                 if (!prev) return prev;
-                const degPerSecAt15Kts = 0.00007; // Approx pour la démo
+                // Calcul de déplacement fluide à 1Hz
+                const degPerSecAt15Kts = 0.00007; 
                 const step = (simSpeed / 15) * degPerSecAt15Kts;
                 return { lat: prev.lat + step, lng: prev.lng + step };
             });

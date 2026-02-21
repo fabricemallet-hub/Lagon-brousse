@@ -409,6 +409,37 @@ export default function VesselTrackerPage() {
                     onDragStart={() => mapCore.setIsFollowMode(false)}
                     options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
                 >
+                    {/* Cercles de mouillage pour toute la flotte suivie */}
+                    {followedVessels?.filter(v => v.isSharing && v.anchorLocation).map(vessel => {
+                        const isMe = vessel.id === emetteur.sharingId;
+                        const status = isMe ? emetteur.vesselStatus : vessel.status;
+                        const radius = isMe ? emetteur.mooringRadius : (vessel.mooringRadius || 100);
+                        const isDrifting = status === 'drifting';
+                        
+                        return (
+                            <React.Fragment key={`anchor-group-${vessel.id}`}>
+                                <OverlayView position={{ lat: vessel.anchorLocation!.latitude, lng: vessel.anchorLocation!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                    <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-orange-500/80 rounded-full border border-white flex items-center justify-center shadow-md z-[800]">
+                                        <Anchor className="size-3 text-white" />
+                                    </div>
+                                </OverlayView>
+                                <Circle 
+                                    center={{ lat: vessel.anchorLocation!.latitude, lng: vessel.anchorLocation!.longitude }}
+                                    radius={radius}
+                                    options={{
+                                        strokeColor: isDrifting ? (mapCore.isFlashOn ? '#ef4444' : '#3b82f6') : '#3b82f6',
+                                        strokeOpacity: 0.8,
+                                        strokeWeight: isMe ? 3 : 2,
+                                        fillColor: '#3b82f6',
+                                        fillOpacity: 0.15,
+                                        clickable: false,
+                                        zIndex: 1
+                                    }}
+                                />
+                            </React.Fragment>
+                        );
+                    })}
+
                     {followedVessels?.filter(v => v.isSharing).map(vessel => (
                         <OverlayView key={vessel.id} position={{ lat: vessel.location?.latitude || 0, lng: vessel.location?.longitude || 0 }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                             <VesselMarker vessel={vessel} isMe={vessel.id === emetteur.sharingId} />
@@ -437,21 +468,6 @@ export default function VesselTrackerPage() {
                             </OverlayView>
                         );
                     })}
-
-                    {emetteur.anchorPos && (
-                        <>
-                            <OverlayView position={emetteur.anchorPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                <div style={{ transform: 'translate(-50%, -50%)' }} className="size-8 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]">
-                                    <Anchor className="size-4 text-white" />
-                                </div>
-                            </OverlayView>
-                            <Circle 
-                                center={emetteur.anchorPos} 
-                                radius={emetteur.mooringRadius} 
-                                options={{ strokeColor: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15, strokeWeight: 1 }} 
-                            />
-                        </>
-                    )}
                 </GoogleMap>
             </div>
         ) : <Skeleton className="h-full w-full" />}
