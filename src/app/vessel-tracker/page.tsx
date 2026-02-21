@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -18,6 +19,22 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { 
+  useUser, 
+  useFirestore, 
+  useDoc, 
+  useMemoFirebase,
+  useCollection
+} from '@/firebase';
+import { 
+  collection, 
+  query, 
+  where, 
+  doc, 
+  orderBy, 
+  addDoc, 
+  serverTimestamp 
+} from 'firebase/firestore';
 import { 
   Select, 
   SelectContent, 
@@ -71,6 +88,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import type { UserAccount, VesselStatus, SoundLibraryEntry } from '@/lib/types';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -98,14 +116,17 @@ const TACTICAL_ICONS: Record<string, any> = {
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
   const props = { className: cn("size-4", className) };
-  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
+  if (charging) return <BatteryFull {...props} className={cn(props.className, "text-blue-500")} />;
   if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
   if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
   return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
 };
 
+const BatteryLow = (props: any) => <Battery className={props.className} />;
+const BatteryMedium = (props: any) => <Battery className={props.className} />;
+
 // Composant de Marqueur de Navire Dynamique (v55.0)
-const VesselMarker = ({ vessel, isMe = false }: { vessel: any, isMe?: boolean }) => {
+const VesselMarker = ({ vessel, isMe = false }: { vessel: VesselStatus, isMe?: boolean }) => {
     const status = vessel.status || 'moving';
     const heading = vessel.heading || 0;
     
@@ -170,6 +191,8 @@ const VesselMarker = ({ vessel, isMe = false }: { vessel: any, isMe?: boolean })
 export default function VesselTrackerPage() {
   const [appMode, setAppMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
+  const { user } = useUser();
+  const firestore = useFirestore();
   const { toast } = useToast();
   
   const mapCore = useMapCore();
@@ -188,6 +211,27 @@ export default function VesselTrackerPage() {
   const recepteur = useRecepteur(emetteur.sharingId);
   const flotte = useFlotte(emetteur.sharingId, emetteur.vesselNickname);
   
+  const userDocRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: profile } = useDoc<UserAccount>(userDocRef);
+
+  // RÉCUPÉRATION DES NAVIRES SUIVIS (FIX: followedVessels definition)
+  const savedVesselIds = profile?.savedVesselIds || [];
+  const vesselsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    const ids = [...savedVesselIds];
+    // On ajoute soi-même à la liste des navires à afficher si on partage
+    if (emetteur.isSharing && !ids.includes(emetteur.sharingId)) {
+        ids.push(emetteur.sharingId);
+    }
+    if (ids.length === 0) return null;
+    return query(collection(firestore, 'vessels'), where('id', 'in', ids.slice(0, 10)));
+  }, [firestore, user, savedVesselIds, emetteur.isSharing, emetteur.sharingId]);
+
+  const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
+
   const photoInputRef = useRef<HTMLInputElement>(null);
   const hasCenteredInitially = useRef(false);
 
@@ -277,7 +321,7 @@ export default function VesselTrackerPage() {
             >
                 {/* Rendu des navires de la flotte (inclut soi-même) */}
                 {followedVessels?.filter(v => v.isSharing).map(vessel => (
-                    <OverlayView key={vessel.id} position={{ lat: vessel.location.latitude, lng: vessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                    <OverlayView key={vessel.id} position={{ lat: vessel.location?.latitude || 0, lng: vessel.location?.longitude || 0 }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <VesselMarker vessel={vessel} isMe={vessel.id === emetteur.sharingId} />
                     </OverlayView>
                 ))}
@@ -731,7 +775,7 @@ export default function VesselTrackerPage() {
 
                                   <div className="space-y-3 pt-2 border-t border-dashed">
                                       <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                                          <HistoryIcon className="size-3" /> Réglages Individuels (Son 2.png)
+                                          <HistoryIcon className="size-3" /> Réglages Individuels
                                       </p>
                                       <div className="grid gap-3">
                                           {Object.entries(recepteur.vesselPrefs.alerts || {}).map(([key, config]) => (
