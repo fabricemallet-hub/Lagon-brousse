@@ -8,7 +8,7 @@ import type { UserAccount, SoundLibraryEntry, VesselStatus, VesselPrefs } from '
 
 /**
  * LOGIQUE RÉCEPTEUR (B) : Journal Technique, Sons Expert, Veille Stratégique.
- * v53.0 : Ajout de la gestion des boucles et des seuils batterie/veille.
+ * v53.2 : Ajout de updateLocalPrefs et savePrefsToFirestore pour validation manuelle.
  */
 export function useRecepteur(vesselId?: string) {
   const { user } = useUser();
@@ -17,6 +17,7 @@ export function useRecepteur(vesselId?: string) {
 
   const [activeAlarms, setActiveAlarms] = useState<Record<string, HTMLAudioElement>>({});
   const [audioAuthorized, setAudioAuthorized] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const silentAudioRef = useRef<HTMLAudioElement | null>(null);
   
   const defaultPrefs: VesselPrefs = {
@@ -110,6 +111,33 @@ export function useRecepteur(vesselId?: string) {
     }
   }, [dbSounds, vesselPrefs, activeAlarms]);
 
+  // Mise à jour locale uniquement pour la réactivité UI immédiate
+  const updateLocalPrefs = useCallback((updates: Partial<VesselPrefs>) => {
+    setVesselPrefs(prev => {
+        const next = { ...prev, ...updates };
+        if (updates.alerts) {
+            next.alerts = { ...prev.alerts, ...updates.alerts };
+        }
+        return next;
+    });
+  }, []);
+
+  // Sauvegarde manuelle vers Firestore (déclenchée par bouton)
+  const savePrefsToFirestore = async () => {
+    if (!user || !firestore) return false;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs });
+      setIsSaving(false);
+      return true;
+    } catch (e) {
+      console.error("Erreur sauvegarde sons:", e);
+      setIsSaving(false);
+      return false;
+    }
+  };
+
+  // Conservation de l'ancienne méthode pour compatibilité (ex: ID suivi)
   const savePrefs = async (updates: Partial<VesselPrefs>) => {
     if (!user || !firestore) return;
     const newPrefs = { ...vesselPrefs, ...updates };
@@ -117,20 +145,11 @@ export function useRecepteur(vesselId?: string) {
     await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs });
   };
 
-  // Logic de veille stratégique
-  useEffect(() => {
-    if (!vesselId || !vesselPrefs.isWatchEnabled) return;
-
-    const interval = setInterval(() => {
-        // En conditions réelles, on vérifierait le dernier log technique ici
-        // Pour l'instant on simule l'écoute du flux de l'émetteur
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, [vesselId, vesselPrefs]);
-
   return {
     vesselPrefs,
+    updateLocalPrefs,
+    savePrefsToFirestore,
+    isSaving,
     savePrefs,
     availableSounds: dbSounds || [],
     playSound,
