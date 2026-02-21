@@ -244,6 +244,14 @@ export default function VesselTrackerPage() {
 
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
+  // RÉCUPÉRATION DE L'ANCRE UNIQUE (Singleton visuel)
+  const activeAnchorVessel = useMemo(() => {
+    if (!followedVessels || mapCore.isCirclesHidden) return null;
+    // On priorise notre propre navire si ancré, sinon le premier trouvé dans la flotte
+    return followedVessels.find(v => v.isSharing && v.id === emetteur.sharingId && v.anchorLocation) 
+        || followedVessels.find(v => v.isSharing && v.anchorLocation);
+  }, [followedVessels, emetteur.sharingId, mapCore.isCirclesHidden]);
+
   // CONNEXION DU MOTEUR D'ALERTES SONORES
   useEffect(() => {
     if (followedVessels) {
@@ -414,9 +422,6 @@ export default function VesselTrackerPage() {
                     className="h-9 px-3 text-[9px] font-black uppercase text-white/60 hover:text-white hover:bg-white/10 flex items-center gap-1.5"
                     onClick={() => {
                         mapCore.clearBreadcrumbs();
-                        if (!emetteur.isSharing || emetteur.vesselStatus !== 'stationary') {
-                            emetteur.setAnchorPos(null);
-                        }
                         toast({ title: "TRACES EFFACÉES", description: "Historique visuel purgé." });
                     }}
                 >
@@ -447,55 +452,45 @@ export default function VesselTrackerPage() {
                     onDragStart={() => mapCore.setIsFollowMode(false)}
                     options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
                 >
-                    {/* RENDU DES CERCLES ET ANCRES FIXES */}
-                    {followedVessels?.filter(v => v.isSharing && v.anchorLocation).map(vessel => {
-                        const isMe = vessel.id === emetteur.sharingId;
-                        const status = isMe ? emetteur.vesselStatus : vessel.status;
-                        const radius = isMe ? emetteur.mooringRadius : (vessel.mooringRadius || 100);
-                        const isDrifting = status === 'drifting';
-                        
-                        return (
-                            <React.Fragment key={`anchor-group-${vessel.id}`}>
-                                {status === 'stationary' && (
-                                    <OverlayView position={{ lat: vessel.anchorLocation!.latitude, lng: vessel.anchorLocation!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                        <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]">
-                                            <Anchor className="size-3.5 text-white" />
-                                        </div>
-                                    </OverlayView>
-                                )}
-                                
-                                <Circle 
-                                    center={{ lat: vessel.anchorLocation!.latitude, lng: vessel.anchorLocation!.longitude }}
-                                    radius={radius}
+                    {/* RÈGLE DE L'ANCRE UNIQUE (SINGLETON VISUEL) */}
+                    {activeAnchorVessel && (
+                        <React.Fragment>
+                            <OverlayView position={{ lat: activeAnchorVessel.anchorLocation!.latitude, lng: activeAnchorVessel.anchorLocation!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]">
+                                    <Anchor className="size-3.5 text-white" />
+                                </div>
+                            </OverlayView>
+                            
+                            <Circle 
+                                center={{ lat: activeAnchorVessel.anchorLocation!.latitude, lng: activeAnchorVessel.anchorLocation!.longitude }}
+                                radius={activeAnchorVessel.mooringRadius || 100}
+                                options={{
+                                    strokeColor: activeAnchorVessel.status === 'drifting' ? (mapCore.isFlashOn ? '#ef4444' : '#3b82f6') : '#3b82f6',
+                                    strokeOpacity: 0.8,
+                                    strokeWeight: 3,
+                                    fillColor: '#3b82f6',
+                                    fillOpacity: 0.15,
+                                    clickable: false,
+                                    zIndex: 1
+                                }}
+                            />
+
+                            {activeAnchorVessel.location && (
+                                <Polyline
+                                    path={[
+                                        { lat: activeAnchorVessel.anchorLocation!.latitude, lng: activeAnchorVessel.anchorLocation!.longitude },
+                                        { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }
+                                    ]}
                                     options={{
-                                        strokeColor: isDrifting ? (mapCore.isFlashOn ? '#ef4444' : '#3b82f6') : '#3b82f6',
+                                        strokeColor: activeAnchorVessel.status === 'drifting' ? (mapCore.isFlashOn ? '#ef4444' : '#3b82f6') : '#3b82f6',
                                         strokeOpacity: 0.8,
-                                        strokeWeight: isMe ? 3 : 2,
-                                        fillColor: '#3b82f6',
-                                        fillOpacity: 0.15,
-                                        clickable: false,
-                                        zIndex: 1
+                                        strokeWeight: 3,
+                                        zIndex: 2
                                     }}
                                 />
-
-                                {/* LIGNE DE TENSION TACTIQUE - ANCRE VERS NAVIRE */}
-                                {(status === 'stationary' || status === 'drifting') && vessel.location && (
-                                    <Polyline
-                                        path={[
-                                            { lat: vessel.anchorLocation!.latitude, lng: vessel.anchorLocation!.longitude },
-                                            { lat: vessel.location.latitude, lng: vessel.location.longitude }
-                                        ]}
-                                        options={{
-                                            strokeColor: isDrifting ? (mapCore.isFlashOn ? '#ef4444' : '#3b82f6') : '#3b82f6',
-                                            strokeOpacity: 0.8,
-                                            strokeWeight: isMe ? 3 : 2,
-                                            zIndex: 2
-                                        }}
-                                    />
-                                )}
-                            </React.Fragment>
-                        );
-                    })}
+                            )}
+                        </React.Fragment>
+                    )}
 
                     {/* RENDU DES NAVIRES MOBILES */}
                     {followedVessels?.filter(v => v.isSharing).map(vessel => (
@@ -550,7 +545,10 @@ export default function VesselTrackerPage() {
                             <Label className="text-[9px] font-black uppercase opacity-40">Position & Vitesse</Label>
                             <Button variant="outline" className="w-full h-10 text-[9px] font-black uppercase border-2 gap-2" onClick={() => {
                                 const center = mapCore.googleMap?.getCenter();
-                                if (center) simulator.teleport({ lat: center.lat(), lng: center.lng() });
+                                if (center) {
+                                    simulator.teleport({ lat: center.lat(), lng: center.lng() });
+                                    mapCore.setIsCirclesHidden(false); // Rétablit la vue si on bouge
+                                }
                             }}>
                                 <MapPin className="size-3" /> Téléporter sur centre carte
                             </Button>
@@ -563,8 +561,14 @@ export default function VesselTrackerPage() {
                         <div className="space-y-3 pt-3 border-t border-dashed">
                             <Label className="text-[9px] font-black uppercase text-orange-600">Stress Test Mouillage</Label>
                             <div className="grid grid-cols-2 gap-2">
-                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-2" onClick={() => simulator.nudge(emetteur.anchorPos, emetteur.mooringRadius)}>Nudge (90% Rayon)</Button>
-                                <Button variant="destructive" className="h-10 text-[8px] font-black uppercase" onClick={() => simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius)}>Forcer Dérive</Button>
+                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-2" onClick={() => {
+                                    simulator.nudge(emetteur.anchorPos, emetteur.mooringRadius);
+                                    mapCore.setIsCirclesHidden(false);
+                                }}>Nudge (90% Rayon)</Button>
+                                <Button variant="destructive" className="h-10 text-[8px] font-black uppercase" onClick={() => {
+                                    simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius);
+                                    mapCore.setIsCirclesHidden(false);
+                                }}>Forcer Dérive</Button>
                             </div>
                         </div>
 
@@ -642,7 +646,7 @@ export default function VesselTrackerPage() {
                                       <Button 
                                           variant="outline" 
                                           className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", 
-                                              emetteur.vesselStatus === 'landed' ? "bg-green-600 text-white border-green-700 shadow-inner" : "bg-green-50 border-green-100 text-green-700 hover:bg-green-100"
+                                              emetteur.vesselStatus === 'landed' ? "bg-green-600 text-white border-green-700 shadow-inner" : "bg-green-50 border-green-100 text-green-700 hover:bg-indigo-100"
                                           )}
                                           onClick={() => emetteur.changeManualStatus('landed', 'HOME À TERRE')}
                                       >
@@ -657,8 +661,12 @@ export default function VesselTrackerPage() {
                                                   emetteur.vesselStatus === 'stationary' || emetteur.vesselStatus === 'drifting' ? "bg-orange-600 hover:bg-orange-700" : "bg-slate-200 text-slate-600 hover:bg-slate-300"
                                               )}
                                               onClick={() => {
-                                                  if (emetteur.anchorPos) emetteur.changeManualStatus('moving', 'REPRISE NAVIGATION');
-                                                  else emetteur.changeManualStatus('stationary', 'MOUILLAGE ACTIF');
+                                                  if (emetteur.anchorPos) {
+                                                      emetteur.changeManualStatus('moving', 'REPRISE NAVIGATION');
+                                                  } else {
+                                                      emetteur.changeManualStatus('stationary', 'MOUILLAGE ACTIF');
+                                                      mapCore.setIsCirclesHidden(false); // Rétablit la vue forcée
+                                                  }
                                               }}
                                           >
                                               <Anchor className="size-4" /> 

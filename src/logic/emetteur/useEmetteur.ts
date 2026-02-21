@@ -10,8 +10,8 @@ import { format } from 'date-fns';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v66.0 : "Le Cerveau"
- * Gère la détection de dérive avec filtre de précision GPS (3 relevés si précision faible).
+ * LOGIQUE ÉMETTEUR (A) v67.0 : "Le Cerveau"
+ * Gère la détection de dérive avec filtrage GPS et nettoyage des ancres orphelines.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number) => void, 
@@ -162,7 +162,7 @@ export function useEmetteur(
     toast({ variant: "destructive", title: `ALERTE ${type}` });
   }, [isSharing, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, accuracy, toast]);
 
-  // LOGIQUE DE DÉTECTION DE DÉRIVE v66.0 (AVEC FILTRE PRÉCISION)
+  // LOGIQUE DE DÉTECTION DE DÉRIVE v67.0 (AVEC FILTRE PRÉCISION)
   useEffect(() => {
     if (!isSharing || !currentPos || !anchorPos || (vesselStatus !== 'stationary' && vesselStatus !== 'drifting' && vesselStatus !== 'emergency')) return;
 
@@ -291,6 +291,7 @@ export function useEmetteur(
     setIsSharing(false);
     if (firestore && sharingId) {
       const ref = doc(firestore, 'vessels', sharingId);
+      // NETTOYAGE COMPLET DE L'ANCRE À L'ARRÊT
       setDoc(ref, { 
         isSharing: false, 
         lastActive: serverTimestamp(),
@@ -302,7 +303,7 @@ export function useEmetteur(
     setAnchorPos(null);
     isEmergencySmsSentRef.current = false;
     consecutiveDriftCountRef.current = 0;
-    handleStopCleanupRef.current?.(); // Déclenche mapCore.clearBreadcrumbs
+    handleStopCleanupRef.current?.(); // Déclenche mapCore.clearBreadcrumbs et masque cercles
     toast({ title: "Partage arrêté" });
   }, [firestore, sharingId, toast]);
 

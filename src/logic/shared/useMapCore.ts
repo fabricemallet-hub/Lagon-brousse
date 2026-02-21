@@ -25,8 +25,8 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v65.0 : Gestion de la carte, des calques météo et du nettoyage visuel.
- * Règle de l'Ancre Unique et Effacement des Traces.
+ * HOOK PARTAGÉ v67.0 : Gestion de la carte et du nettoyage visuel.
+ * Implémentation du système d'acquittement et de la visibilité exclusive des cercles.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
@@ -40,11 +40,13 @@ export function useMapCore() {
   // Oscillateur pour le clignotement des alertes (1Hz)
   const [isFlashOn, setIsFlashOn] = useState(true);
   
+  // États de nettoyage visuel
   const [breadcrumbs, setBreadcrumbs] = useState<{ lat: number, lng: number, timestamp: number }[]>([]);
-  const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
-
-  const [tacticalMarkers, setTacticalMarkers] = useState<TacticalMarker[]>([]);
+  const [isCirclesHidden, setIsCirclesHidden] = useState(false);
   const [isTacticalHidden, setIsTacticalHidden] = useState(false);
+  
+  const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
+  const [tacticalMarkers, setTacticalMarkers] = useState<TacticalMarker[]>([]);
 
   // Moteur de clignotement global
   useEffect(() => {
@@ -134,6 +136,7 @@ export function useMapCore() {
 
   const clearBreadcrumbs = useCallback(() => {
     setBreadcrumbs([]);
+    setIsCirclesHidden(true); // Masque les cercles et ancres lors du nettoyage
     lastTracePosRef.current = null;
   }, []);
 
@@ -185,10 +188,12 @@ export function useMapCore() {
     setTacticalMarkers,
     syncTacticalMarkers,
     isTacticalHidden,
-    setIsTacticalHidden
+    setIsTacticalHidden,
+    isCirclesHidden,
+    setIsCirclesHidden
   }), [
     isGoogleLoaded, viewMode, switchViewMode, windyLayer, googleMap, isFollowMode, isFullscreen, isFlashOn,
     breadcrumbs, updateBreadcrumbs, clearBreadcrumbs, handleRecenter, saveMapState,
-    tacticalMarkers, syncTacticalMarkers, isTacticalHidden
+    tacticalMarkers, syncTacticalMarkers, isTacticalHidden, isCirclesHidden
   ]);
 }
