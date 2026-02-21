@@ -4,15 +4,14 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useUser, useFirestore } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, getDocs, writeBatch } from 'firebase/firestore';
-import type { VesselStatus, TechLogEntry } from '@/lib/types';
+import type { VesselStatus, TechLogEntry, UserAccount } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v75.0 : "Sync & Robustesse"
- * Gestion automatique de la visibilité des calques de sécurité.
+ * LOGIQUE ÉMETTEUR (A) v76.0 : "Confidentialité & Trajectoires"
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -37,6 +36,10 @@ export function useEmetteur(
   const [customFleetId, setCustomFleetId] = useState('');
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
+  // Nouveaux états de confidentialité v76.0
+  const [isGhostMode, setIsGhostMode] = useState(false);
+  const [isTrajectoryHidden, setIsTrajectoryHidden] = useState(false);
+
   const [battery, setBattery] = useState<{ level: number, charging: boolean }>({ level: 1, charging: false });
 
   const [emergencyContact, setEmergencyContact] = useState('');
@@ -53,6 +56,8 @@ export function useEmetteur(
   const mooringRadiusRef = useRef(mooringRadius);
   const batteryRef = useRef(battery);
   const isSharingRef = useRef(isSharing);
+  const isGhostModeRef = useRef(isGhostMode);
+  const isTrajectoryHiddenRef = useRef(isTrajectoryHidden);
 
   useEffect(() => { vesselStatusRef.current = vesselStatus; }, [vesselStatus]);
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
@@ -60,6 +65,8 @@ export function useEmetteur(
   useEffect(() => { mooringRadiusRef.current = mooringRadius; }, [mooringRadius]);
   useEffect(() => { batteryRef.current = battery; }, [battery]);
   useEffect(() => { isSharingRef.current = isSharing; }, [isSharing]);
+  useEffect(() => { isGhostModeRef.current = isGhostMode; }, [isGhostMode]);
+  useEffect(() => { isTrajectoryHiddenRef.current = isTrajectoryHidden; }, [isTrajectoryHidden]);
 
   const watchIdRef = useRef<number | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -106,6 +113,9 @@ export function useEmetteur(
       const savedEmergencyContact = localStorage.getItem('lb_emergency_contact');
       const savedSmsMessage = localStorage.getItem('lb_vessel_sms_message');
       const savedEmergencyEnabled = localStorage.getItem('lb_emergency_enabled');
+      
+      const savedGhost = localStorage.getItem('lb_vessel_ghost');
+      const savedTrajHidden = localStorage.getItem('lb_vessel_traj_hidden');
 
       if (savedNickname) setVesselNickname(savedNickname);
       if (savedVesselId) setCustomSharingId(savedVesselId);
@@ -115,6 +125,9 @@ export function useEmetteur(
       if (savedEmergencyContact) setEmergencyContact(savedEmergencyContact);
       if (savedSmsMessage) setVesselSmsMessage(savedSmsMessage);
       if (savedEmergencyEnabled !== null) setIsEmergencyEnabled(savedEmergencyEnabled === 'true');
+      
+      if (savedGhost === 'true') setIsGhostMode(true);
+      if (savedTrajHidden === 'true') setIsTrajectoryHidden(true);
     }
   }, []);
 
@@ -194,7 +207,9 @@ export function useEmetteur(
       fleetId: customFleetId.trim().toUpperCase() || null,
       mooringRadius: mooringRadiusRef.current,
       batteryLevel,
-      isCharging
+      isCharging,
+      isGhostMode: isGhostModeRef.current,
+      isTrajectoryHidden: isTrajectoryHiddenRef.current
     };
 
     if (statusChanged) {
@@ -406,6 +421,30 @@ export function useEmetteur(
     toast({ title: label || `Statut : ${st}` });
   }, [updateVesselInFirestore, toast, addTechLog]);
 
+  const toggleGhostMode = useCallback(() => {
+    const newVal = !isGhostMode;
+    setIsGhostMode(newVal);
+    isGhostModeRef.current = newVal;
+    localStorage.setItem('lb_vessel_ghost', newVal.toString());
+    updateVesselInFirestore({ isGhostMode: newVal });
+    toast({ title: newVal ? "Mode Fantôme activé" : "Mode Fantôme désactivé", description: newVal ? "Invisible pour la flotte C." : "Visible pour tous." });
+  }, [isGhostMode, updateVesselInFirestore, toast]);
+
+  const toggleTrajectoryHidden = useCallback(() => {
+    const newVal = !isTrajectoryHidden;
+    setIsTrajectoryHidden(newVal);
+    isTrajectoryHiddenRef.current = newVal;
+    localStorage.setItem('lb_vessel_traj_hidden', newVal.toString());
+    updateVesselInFirestore({ isTrajectoryHidden: newVal });
+    toast({ title: newVal ? "Trajectoire masquée" : "Trajectoire affichée", description: newVal ? "Invisible pour vous et la flotte." : "Visible." });
+  }, [isTrajectoryHidden, updateVesselInFirestore, toast]);
+
+  const resetTrajectory = useCallback(() => {
+    handleStopCleanupRef.current?.();
+    addTechLog('RESET', 'Trajectoire remise à zéro');
+    toast({ title: "Trajectoire réinitialisée" });
+  }, [addTechLog, toast]);
+
   return useMemo(() => ({
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     triggerEmergency, changeManualStatus, anchorPos, setAnchorPos, mooringRadius, setMooringRadius, accuracy, battery,
@@ -420,12 +459,14 @@ export function useEmetteur(
     isCustomMessageEnabled, setIsCustomMessageEnabled, saveSmsSettings: async () => {
         if (user && firestore) await updateDoc(doc(firestore, 'users', user.uid), { emergencyContact, vesselSmsMessage, isEmergencyEnabled, isCustomMessageEnabled });
         toast({ title: "Réglages SMS sauvegardés" });
-    }, clearLogs
+    }, clearLogs,
+    isGhostMode, toggleGhostMode, isTrajectoryHidden, toggleTrajectoryHidden, resetTrajectory
   }), [
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     triggerEmergency, changeManualStatus, anchorPos, mooringRadius, accuracy, battery,
     vesselNickname, customSharingId, customFleetId, sharingId,
     lastSyncTime, techLogs, tacticalLogs, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
-    isCustomMessageEnabled, toast, user, firestore, clearLogs
+    isCustomMessageEnabled, toast, user, firestore, clearLogs,
+    isGhostMode, toggleGhostMode, isTrajectoryHidden, toggleTrajectoryHidden, resetTrajectory
   ]);
 }

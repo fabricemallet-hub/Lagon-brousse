@@ -114,6 +114,7 @@ export interface UserAccount {
   ridet?: string;
   vesselSharingTarget?: 'none' | 'receiver' | 'fleet' | 'both';
   isGhostMode?: boolean;
+  isTrajectoryHidden?: boolean;
   shootingAngle?: {
       center: number;
       spread: number;
@@ -422,6 +423,7 @@ export interface VesselStatus {
   isPositionHidden?: boolean;
   isPrivateHidden?: boolean;
   isGhostMode?: boolean;
+  isTrajectoryHidden?: boolean;
   accuracy?: number;
   mooringRadius?: number;
   shootingAngle?: ShootingAngle;

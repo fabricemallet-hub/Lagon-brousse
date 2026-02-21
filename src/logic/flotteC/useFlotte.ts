@@ -9,8 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import type { VesselStatus } from '@/lib/types';
 
 /**
- * LOGIQUE FLOTTE (C) : Journal Tactique, Photos, Urgences.
- * v58.2 : Mémoïsation du retour pour stabiliser l'UI.
+ * LOGIQUE FLOTTE (C) v76.0 : Journal Tactique, Photos, Urgences.
+ * Filtrage des membres en mode Fantôme.
  */
 export function useFlotte(fleetId?: string, vesselNickname?: string) {
   const { user } = useUser();
@@ -20,7 +20,14 @@ export function useFlotte(fleetId?: string, vesselNickname?: string) {
   const tacticalLogsRef = useMemoFirebase(() => (firestore && fleetId) ? query(collection(firestore, 'vessels', fleetId, 'tactical_logs'), orderBy('time', 'desc')) : null, [firestore, fleetId]);
   const { data: tacticalLogs } = useCollection(tacticalLogsRef);
 
-  const fleetMembersRef = useMemoFirebase(() => (firestore && fleetId) ? query(collection(firestore, 'vessels'), where('fleetId', '==', fleetId), where('isSharing', '==', true)) : null, [firestore, fleetId]);
+  // RÈGLE v76.0 : Seuls les navires partagés ET non-fantômes sont visibles par la flotte générale
+  const fleetMembersRef = useMemoFirebase(() => (firestore && fleetId) ? query(
+    collection(firestore, 'vessels'), 
+    where('fleetId', '==', fleetId), 
+    where('isSharing', '==', true),
+    where('isGhostMode', '==', false)
+  ) : null, [firestore, fleetId]);
+  
   const { data: fleetMembers } = useCollection<VesselStatus>(fleetMembersRef);
 
   const addTacticalLog = useCallback(async (type: string, lat: number, lng: number, photoUrl?: string) => {

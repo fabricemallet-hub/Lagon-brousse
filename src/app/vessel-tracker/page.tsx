@@ -185,6 +185,7 @@ const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
                         )}>
                             {statusLabel}
                         </span>
+                        {vessel.isGhostMode && <Ghost className="size-2 text-primary" />}
                     </div>
                 </div>
             </div>
@@ -202,6 +203,7 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
   
   const [appMode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
+  const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   
   const mapCore = useMapCore();
   const simulator = useSimulator();
@@ -241,6 +243,7 @@ export default function VesselTrackerPage() {
         ids.push(emetteur.sharingId);
     }
     if (ids.length === 0) return null;
+    // RÈGLE v76.0 : Le récepteur B suit par ID spécifique, donc pas de filtre ghost ici
     return query(collection(firestore, 'vessels'), where('id', 'in', ids.slice(0, 10)));
   }, [firestore, user, savedVesselIds, emetteur.isSharing, emetteur.sharingId]);
 
@@ -248,7 +251,6 @@ export default function VesselTrackerPage() {
 
   const activeAnchorVessel = useMemo(() => {
     if (mapCore.isCirclesHidden) return null;
-    // Si l'émetteur local est stationnaire, on utilise ses données locales prioritaires
     if (emetteur.isSharing && (emetteur.vesselStatus === 'stationary' || emetteur.vesselStatus === 'drifting') && emetteur.anchorPos) {
         return { 
             id: emetteur.sharingId, 
@@ -301,6 +303,13 @@ export default function VesselTrackerPage() {
     return `[${nick.toUpperCase()}] ${msg} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
   }, [emetteur.vesselSmsMessage, emetteur.isCustomMessageEnabled, emetteur.vesselNickname]);
 
+  const handleCopyLogEntry = (log: any) => {
+    const pos = log.pos || { lat: -22.27, lng: 166.45 };
+    const text = `Log: ${log.label || log.type} - Time: ${format(log.time, 'HH:mm:ss')} - Pos: ${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)} - Google Maps: https://www.google.com/maps?q=${pos.lat},${pos.lng}`;
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copié !", description: "Coordonnées prêtes à être collées." });
+  };
+
   if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
   if (!isLoaded || isProfileLoading) return <Skeleton className="h-96 w-full" />;
 
@@ -322,7 +331,8 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[10000] flex bg-slate-900/90 backdrop-blur-md p-1 rounded-2xl border-2 border-white/20 shadow-2xl">
+        {/* BARRE TACTIQUE v76.0 - Z-INDEX 9999 */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[9999] flex bg-slate-900/90 backdrop-blur-md p-1 rounded-2xl border-2 border-white/20 shadow-2xl">
             <Button variant={mapCore.viewMode === 'alpha' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" onClick={() => mapCore.setViewMode('alpha')}>Maps</Button>
             <Button variant={mapCore.viewMode === 'beta' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" onClick={() => mapCore.setViewMode('beta')}>Météo</Button>
             <Button variant={mapCore.viewMode === 'gamma' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" onClick={() => mapCore.setViewMode('gamma')}>Windy</Button>
@@ -340,8 +350,8 @@ export default function VesselTrackerPage() {
                     onDragStart={() => mapCore.setIsFollowMode(false)}
                     options={{ disableDefaultUI: true, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}
                 >
-                    {/* TRACÉ HISTORIQUE (BREADCRUMBS) */}
-                    {mapCore.breadcrumbs.length > 1 && (
+                    {/* TRACÉ HISTORIQUE (BREADCRUMBS) v76.0 : Masquage sélectif */}
+                    {!emetteur.isTrajectoryHidden && mapCore.breadcrumbs.length > 1 && (
                         <Polyline 
                             path={mapCore.breadcrumbs.map(p => ({ lat: p.lat, lng: p.lng }))}
                             options={{ strokeColor: '#3b82f6', strokeOpacity: 0.6, strokeWeight: 2, zIndex: 1 }}
@@ -402,6 +412,7 @@ export default function VesselTrackerPage() {
                                 batteryLevel: Math.round(emetteur.battery?.level * 100),
                                 isCharging: emetteur.battery?.charging,
                                 isSharing: true,
+                                isGhostMode: emetteur.isGhostMode,
                                 lastActive: new Date()
                             } as any} />
                         </OverlayView>
@@ -538,7 +549,7 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v75.0 prêt - Sync & Robustesse OK</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v76.0 prêt - Mode Fantôme OK</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm cursor-pointer transition-all active:scale-[0.98]", log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') ? 'border-red-200 bg-red-50' : 'border-slate-100')} onClick={() => handleCopyLogEntry(log)}>
                                                   <div className="flex justify-between items-start">
@@ -570,6 +581,34 @@ export default function VesselTrackerPage() {
 
                               <TabsContent value="settings" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
                                   <Button className="w-full h-14 font-black uppercase tracking-widest shadow-xl rounded-2xl bg-primary text-white" onClick={() => recepteur.savePrefsToFirestore()} disabled={recepteur.isSaving}>ENREGISTRER LES RÉGLAGES</Button>
+                                  
+                                  {/* RÉGLAGES CONFIDENTIALITÉ v76.0 */}
+                                  <div className="space-y-4 p-4 border-2 rounded-2xl bg-slate-900 text-white">
+                                      <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
+                                          <Ghost className="size-3" /> Confidentialité Tactique
+                                      </p>
+                                      
+                                      <div className="flex items-center justify-between py-2 border-b border-white/10">
+                                          <div className="space-y-0.5">
+                                              <Label className="text-xs font-black uppercase">Mode Fantôme</Label>
+                                              <p className="text-[8px] font-bold text-slate-400 uppercase">Invisible pour la Flotte C</p>
+                                          </div>
+                                          <Switch checked={emetteur.isGhostMode} onCheckedChange={emetteur.toggleGhostMode} />
+                                      </div>
+
+                                      <div className="flex items-center justify-between py-2">
+                                          <div className="space-y-0.5">
+                                              <Label className="text-xs font-black uppercase">Masquer Tracé</Label>
+                                              <p className="text-[8px] font-bold text-slate-400 uppercase">Cache la ligne bleue</p>
+                                          </div>
+                                          <Switch checked={emetteur.isTrajectoryHidden} onCheckedChange={emetteur.toggleTrajectoryHidden} />
+                                      </div>
+
+                                      <Button variant="outline" className="w-full h-10 font-black uppercase text-[9px] border-2 bg-white text-slate-900 mt-2 gap-2" onClick={emetteur.resetTrajectory}>
+                                          <HistoryIcon className="size-3" /> RESET TRAJECTOIRE
+                                      </Button>
+                                  </div>
+
                                   <div className="flex items-center justify-between p-4 bg-primary/5 rounded-2xl border-2 border-primary/10"><Label className="text-xs font-black uppercase">Activer les signaux sonores</Label><Switch checked={recepteur.vesselPrefs.isNotifyEnabled} onCheckedChange={v => recepteur.updateLocalPrefs({ isNotifyEnabled: v })} /></div>
                                   <div className="space-y-3"><Label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2"><Volume2 className="size-3" /> Volume global</Label><Slider value={[recepteur.vesselPrefs.volume * 100]} max={100} onValueChange={v => recepteur.updateLocalPrefs({ volume: v[0] / 100 })} /></div>
                                   <div className="space-y-4 p-4 border-2 rounded-2xl bg-slate-50">
