@@ -31,7 +31,9 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
   const [vesselHistory, setVesselHistory] = useState<string[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
-  const [techLogs, setTechLogs] = useState<any[]>([]);
+  const [techLogs, setTechLogs] = useState<any[]>([
+    { label: 'SYSTÈME', details: 'v40.0 prêt - En attente de signal GPS', time: new Date() }
+  ]);
   const [tacticalLogs, setTacticalLogs] = useState<any[]>([]);
   const lastLoggedBattery = useRef<number>(100);
   const lastLoggedAccuracy = useRef<number>(100);
@@ -50,7 +52,8 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
         const vh = JSON.parse(localStorage.getItem('lb_vessel_history') || '[]');
         setVesselHistory(vh);
         if (savedVesselId) {
-            setTechLogs(JSON.parse(localStorage.getItem(`lb_tech_logs_${savedVesselId}`) || '[]'));
+            const savedTech = JSON.parse(localStorage.getItem(`lb_tech_logs_${savedVesselId}`) || '[]');
+            if (savedTech.length > 0) setTechLogs(savedTech);
             setTacticalLogs(JSON.parse(localStorage.getItem(`lb_tact_logs_${savedVesselId}`) || '[]'));
         }
       } catch (e) { console.error(e); }
@@ -99,7 +102,10 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
   }, [isSharing, sharingId, addTechLog]);
 
   const addTacticalLog = useCallback(async (type: string, photoUrl?: string) => {
-    if (!firestore || !sharingId || !currentPos) return;
+    if (!firestore || !sharingId || !currentPos) {
+        toast({ variant: "destructive", title: "Action impossible", description: "GPS non fixé ou partage inactif." });
+        return;
+    }
 
     const logEntry = {
         type: type.toUpperCase(),

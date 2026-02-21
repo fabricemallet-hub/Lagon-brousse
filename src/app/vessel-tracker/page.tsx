@@ -67,7 +67,8 @@ import {
   Volume2,
   Timer,
   Bell,
-  Eye
+  Eye,
+  ClipboardList
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -75,6 +76,16 @@ import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
+
+const TACTICAL_SPECIES = [
+    { label: 'MARLIN', icon: Target },
+    { label: 'THON', icon: Fish },
+    { label: 'TAZARD', icon: Fish },
+    { label: 'WAHOO', icon: Fish },
+    { label: 'BONITE', icon: Fish },
+    { label: 'SARDINES', icon: Waves },
+    { label: 'OISEAUX', icon: Bird }
+];
 
 export default function VesselTrackerPage() {
   const [appMode, setAppMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
@@ -84,7 +95,6 @@ export default function VesselTrackerPage() {
   const emetteur = useEmetteur(
     (lat, lng) => {
         mapCore.updateBreadcrumbs(lat, lng);
-        // Si follow mode actif, on maintient au centre
         if (mapCore.isFollowMode && mapCore.googleMap) {
             mapCore.googleMap.panTo({ lat, lng });
         }
@@ -116,7 +126,6 @@ export default function VesselTrackerPage() {
     }
   }, [emetteur.lastSyncTime]);
 
-  // DÉMARRAGE ÉTENDU : FORCE LE LOCK ET LE CENTRE
   const handleStartSharingExtended = () => {
     emetteur.startSharing();
     mapCore.setIsFollowMode(true);
@@ -126,8 +135,16 @@ export default function VesselTrackerPage() {
     toast({ title: "Partage Actif", description: "GPS & Verrouillage activés." });
   };
 
+  const handleRecenter = () => {
+    if (emetteur.currentPos) {
+        mapCore.handleRecenter(emetteur.currentPos);
+    } else {
+        toast({ description: "En attente de signal GPS..." });
+    }
+  };
+
   return (
-    <div className="w-full space-y-4 pb-32 px-1">
+    <div className="w-full space-y-4 pb-32 px-1 relative">
       {recepteur.isAlarmActive && (
         <Button 
             className="fixed top-2 left-1/2 -translate-x-1/2 z-[10000] h-14 bg-red-600 hover:bg-red-700 text-white font-black uppercase shadow-2xl animate-bounce gap-3 px-8 rounded-full border-4 border-white"
@@ -319,7 +336,7 @@ export default function VesselTrackerPage() {
                                   <div key={i} className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm">
                                       <div className="flex flex-col">
                                         <span className={cn("font-black text-[10px] uppercase", log.label === 'DÉRIVE' ? 'text-red-600' : 'text-primary')}>{log.label}</span>
-                                        <span className="text-[8px] font-bold opacity-40">{log.time ? format(log.time.toDate(), 'HH:mm:ss') : '...'}</span>
+                                        <span className="text-[8px] font-bold opacity-40">{log.time ? format(log.time.toDate ? log.time.toDate() : log.time, 'HH:mm:ss') : '...'}</span>
                                       </div>
                                       <div className="flex items-center gap-2">
                                           <span className="text-[9px] font-black">{log.battery}%</span>
@@ -350,7 +367,7 @@ export default function VesselTrackerPage() {
                                       </div>
                                       <div className="text-right">
                                           <p className="text-[10px] font-black text-blue-600">{log.wind} ND</p>
-                                          <p className="text-[8px] font-bold opacity-40">{log.time ? format(log.time.toDate(), 'HH:mm') : '...'}</p>
+                                          <p className="text-[8px] font-bold opacity-40">{log.time ? format(log.time.toDate ? log.time.toDate() : log.time, 'HH:mm') : '...'}</p>
                                       </div>
                                   </div>
                               ))}
@@ -466,6 +483,118 @@ export default function VesselTrackerPage() {
               <div className="space-y-2"><p className="text-[9px] font-black uppercase text-indigo-600 border-b pb-1">VHF</p><p className="text-xs font-black">Port Autonome : Canal 12</p></div>
           </CardContent>
       </Card>
+
+      {/* JOURNAUX DE BORD - FIXE AU BAS (Z-INDEX 10001) */}
+      <div className="fixed bottom-16 left-0 right-0 z-[10001] pointer-events-none px-1">
+          <div className="max-w-2xl mx-auto pointer-events-auto">
+              <Accordion type="single" collapsible className="bg-white/95 backdrop-blur-md rounded-t-[2.5rem] shadow-[0_-8px_30px_rgba(0,0,0,0.2)] border-x-2 border-t-2">
+                  <AccordionItem value="logs" className="border-none">
+                      <AccordionTrigger className="h-12 px-6 hover:no-underline">
+                          <div className="flex items-center gap-3">
+                              <ClipboardList className="size-5 text-primary" />
+                              <span className="text-sm font-black uppercase tracking-tighter">Journal de Bord Unifié</span>
+                              <Badge variant="outline" className="bg-primary/5 border-primary/20 text-[8px] font-black">LIVE</Badge>
+                          </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="p-0">
+                          <Tabs defaultValue="tactical" className="w-full">
+                              <TabsList className="grid w-full grid-cols-2 h-10 rounded-none bg-muted/20 border-y">
+                                  <TabsTrigger value="tactical" className="text-[10px] font-black uppercase">Tactique</TabsTrigger>
+                                  <TabsTrigger value="technical" className="text-[10px] font-black uppercase">Technique</TabsTrigger>
+                              </TabsList>
+                              
+                              <TabsContent value="tactical" className="m-0 bg-white">
+                                  <div className="p-4 space-y-4">
+                                      {/* GRILLE DE CAPTURE TACTIQUE */}
+                                      <div className="grid grid-cols-4 gap-2">
+                                          {TACTICAL_SPECIES.map(spec => (
+                                              <Button 
+                                                key={spec.label} 
+                                                variant="outline" 
+                                                className="flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 hover:bg-primary/5 active:scale-95 transition-all"
+                                                onClick={() => emetteur.addTacticalLog(spec.label)}
+                                              >
+                                                  <spec.icon className="size-5 text-primary" />
+                                                  <span className="text-[8px] font-black">{spec.label}</span>
+                                              </Button>
+                                          ))}
+                                          <Button 
+                                            variant="secondary" 
+                                            className="flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-primary/20 shadow-sm"
+                                            onClick={() => photoInputRef.current?.click()}
+                                          >
+                                              <Camera className="size-5 text-primary" />
+                                              <span className="text-[8px] font-black">PRISE</span>
+                                          </Button>
+                                      </div>
+
+                                      <ScrollArea className="h-[200px] border-t pt-2">
+                                          <div className="space-y-2">
+                                              {emetteur.tacticalLogs.length > 0 ? emetteur.tacticalLogs.map((log, i) => (
+                                                  <div 
+                                                    key={i} 
+                                                    className="p-3 bg-slate-50 border-2 rounded-xl flex items-center justify-between cursor-pointer active:bg-slate-100"
+                                                    onClick={() => mapCore.handleRecenter(log.pos)}
+                                                  >
+                                                      <div className="flex items-center gap-3">
+                                                          <div className="p-2 bg-primary/10 rounded-lg"><Fish className="size-4 text-primary" /></div>
+                                                          <div className="flex flex-col">
+                                                              <span className="font-black text-[10px] uppercase text-slate-800">{log.type}</span>
+                                                              <span className="text-[8px] font-bold opacity-40 uppercase">{format(log.time, 'HH:mm')}</span>
+                                                          </div>
+                                                      </div>
+                                                      <LocateFixed className="size-3 text-primary/40" />
+                                                  </div>
+                                              )) : (
+                                                  <div className="py-10 text-center opacity-30 italic text-[10px] uppercase font-black">Aucune prise enregistrée</div>
+                                              )}
+                                          </div>
+                                      </ScrollArea>
+                                  </div>
+                              </TabsContent>
+
+                              <TabsContent value="technical" className="m-0 bg-slate-50/50">
+                                  <div className="p-4 space-y-4">
+                                      <div className="flex items-center justify-between bg-white p-3 rounded-xl border-2 shadow-sm">
+                                          <div className="flex items-center gap-4">
+                                              <div className="flex items-center gap-1.5">
+                                                  <Battery className="size-3 text-slate-400" />
+                                                  <span className="text-[10px] font-black">{emetteur.accuracy > 0 ? `${emetteur.accuracy}m` : 'Wait...'}</span>
+                                              </div>
+                                              <div className="flex items-center gap-1.5 border-l pl-4">
+                                                  <LocateFixed className="size-3 text-primary" />
+                                                  <span className="text-[10px] font-black uppercase text-primary">GPS FIX</span>
+                                              </div>
+                                          </div>
+                                          <Button variant="ghost" size="sm" className="h-7 text-destructive text-[8px] font-black uppercase border border-destructive/10" onClick={emetteur.clearLogs}>
+                                              <Trash2 className="size-3 mr-1" /> Effacer
+                                          </Button>
+                                      </div>
+
+                                      <ScrollArea className="h-[200px]">
+                                          <div className="space-y-2">
+                                              {emetteur.techLogs.map((log, i) => (
+                                                  <div key={i} className="p-2.5 bg-white border rounded-lg flex items-center justify-between text-[9px] shadow-sm">
+                                                      <div className="flex flex-col gap-0.5">
+                                                          <div className="flex items-center gap-2">
+                                                              <span className={cn("font-black uppercase", log.label === 'SYSTÈME' ? 'text-primary' : 'text-slate-600')}>{log.label}</span>
+                                                              <span className="text-[8px] font-bold opacity-40">{format(log.time, 'HH:mm:ss')}</span>
+                                                          </div>
+                                                          <span className="text-slate-500 font-medium italic">"{log.details}"</span>
+                                                      </div>
+                                                      {log.pos && <LocateFixed className="size-3 text-primary/20" />}
+                                                  </div>
+                                              ))}
+                                          </div>
+                                      </ScrollArea>
+                                  </div>
+                              </TabsContent>
+                          </Tabs>
+                      </AccordionContent>
+                  </AccordionItem>
+              </Accordion>
+          </div>
+      </div>
     </div>
   );
 }
