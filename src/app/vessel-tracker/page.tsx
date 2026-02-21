@@ -89,7 +89,7 @@ import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { format, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
+import { GoogleMap, OverlayView, Circle, Polyline } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { fetchWindyWeather } from '@/lib/windy-api';
 
@@ -127,6 +127,9 @@ export default function VesselTrackerPage() {
   const [currentHeading, setCurrentHeading] = useState<number>(0);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [anchorPos, setAnchorPos] = useState<{ lat: number, lng: number } | null>(null);
+  
+  // BREADCRUMBS (Trace de parcours)
+  const [breadcrumbs, setBreadcrumbs] = useState<{ lat: number, lng: number, timestamp: number }[]>([]);
   
   // REFS STABILITÉ
   const shouldPanOnNextFix = useRef(false); 
@@ -201,6 +204,26 @@ export default function VesselTrackerPage() {
   const windyAPI = useRef<any>(null);
   const windyStore = useRef<any>(null);
   const isWindyInitializing = useRef(false);
+
+  // Persistance Breadcrumbs
+  useEffect(() => {
+    const saved = localStorage.getItem('lb_breadcrumbs_v1');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Filtrer les points obsolètes au chargement
+        const now = Date.now();
+        const valid = parsed.filter((p: any) => now - p.timestamp < 30 * 60 * 1000);
+        setBreadcrumbs(valid);
+      } catch (e) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    if (breadcrumbs.length > 0) {
+      localStorage.setItem('lb_breadcrumbs_v1', JSON.stringify(breadcrumbs));
+    }
+  }, [breadcrumbs]);
 
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || viewMode === 'alpha' || isWindyInitializing.current) return;
@@ -351,17 +374,6 @@ export default function VesselTrackerPage() {
     if (!startTimeRef.current) startTimeRef.current = new Date();
     isSharingRef.current = true;
 
-    // Log activation mouillage
-    if (vesselStatus === 'stationary') {
-        setTechHistory(prev => [{
-            status: 'MOUILLAGE ACTIF',
-            battery: 100,
-            accuracy: 0,
-            time: new Date(),
-            duration: 'DÉBUT SURVEILLANCE'
-        }, ...prev]);
-    }
-
     watchIdRef.current = navigator.geolocation.watchPosition(
         (pos) => {
             const { latitude, longitude, speed, heading, accuracy } = pos.coords;
@@ -372,6 +384,20 @@ export default function VesselTrackerPage() {
             setCurrentSpeed(Math.round(knotSpeed));
             setCurrentHeading(heading || 0);
             
+            // Mise à jour des Breadcrumbs
+            const now = Date.now();
+            const lastBreadcrumb = lastPosRef.current;
+            const distMoved = lastBreadcrumb ? getDistance(latitude, longitude, lastBreadcrumb.lat, lastBreadcrumb.lng) : 10;
+
+            if (distMoved > 2) {
+                setBreadcrumbs(prev => {
+                    // Filtrage des points de plus de 30 min
+                    const thirtyMinsAgo = now - 30 * 60 * 1000;
+                    const filtered = prev.filter(p => p.timestamp > thirtyMinsAgo);
+                    return [...filtered, { lat: latitude, lng: longitude, timestamp: now }];
+                });
+            }
+
             if (isFollowMode && googleMap) {
                 googleMap.panTo(newPos);
                 if (shouldPanOnNextFix.current) { googleMap.setZoom(15); shouldPanOnNextFix.current = false; }
@@ -407,7 +433,6 @@ export default function VesselTrackerPage() {
   const handleStartSharing = async () => {
     if (!sharingId) { toast({ variant: 'destructive', title: "ID Navire requis" }); return; }
     
-    // Mémoriser l'ID
     if (user && firestore) {
         const newVHistory = [sharingId, ...vesselHistory.filter(id => id !== sharingId)].slice(0, 5);
         const newFHistory = customFleetId ? [customFleetId, ...fleetHistory.filter(id => id !== customFleetId)].slice(0, 5) : fleetHistory;
@@ -450,8 +475,6 @@ export default function VesselTrackerPage() {
     const field = type === 'vessel' ? 'vesselIdHistory' : 'fleetIdHistory';
     try {
         await updateDoc(doc(firestore, 'users', user.uid), { [field]: arrayRemove(id) });
-        
-        // Action Distante si c'est l'ID actuel
         if ((type === 'vessel' && id === sharingId) || (type === 'fleet' && id === customFleetId)) {
             handleStopSharing();
         }
@@ -506,6 +529,18 @@ export default function VesselTrackerPage() {
             onDragStart={() => setIsFollowMode(false)}
             options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
         >
+            {breadcrumbs.length > 1 && (
+                <Polyline 
+                    path={breadcrumbs.map(p => ({ lat: p.lat, lng: p.lng }))}
+                    options={{
+                        strokeColor: "#3b82f6",
+                        strokeOpacity: 0.6,
+                        strokeWeight: 3,
+                        clickable: false
+                    }}
+                />
+            )}
+
             {currentPos && (
                 <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                     <div style={{ transform: 'translate(-50%, -50%)' }} className="relative">
@@ -610,7 +645,7 @@ export default function VesselTrackerPage() {
                               <Switch checked={isGhostMode} onCheckedChange={setIsGhostMode} />
                           </div>
                           <div className="space-y-4">
-                              <div className="space-y-1"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">Surnom du navire</Label><Input placeholder="EX: KOOL@PIK" value={vesselNickname} onChange={e => setNickname(e.target.value)} className="font-black text-center h-12 border-2 uppercase bg-white" /></div>
+                              <div className="space-y-1"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">Surnom du navire</Label><Input placeholder="EX: KOOL@PIK" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-black text-center h-12 border-2 uppercase bg-white" /></div>
                               <div className="space-y-1"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">ID Navire (Individuel)</Label><Input placeholder="EX: XXX" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase bg-white" /></div>
                               <div className="space-y-1"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">ID Groupe Flotte C (Collectif)</Label><Input placeholder="EX: ABC" value={customFleetId} onChange={e => setCustomFleetId(e.target.value)} className="font-black text-center h-12 border-2 uppercase bg-white" /></div>
                           </div>
@@ -661,19 +696,30 @@ export default function VesselTrackerPage() {
                       <AccordionTrigger className="flex items-center justify-between px-4 h-12 bg-white hover:no-underline border-b">
                           <div className="flex items-center gap-2 font-black uppercase text-[10px]"><Zap className="size-3 text-primary" /> Journal Technique</div>
                       </AccordionTrigger>
-                      <AccordionContent className="p-3 space-y-2 max-h-64 overflow-y-auto scrollbar-hide">
-                          {techHistory.length > 0 ? techHistory.map((log, i) => (
-                              <div key={i} className="flex justify-between items-center p-3 bg-white rounded-xl border-2 text-[9px] font-bold shadow-sm">
-                                  <div className="flex flex-col gap-0.5">
-                                      <span className="font-black uppercase text-slate-800">{log.status}</span>
-                                      <span className="text-primary">{log.duration}</span>
+                      <AccordionContent className="p-3 space-y-3">
+                          <div className="flex gap-2">
+                              <Button variant="outline" className="flex-1 h-10 font-black uppercase text-[9px] border-2 bg-white" onClick={() => { setBreadcrumbs([]); localStorage.removeItem('lb_breadcrumbs_v1'); toast({ title: "Trace effacée" }); }}>
+                                  <X className="size-3 mr-1" /> EFFACER LA TRACE
+                              </Button>
+                              <Button variant="outline" className="flex-1 h-10 font-black uppercase text-[9px] border-2 bg-white" onClick={() => { setTechHistory([]); toast({ title: "Logs effacés" }); }}>
+                                  <Trash2 className="size-3 mr-1" /> VIDER LOGS
+                              </Button>
+                          </div>
+                          
+                          <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-hide">
+                              {techHistory.length > 0 ? techHistory.map((log, i) => (
+                                  <div key={i} className="flex justify-between items-center p-3 bg-white rounded-xl border-2 text-[9px] font-bold shadow-sm">
+                                      <div className="flex flex-col gap-0.5">
+                                          <span className="font-black uppercase text-slate-800">{log.status}</span>
+                                          <span className="text-primary">{log.duration}</span>
+                                      </div>
+                                      <div className="flex flex-col items-end gap-0.5 opacity-60">
+                                          <span>{format(log.time, 'HH:mm:ss')}</span>
+                                          <span>+/- {log.accuracy}m</span>
+                                      </div>
                                   </div>
-                                  <div className="flex flex-col items-end gap-0.5 opacity-60">
-                                      <span>{format(log.time, 'HH:mm:ss')}</span>
-                                      <span>+/- {log.accuracy}m</span>
-                                  </div>
-                              </div>
-                          )) : <p className="text-center text-[9px] font-bold uppercase opacity-30 py-4 italic">Aucune donnée technique</p>}
+                              )) : <p className="text-center text-[9px] font-bold uppercase opacity-30 py-4 italic">Aucune donnée technique</p>}
+                          </div>
                       </AccordionContent>
                   </AccordionItem>
               </Accordion>
