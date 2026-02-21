@@ -7,8 +7,8 @@ import { useSimulator } from '@/logic/shared/useSimulator';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
 import { useRecepteur } from '@/logic/recepteur/useRecepteur';
 import { useFlotte } from '@/logic/flotteC/useFlotte';
-import { GoogleMap, OverlayView, Polyline, Circle } from '@react-google-maps/api';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -114,17 +114,6 @@ const TACTICAL_SPECIES = [
     { label: 'OISEAUX', icon: Bird }
 ];
 
-const TACTICAL_ICONS: Record<string, any> = {
-    'MARLIN': Target,
-    'THON': Fish,
-    'TAZARD': Fish,
-    'WAHOO': Fish,
-    'BONITE': Fish,
-    'SARDINES': Waves,
-    'OISEAUX': Bird,
-    'PHOTO': Camera
-};
-
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
   const props = { className: cn("size-4", className) };
@@ -134,9 +123,6 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
   return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
 };
 
-const BatteryLow = (props: any) => <Battery className={props.className} />;
-const BatteryMedium = (props: any) => <Battery className={props.className} />;
-
 const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
     const status = vessel.status || 'moving';
     const heading = vessel.heading || 0;
@@ -144,7 +130,6 @@ const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
     let Icon = Navigation;
     let bgColor = 'bg-green-600'; 
     let animationClass = '';
-    let iconClass = 'size-4 text-white';
     let statusLabel = 'EN ROUTE';
 
     switch (status) {
@@ -212,7 +197,7 @@ const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
                     transform: (status === 'moving' || status === 'returning' || status === 'stationary' || status === 'drifting') ? `rotate(${heading}deg)` : 'none'
                 }}
             >
-                <Icon className={iconClass} />
+                <Icon className="size-4 text-white" />
             </div>
         </div>
     );
@@ -225,7 +210,6 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
   
   const [appMode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
-  const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   
   const mapCore = useMapCore();
   const simulator = useSimulator();
@@ -309,25 +293,6 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const handleCopyLogEntry = (log: any) => {
-    if (!log.pos) return;
-    const time = format(log.time, 'HH:mm:ss');
-    const text = `Lat: ${log.pos.lat.toFixed(6)}, Lng: ${log.pos.lng.toFixed(6)} - [${log.label || log.statusLabel}] à ${time} - Lien: https://www.google.com/maps?q=${log.pos.lat},${log.pos.lng}`;
-    navigator.clipboard.writeText(text).then(() => {
-        toast({ title: "POSITION COPIÉE", description: "Format prêt pour SMS/WhatsApp" });
-    });
-  };
-
-  const windyUrl = useMemo(() => {
-    const centerLat = mapCore.googleMap?.getCenter()?.lat() || INITIAL_CENTER.lat;
-    const centerLng = mapCore.googleMap?.getCenter()?.lng() || INITIAL_CENTER.lng;
-    const currentZoom = mapCore.googleMap?.getZoom() || 11;
-    const layer = mapCore.windyLayer === 'wind' ? 'wind' : 
-                  mapCore.windyLayer === 'temp' ? 'temp' : 
-                  mapCore.windyLayer === 'waves' ? 'waves' : 'wind';
-    return `https://embed.windy.com/embed2.html?lat=${centerLat}&lon=${centerLng}&zoom=${currentZoom}&level=surface&overlay=${layer}&menu=&message=&marker=&calendar=&pressure=&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1`;
-  }, [mapCore.googleMap, mapCore.windyLayer]);
-
   const smsPreview = useMemo(() => {
     const nick = emetteur.vesselNickname || 'KOOLAPIK';
     const msg = emetteur.isCustomMessageEnabled && emetteur.vesselSmsMessage ? emetteur.vesselSmsMessage : "Requiert assistance immédiate.";
@@ -336,8 +301,6 @@ export default function VesselTrackerPage() {
 
   if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
   if (!isLoaded || isProfileLoading) return <Skeleton className="h-96 w-full" />;
-
-  const ackList = Object.entries(recepteur.acknowledgedAlerts);
 
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
@@ -357,7 +320,37 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
-        {mapCore.isGoogleLoaded ? (
+        {/* BARRE DE BASULEMENT DE CARTE - Z-INDEX MASTER */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[10000] flex bg-slate-900/90 backdrop-blur-md p-1 rounded-2xl border-2 border-white/20 shadow-2xl">
+            <Button 
+                variant={mapCore.viewMode === 'alpha' ? 'default' : 'ghost'} 
+                size="sm" 
+                className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" 
+                onClick={() => mapCore.setViewMode('alpha')}
+            >
+                Maps
+            </Button>
+            <Button 
+                variant={mapCore.viewMode === 'beta' ? 'default' : 'ghost'} 
+                size="sm" 
+                className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" 
+                onClick={() => mapCore.setViewMode('beta')}
+            >
+                Météo
+            </Button>
+            <Button 
+                variant={mapCore.viewMode === 'gamma' ? 'default' : 'ghost'} 
+                size="sm" 
+                className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" 
+                onClick={() => mapCore.setViewMode('gamma')}
+            >
+                Windy
+            </Button>
+        </div>
+
+        {mapCore.viewMode === 'gamma' ? (
+            <iframe src={`https://embed.windy.com/embed2.html?lat=${INITIAL_CENTER.lat}&lon=${INITIAL_CENTER.lng}&zoom=11&level=surface&overlay=wind&menu=&message=&marker=&calendar=&pressure=&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1`} className="w-full h-full border-none" />
+        ) : (
             <div className="relative w-full h-full">
                 <GoogleMap
                     mapContainerClassName="w-full h-full"
@@ -365,9 +358,12 @@ export default function VesselTrackerPage() {
                     defaultZoom={12}
                     onLoad={mapCore.setGoogleMap}
                     onDragStart={() => mapCore.setIsFollowMode(false)}
-                    options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
+                    options={{ 
+                        disableDefaultUI: true, 
+                        mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', 
+                        gestureHandling: 'greedy' 
+                    }}
                 >
-                    {/* NETTOYAGE FORCÉ : On utilise une clé unique basée sur la position pour forcer le re-rendu du cercle */}
                     {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                         <React.Fragment key={`mooring-singleton-${activeAnchorVessel.id}`}>
                             <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
@@ -404,7 +400,7 @@ export default function VesselTrackerPage() {
                     )}
                 </GoogleMap>
             </div>
-        ) : <Skeleton className="h-full w-full" />}
+        )}
         <div className="absolute top-4 left-4 z-[9999] flex flex-col gap-2">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl hover:bg-white" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>{mapCore.isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
         </div>
@@ -461,7 +457,7 @@ export default function VesselTrackerPage() {
                           <CardContent className="p-5 space-y-5">
                               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">Mon Surnom</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg" /></div>
                               <div className="grid grid-cols-2 gap-3">
-                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
+                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 text-indigo-600">ID Flotte</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase" /></div>
                               </div>
                               <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl gap-3" onClick={emetteur.startSharing}><Zap className="size-5 fill-white" /> Lancer le Partage GPS</Button>
@@ -534,14 +530,30 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v73.2 prêt - Mouillage Auto OK</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v74.0 prêt - Surveillance Temporelle OK</div>
                                           {emetteur.techLogs.map((log, i) => (
-                                              <div key={i} className={cn("p-2 border rounded-lg bg-white flex justify-between items-center text-[9px] shadow-sm cursor-pointer", log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') ? 'border-red-200 bg-red-50' : '')} onClick={() => handleCopyLogEntry(log)}>
-                                                  <div className="flex flex-col gap-0.5">
-                                                      <span className={cn("font-black uppercase", log.label.includes('ÉNERGIE') || log.label.includes('URGENCE') ? 'text-red-600' : 'text-slate-800')}>{log.label} {log.durationMinutes > 0 ? `(${log.durationMinutes} min)` : ''}</span>
-                                                      <span className="text-[7px] opacity-40 font-bold">{log.details} • Batt: {log.batteryLevel}% • Prec: +/-{log.accuracy}m</span>
+                                              <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm cursor-pointer transition-all active:scale-[0.98]", log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') ? 'border-red-200 bg-red-50' : 'border-slate-100')} onClick={() => handleCopyLogEntry(log)}>
+                                                  <div className="flex justify-between items-start">
+                                                      <div className="flex flex-col gap-0.5">
+                                                          <span className={cn("font-black uppercase text-[10px]", log.label.includes('ÉNERGIE') || log.label.includes('URGENCE') ? 'text-red-600' : 'text-slate-800')}>
+                                                              {log.label} {log.durationMinutes > 0 ? `(${log.durationMinutes} min)` : ''}
+                                                          </span>
+                                                          <span className="text-[8px] opacity-40 font-bold uppercase">{format(log.time, 'HH:mm:ss')}</span>
+                                                      </div>
+                                                      <div className="flex items-center gap-3">
+                                                          {log.batteryLevel !== undefined && (
+                                                              <div className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border">
+                                                                  <Battery className={cn("size-2.5", log.batteryLevel < 20 ? "text-red-500" : "text-green-600")} />
+                                                                  {log.batteryLevel}%
+                                                              </div>
+                                                          )}
+                                                          <Copy className="size-3 opacity-20" />
+                                                      </div>
                                                   </div>
-                                                  <div className="flex items-center gap-2"><span className="font-bold opacity-40">{format(log.time, 'HH:mm:ss')}</span><Copy className="size-3 opacity-20" /></div>
+                                                  <div className="flex items-center justify-between border-t border-dashed pt-1.5">
+                                                      <span className="text-[8px] font-bold text-muted-foreground uppercase truncate flex-1">{log.details}</span>
+                                                      {log.accuracy !== undefined && <Badge variant="outline" className="text-[7px] h-3.5 font-black uppercase bg-white">Prec: +/-{log.accuracy}m</Badge>}
+                                                  </div>
                                               </div>
                                           ))}
                                       </div>
