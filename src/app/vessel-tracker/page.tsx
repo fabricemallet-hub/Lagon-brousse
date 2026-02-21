@@ -485,7 +485,7 @@ export default function VesselTrackerPage() {
       </Card>
 
       {/* JOURNAUX DE BORD - FIXE AU BAS (Z-INDEX 10001) */}
-      <div className="fixed bottom-16 left-0 right-0 z-[10001] pointer-events-none px-1">
+      <div id="cockpit-logs" className="fixed bottom-16 left-0 right-0 z-[10001] pointer-events-none px-1">
           <div className="max-w-2xl mx-auto pointer-events-auto">
               <Accordion type="single" collapsible className="bg-white/95 backdrop-blur-md rounded-t-[2.5rem] shadow-[0_-8px_30px_rgba(0,0,0,0.2)] border-x-2 border-t-2">
                   <AccordionItem value="logs" className="border-none">
@@ -574,7 +574,11 @@ export default function VesselTrackerPage() {
                                       <ScrollArea className="h-[200px]">
                                           <div className="space-y-2">
                                               {emetteur.techLogs.map((log, i) => (
-                                                  <div key={i} className="p-2.5 bg-white border rounded-lg flex items-center justify-between text-[9px] shadow-sm">
+                                                  <div 
+                                                    key={i} 
+                                                    className="p-2.5 bg-white border rounded-lg flex items-center justify-between text-[9px] shadow-sm cursor-pointer active:bg-slate-100"
+                                                    onClick={() => log.pos && mapCore.handleRecenter(log.pos)}
+                                                  >
                                                       <div className="flex flex-col gap-0.5">
                                                           <div className="flex items-center gap-2">
                                                               <span className={cn("font-black uppercase", log.label === 'SYSTÈME' ? 'text-primary' : 'text-slate-600')}>{log.label}</span>
