@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { getDistance } from '@/lib/utils';
 
@@ -15,8 +15,12 @@ export function useMapCore() {
   const [googleMap, setGoogleMap] = useState<google.maps.Map | null>(null);
   const [isFollowMode, setIsFollowMode] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // State pour le rendu React
   const [breadcrumbs, setBreadcrumbs] = useState<{ lat: number, lng: number, timestamp: number }[]>([]);
   
+  // Référence persistante pour l'instance Google Maps de la trace
+  const polylineRef = useRef<google.maps.Polyline | null>(null);
   const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
 
   // Mise à jour de la trace (Mémoire 30 min, filtre 2m)
@@ -33,10 +37,14 @@ export function useMapCore() {
     }
   }, []);
 
-  const clearBreadcrumbs = () => {
+  const clearBreadcrumbs = useCallback(() => {
     setBreadcrumbs([]);
     lastTracePosRef.current = null;
-  };
+    if (polylineRef.current) {
+        polylineRef.current.setMap(null);
+        polylineRef.current = null;
+    }
+  }, []);
 
   const handleRecenter = (pos: { lat: number, lng: number } | null) => {
     if (pos && googleMap) {
@@ -59,6 +67,7 @@ export function useMapCore() {
     breadcrumbs,
     updateBreadcrumbs,
     clearBreadcrumbs,
-    handleRecenter
+    handleRecenter,
+    polylineRef
   };
 }

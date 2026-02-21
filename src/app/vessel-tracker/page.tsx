@@ -51,19 +51,29 @@ import {
   MessageSquare,
   CheckCircle2,
   Trash2,
-  ChevronDown
+  ChevronDown,
+  ChevronRight,
+  BatteryCharging,
+  BatteryLow,
+  BatteryMedium,
+  WifiOff
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useToast } from '@/hooks/use-toast';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 export default function VesselTrackerPage() {
   const [appMode, setAppMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
+  const { toast } = useToast();
   
   const mapCore = useMapCore();
-  const emetteur = useEmetteur(mapCore.updateBreadcrumbs);
+  const emetteur = useEmetteur(
+    mapCore.updateBreadcrumbs,
+    () => mapCore.clearBreadcrumbs() // Callback cleanup à l'arrêt
+  );
   const recepteur = useRecepteur(emetteur.customSharingId);
   const flotte = useFlotte(emetteur.customSharingId, emetteur.vesselNickname);
   
@@ -86,6 +96,12 @@ export default function VesselTrackerPage() {
       }
   };
 
+  const handleClearTrace = () => {
+    mapCore.clearBreadcrumbs();
+    emetteur.addTechLog('TRACE RESET', 'Trace de parcours réinitialisée par l\'utilisateur');
+    toast({ title: "Trace effacée" });
+  };
+
   return (
     <div className="w-full space-y-4 pb-32 px-1">
       {/* SÉLECTEUR DE MODE GLOBAL */}
@@ -100,7 +116,7 @@ export default function VesselTrackerPage() {
           <Button 
             variant={appMode === 'receiver' ? 'default' : 'ghost'} 
             className="flex-1 font-black uppercase text-[9px] sm:text-[10px] h-12 px-1" 
-            onClick={() => setMode('receiver')}
+            onClick={() => setAppMode('receiver')}
           >
             Récepteur (B)
           </Button>
@@ -143,18 +159,29 @@ export default function VesselTrackerPage() {
                     </OverlayView>
                 )}
 
-                {/* BREADCRUMBS */}
+                {/* BREADCRUMBS (REF STOCKÉE) */}
                 {mapCore.breadcrumbs.length > 1 && (
-                    <Polyline path={mapCore.breadcrumbs} options={{ strokeColor: "#3b82f6", strokeOpacity: 0.6, strokeWeight: 2 }} />
+                    <Polyline 
+                        path={mapCore.breadcrumbs} 
+                        onLoad={(p) => mapCore.polylineRef.current = p}
+                        options={{ strokeColor: "#3b82f6", strokeOpacity: 0.6, strokeWeight: 2 }} 
+                    />
                 )}
 
-                {/* MOUILLAGE ACTIF */}
+                {/* MOUILLAGE ACTIF (REF STOCKÉE) */}
                 {emetteur.anchorPos && (
                     <>
                         <OverlayView position={emetteur.anchorPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                            <div style={{ transform: 'translate(-50%, -50%)' }} className="size-8 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg"><Anchor className="size-4 text-white" /></div>
+                            <div style={{ transform: 'translate(-50%, -50%)' }} className="size-8 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
+                                <Anchor className="size-4 text-white" />
+                            </div>
                         </OverlayView>
-                        <Circle center={emetteur.anchorPos} radius={emetteur.mooringRadius} options={{ strokeColor: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15, strokeWeight: 1 }} />
+                        <Circle 
+                            center={emetteur.anchorPos} 
+                            radius={emetteur.mooringRadius} 
+                            onLoad={(c) => emetteur.anchorCircleRef.current = c}
+                            options={{ strokeColor: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15, strokeWeight: 1 }} 
+                        />
                     </>
                 )}
             </GoogleMap>
@@ -272,7 +299,12 @@ export default function VesselTrackerPage() {
                       <CardHeader className="bg-slate-100 p-4 border-b">
                           <CardTitle className="text-xs font-black uppercase flex items-center justify-between">
                               <div className="flex items-center gap-2"><HistoryIcon className="size-4 text-primary" /> Journal de Bord</div>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/40 hover:text-destructive" onClick={emetteur.clearLogs}><Trash2 className="size-3" /></Button>
+                              <div className="flex items-center gap-2">
+                                <Button variant="outline" className="h-7 text-[8px] font-black uppercase border-primary/30 text-primary gap-1 px-2" onClick={handleClearTrace}>
+                                    <Waves className="size-2.5" /> Effacer Trace
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/40 hover:text-destructive" onClick={emetteur.clearLogs}><Trash2 className="size-3" /></Button>
+                              </div>
                           </CardTitle>
                       </CardHeader>
                       <Tabs defaultValue="tech">
