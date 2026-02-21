@@ -12,7 +12,7 @@ import { getDistance } from '@/lib/utils';
 /**
  * LOGIQUE ÉMETTEUR (A) : "Le Cerveau"
  * Gère l'identité, le partage Firestore, l'historique et les changements de statut dynamiques.
- * v58.2 : Fix boucle infinie par stabilisation des callbacks via Refs.
+ * v58.3 : Fix ReferenceError saveSmsSettings + Stabilisation callbacks.
  */
 export function useEmetteur(
     onPositionUpdate?: (lat: number, lng: number) => void, 
@@ -49,7 +49,6 @@ export function useEmetteur(
   const lastSentStatusRef = useRef<string | null>(null);
   const lastGpsCutRef = useRef<boolean>(false);
   
-  // Pattern Latest Ref pour éviter les dépendances changeantes dans les callbacks
   const currentPosRef = useRef(currentPos);
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
 
@@ -90,11 +89,6 @@ export function useEmetteur(
       }
     }
   }, []);
-
-  useEffect(() => {
-    if (vesselStatus) localStorage.setItem('lb_vessel_status', vesselStatus);
-    localStorage.setItem('lb_mooring_radius', mooringRadius.toString());
-  }, [vesselStatus, mooringRadius]);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
@@ -322,6 +316,22 @@ export function useEmetteur(
     });
     toast({ title: label || `Statut : ${st}` });
   }, [currentPos, updateVesselInFirestore, toast]);
+
+  const saveSmsSettings = useCallback(async () => {
+    localStorage.setItem('lb_emergency_contact', emergencyContact);
+    localStorage.setItem('lb_vessel_sms_message', vesselSmsMessage);
+    localStorage.setItem('lb_emergency_enabled', String(isEmergencyEnabled));
+    
+    if (user && firestore) {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            emergencyContact,
+            vesselSmsMessage,
+            isEmergencyEnabled,
+            isCustomMessageEnabled
+        });
+    }
+    toast({ title: "Réglages SMS sauvegardés" });
+  }, [user, firestore, emergencyContact, vesselSmsMessage, isEmergencyEnabled, isCustomMessageEnabled, toast]);
 
   const loadFromHistory = useCallback((vId: string, fId: string) => {
     setCustomSharingId(vId);
