@@ -1,7 +1,9 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useMapCore } from '@/logic/shared/useMapCore';
+import { useSimulator } from '@/logic/shared/useSimulator';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
 import { useRecepteur } from '@/logic/recepteur/useRecepteur';
 import { useFlotte } from '@/logic/flotteC/useFlotte';
@@ -81,13 +83,15 @@ import {
   EyeOff,
   ClipboardList,
   Lock,
-  Unlock
+  Unlock,
+  TestTube2
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import type { UserAccount, VesselStatus, SoundLibraryEntry } from '@/lib/types';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -195,6 +199,7 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
   
   const mapCore = useMapCore();
+  const simulator = useSimulator();
   const emetteur = useEmetteur(
     (lat, lng) => {
         mapCore.updateBreadcrumbs(lat, lng);
@@ -204,7 +209,8 @@ export default function VesselTrackerPage() {
     },
     () => {
         mapCore.clearBreadcrumbs();
-    }
+    },
+    simulator
   );
   
   const recepteur = useRecepteur(emetteur.sharingId);
@@ -290,6 +296,12 @@ export default function VesselTrackerPage() {
         >
             <Volume2 className="size-6 animate-pulse" /> ARRÊTER LE SON
         </Button>
+      )}
+
+      {simulator.isActive && (
+        <div className="fixed top-12 left-0 right-0 h-6 bg-red-600/90 text-white flex items-center justify-center text-[9px] font-black z-[10008] animate-pulse uppercase tracking-widest border-b border-white/20">
+            ⚠️ Mode Simulation Actif ⚠️
+        </div>
       )}
 
       <div className="flex bg-slate-900 text-white p-1 rounded-xl shadow-lg border-2 border-primary/20 sticky top-0 z-[100]">
@@ -415,11 +427,65 @@ export default function VesselTrackerPage() {
             </div>
         ) : <Skeleton className="h-full w-full" />}
         
+        {/* BOUTONS FLOTTANTS MAP */}
         <div className="absolute top-4 left-4 z-[9999] flex flex-col gap-2">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl hover:bg-white" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>
                 {mapCore.isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}
             </Button>
+            
+            {/* BOUTON SIMULATEUR [SIM] */}
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button className={cn("size-10 rounded-xl border-2 shadow-xl font-black text-[10px] transition-all", simulator.isActive ? "bg-red-600 text-white border-red-400" : "bg-white/90 text-slate-600 border-slate-200")}>
+                        {simulator.isActive ? <RefreshCw className="size-4 animate-spin" /> : "[SIM]"}
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0 rounded-2xl border-none shadow-2xl overflow-hidden z-[10007]" side="right" sideOffset={10}>
+                    <div className="bg-slate-900 text-white p-4 border-b">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2"><TestTube2 className="size-3" /> Console Simulateur</p>
+                    </div>
+                    <div className="p-4 space-y-4 bg-white">
+                        <div className="space-y-3">
+                            <Label className="text-[9px] font-black uppercase opacity-40">Position & Vitesse</Label>
+                            <Button variant="outline" className="w-full h-10 text-[9px] font-black uppercase border-2 gap-2" onClick={() => simulator.teleport({ lat: centerLat, lng: centerLng })}>
+                                <MapPin className="size-3" /> Téléporter sur centre carte
+                            </Button>
+                            <div className="flex flex-col gap-1">
+                                <div className="flex justify-between text-[9px] font-black uppercase"><span>Vitesse</span><span>{simulator.simSpeed} ND</span></div>
+                                <Slider value={[simulator.simSpeed]} max={30} onValueChange={v => simulator.setSimSpeed(v[0])} />
+                            </div>
+                        </div>
+
+                        <div className="space-y-3 pt-3 border-t border-dashed">
+                            <Label className="text-[9px] font-black uppercase text-orange-600">Stress Test Mouillage</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-2" onClick={() => simulator.nudge(emetteur.anchorPos, emetteur.mooringRadius)}>Nudge (Dans cercle)</Button>
+                                <Button variant="destructive" className="h-10 text-[8px] font-black uppercase" onClick={() => simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius)}>Forcer Dérive</Button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3 pt-3 border-t border-dashed">
+                            <Label className="text-[9px] font-black uppercase text-red-600">Simulation Pannes</Label>
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border-2">
+                                    <span className="text-[9px] font-black uppercase">Coupure GPS</span>
+                                    <Switch checked={simulator.isGpsCut} onCheckedChange={simulator.setIsGpsCut} className="scale-75" />
+                                </div>
+                                <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border-2">
+                                    <span className="text-[9px] font-black uppercase">Coupure Com</span>
+                                    <Switch checked={simulator.isComCut} onCheckedChange={simulator.setIsComCut} className="scale-75" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <Button className="w-full h-12 font-black uppercase text-[10px] bg-red-600 hover:bg-red-700" onClick={simulator.stopSim}>
+                            Désactiver Simulation
+                        </Button>
+                    </div>
+                </PopoverContent>
+            </Popover>
         </div>
+
         <div className="absolute top-4 right-4 z-[9999] flex flex-col gap-2">
             <Button onClick={() => mapCore.setIsFollowMode(!mapCore.isFollowMode)} className={cn("h-10 w-10 border-2 shadow-xl rounded-xl transition-all", mapCore.isFollowMode ? "bg-primary text-white" : "bg-white text-primary")}>
                 {mapCore.isFollowMode ? <Lock className="size-5" /> : <Unlock className="size-5" />}
@@ -611,7 +677,7 @@ export default function VesselTrackerPage() {
                                               <Input 
                                                   placeholder="Ex: 742929" 
                                                   value={emetteur.emergencyContact} 
-                                                  onChange={e => emetteur.setEmergencyContact(e.target.value)}
+                                                  onChange={e => emetteur.setEmergencyContact(e.target.value)} 
                                                   className="h-12 pl-10 border-2 font-black text-lg"
                                               />
                                           </div>

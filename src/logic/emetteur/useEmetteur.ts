@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -11,9 +12,13 @@ import { getDistance } from '@/lib/utils';
 /**
  * LOGIQUE ÉMETTEUR (A) : "Le Cerveau"
  * Gère l'identité, le partage Firestore, l'historique et les changements de statut dynamiques.
- * v56.0 : Finalisation de la gestion du rayon de mouillage et du nettoyage des overlays.
+ * v58.0 : Intégration optionnelle du module de simulation.
  */
-export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => void, onStopCleanup?: () => void) {
+export function useEmetteur(
+    onPositionUpdate?: (lat: number, lng: number) => void, 
+    onStopCleanup?: () => void,
+    simulator?: any
+) {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -43,6 +48,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
   
   const watchIdRef = useRef<number | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
+  const lastGpsCutRef = useRef<boolean>(false);
 
   // CHARGEMENT PERSISTANCE LOCALE
   useEffect(() => {
@@ -106,6 +112,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
 
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>) => {
     if (!user || !firestore || !isSharing) return;
+    if (simulator?.isComCut) return; // Coupure Com simulée
     
     let batteryInfo = { batteryLevel: 100, isCharging: false };
     if ('getBattery' in navigator) {
@@ -133,7 +140,53 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
           lastSentStatusRef.current = data.status || lastSentStatusRef.current;
       })
       .catch(() => {});
-  }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId, mooringRadius]);
+  }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId, mooringRadius, simulator?.isComCut]);
+
+  // MODULE SIMULATION : Injection de données
+  useEffect(() => {
+    if (!simulator?.isActive || !simulator.simPos || !isSharing) return;
+
+    const { lat, lng } = simulator.simPos;
+    const speed = simulator.simSpeed;
+    const acc = simulator.isGpsCut ? 600 : simulator.simAccuracy;
+
+    setCurrentPos({ lat, lng });
+    setAccuracy(acc);
+    onPositionUpdate?.(lat, lng);
+
+    if (simulator.isGpsCut && !lastGpsCutRef.current) {
+        addTechLog('ALERTE GPS', 'Signal dégradé (>500m)');
+        lastGpsCutRef.current = true;
+    } else if (!simulator.isGpsCut) {
+        lastGpsCutRef.current = false;
+    }
+
+    let nextStatus = vesselStatus;
+    if (vesselStatus === 'stationary' && anchorPos) {
+        const dist = getDistance(lat, lng, anchorPos.lat, anchorPos.lng);
+        if (dist > mooringRadius) {
+            nextStatus = 'drifting';
+            setVesselStatus('drifting');
+        }
+    } else if (vesselStatus === 'drifting' && anchorPos) {
+        const dist = getDistance(lat, lng, anchorPos.lat, anchorPos.lng);
+        if (dist <= mooringRadius) {
+            nextStatus = 'stationary';
+            setVesselStatus('stationary');
+        }
+    } else if (vesselStatus !== 'emergency' && vesselStatus !== 'returning' && vesselStatus !== 'landed') {
+        nextStatus = speed < 0.2 ? 'stationary' : 'moving';
+        setVesselStatus(nextStatus);
+    }
+
+    updateVesselInFirestore({ 
+        location: { latitude: lat, longitude: lng }, 
+        status: nextStatus,
+        accuracy: acc,
+        speed: Math.round(speed)
+    });
+
+  }, [simulator?.isActive, simulator?.simPos, simulator?.simSpeed, simulator?.simAccuracy, simulator?.isGpsCut, isSharing, anchorPos, mooringRadius, vesselStatus, onPositionUpdate, addTechLog, updateVesselInFirestore]);
 
   const startSharing = () => {
     if (!navigator.geolocation || !user || !firestore) return;
@@ -159,6 +212,8 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
+        if (simulator?.isActive) return; // Simulation outrepasse le vrai GPS
+
         const { latitude, longitude, speed, heading, accuracy: acc } = pos.coords;
         const newPos = { lat: latitude, lng: longitude };
         const knotSpeed = (speed || 0) * 1.94384;
@@ -170,7 +225,6 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
 
         let nextStatus = vesselStatus;
 
-        // Logique de dérive automatique si au mouillage
         if (vesselStatus === 'stationary' && anchorPos) {
             const distFromAnchor = getDistance(latitude, longitude, anchorPos.lat, anchorPos.lng);
             if (distFromAnchor > mooringRadius) {
