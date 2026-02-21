@@ -244,10 +244,10 @@ export default function VesselTrackerPage() {
 
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // RÉCUPÉRATION DE L'ANCRE UNIQUE (Singleton visuel)
+  // RÉCUPÉRATION DE L'ANCRE UNIQUE (SINGLETON VISUEL)
   const activeAnchorVessel = useMemo(() => {
     if (!followedVessels || mapCore.isCirclesHidden) return null;
-    // On priorise notre propre navire si ancré, sinon le premier trouvé dans la flotte
+    // On priorise notre propre navire si ancré, sinon le premier trouvé dans la flotte qui a une ancre valide
     return followedVessels.find(v => v.isSharing && v.id === emetteur.sharingId && v.anchorLocation) 
         || followedVessels.find(v => v.isSharing && v.anchorLocation);
   }, [followedVessels, emetteur.sharingId, mapCore.isCirclesHidden]);
@@ -318,16 +318,14 @@ export default function VesselTrackerPage() {
   }, [centerLat, centerLng, currentZoom, mapCore.windyLayer]);
 
   const handleStartSharingEnhanced = () => {
-    recepteur.initAudio(); // Déblocage Audio
+    recepteur.initAudio(); 
     emetteur.startSharing();
   };
 
-  // Liste des alertes acquittées pour affichage visuel
   const ackList = Object.entries(recepteur.acknowledgedAlerts);
 
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
-      {/* KILL SWITCH AUDIO - FLOTTANT HAUT */}
       {recepteur.isAlarmActive && (
         <Button 
             className="fixed top-2 left-1/2 -translate-x-1/2 z-[10008] h-14 bg-red-600 hover:bg-red-700 text-white font-black uppercase shadow-2xl animate-bounce gap-3 px-8 rounded-full border-4 border-white transition-all active:scale-95"
@@ -337,7 +335,6 @@ export default function VesselTrackerPage() {
         </Button>
       )}
 
-      {/* BANDEAU ALERTES ACQUITTÉES (VISUEL SEUL) */}
       {ackList.length > 0 && !recepteur.isAlarmActive && (
         <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[10008] w-max px-4 py-2 bg-slate-900/90 text-white rounded-full border border-white/20 shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
             <ShieldAlert className="size-3 text-orange-500" />
@@ -452,17 +449,21 @@ export default function VesselTrackerPage() {
                     onDragStart={() => mapCore.setIsFollowMode(false)}
                     options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
                 >
-                    {/* RÈGLE DE L'ANCRE UNIQUE (SINGLETON VISUEL) */}
-                    {activeAnchorVessel && (
-                        <React.Fragment>
-                            <OverlayView position={{ lat: activeAnchorVessel.anchorLocation!.latitude, lng: activeAnchorVessel.anchorLocation!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                    {/* RÈGLE DE L'ANCRE UNIQUE (SINGLETON VISUEL v68.0) */}
+                    {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
+                        <React.Fragment key={`mooring-singleton-${activeAnchorVessel.id}`}>
+                            <OverlayView 
+                                position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
+                                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                            >
                                 <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]">
                                     <Anchor className="size-3.5 text-white" />
                                 </div>
                             </OverlayView>
                             
                             <Circle 
-                                center={{ lat: activeAnchorVessel.anchorLocation!.latitude, lng: activeAnchorVessel.anchorLocation!.longitude }}
+                                key={`circle-${activeAnchorVessel.id}-${activeAnchorVessel.mooringRadius}`}
+                                center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }}
                                 radius={activeAnchorVessel.mooringRadius || 100}
                                 options={{
                                     strokeColor: activeAnchorVessel.status === 'drifting' ? (mapCore.isFlashOn ? '#ef4444' : '#3b82f6') : '#3b82f6',
@@ -477,8 +478,9 @@ export default function VesselTrackerPage() {
 
                             {activeAnchorVessel.location && (
                                 <Polyline
+                                    key={`line-${activeAnchorVessel.id}`}
                                     path={[
-                                        { lat: activeAnchorVessel.anchorLocation!.latitude, lng: activeAnchorVessel.anchorLocation!.longitude },
+                                        { lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude },
                                         { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }
                                     ]}
                                     options={{
@@ -492,7 +494,6 @@ export default function VesselTrackerPage() {
                         </React.Fragment>
                     )}
 
-                    {/* RENDU DES NAVIRES MOBILES */}
                     {followedVessels?.filter(v => v.isSharing).map(vessel => (
                         <OverlayView key={vessel.id} position={{ lat: vessel.location?.latitude || 0, lng: vessel.location?.longitude || 0 }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                             <VesselMarker vessel={vessel} isMe={vessel.id === emetteur.sharingId} />
@@ -547,7 +548,7 @@ export default function VesselTrackerPage() {
                                 const center = mapCore.googleMap?.getCenter();
                                 if (center) {
                                     simulator.teleport({ lat: center.lat(), lng: center.lng() });
-                                    mapCore.setIsCirclesHidden(false); // Rétablit la vue si on bouge
+                                    mapCore.setIsCirclesHidden(false); 
                                 }
                             }}>
                                 <MapPin className="size-3" /> Téléporter sur centre carte
@@ -665,7 +666,7 @@ export default function VesselTrackerPage() {
                                                       emetteur.changeManualStatus('moving', 'REPRISE NAVIGATION');
                                                   } else {
                                                       emetteur.changeManualStatus('stationary', 'MOUILLAGE ACTIF');
-                                                      mapCore.setIsCirclesHidden(false); // Rétablit la vue forcée
+                                                      mapCore.setIsCirclesHidden(false); 
                                                   }
                                               }}
                                           >

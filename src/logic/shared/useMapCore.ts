@@ -25,8 +25,8 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v67.0 : Gestion de la carte et du nettoyage visuel.
- * Implémentation du système d'acquittement et de la visibilité exclusive des cercles.
+ * HOOK PARTAGÉ v68.0 : Gestion de la carte et du nettoyage visuel.
+ * Correction de l'accumulation des cercles et optimisation du bouton EFFACER.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
@@ -136,7 +136,7 @@ export function useMapCore() {
 
   const clearBreadcrumbs = useCallback(() => {
     setBreadcrumbs([]);
-    setIsCirclesHidden(true); // Masque les cercles et ancres lors du nettoyage
+    setIsCirclesHidden(true); // Masque RADICALEMENT les cercles et ancres
     lastTracePosRef.current = null;
   }, []);
 

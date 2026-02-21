@@ -10,8 +10,8 @@ import { format } from 'date-fns';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v67.0 : "Le Cerveau"
- * Gère la détection de dérive avec filtrage GPS et nettoyage des ancres orphelines.
+ * LOGIQUE ÉMETTEUR (A) v68.0 : "Le Cerveau"
+ * Correction du nettoyage de l'ancre et des doublons Firestore.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number) => void, 
@@ -162,7 +162,7 @@ export function useEmetteur(
     toast({ variant: "destructive", title: `ALERTE ${type}` });
   }, [isSharing, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, accuracy, toast]);
 
-  // LOGIQUE DE DÉTECTION DE DÉRIVE v67.0 (AVEC FILTRE PRÉCISION)
+  // LOGIQUE DE DÉTECTION DE DÉRIVE v68.0 (AVEC FILTRE PRÉCISION)
   useEffect(() => {
     if (!isSharing || !currentPos || !anchorPos || (vesselStatus !== 'stationary' && vesselStatus !== 'drifting' && vesselStatus !== 'emergency')) return;
 
@@ -171,9 +171,7 @@ export function useEmetteur(
     const acc = accuracy || 0;
 
     if (dist > radius) {
-        // Filtre de précision GPS
         if (acc <= 20) {
-            // Haute précision : Déclenchement immédiat
             if (vesselStatus !== 'drifting' && vesselStatus !== 'emergency') {
                 setVesselStatus('drifting');
                 updateVesselInFirestore({ status: 'drifting', eventLabel: 'DÉRIVE DÉTECTÉE' });
@@ -181,7 +179,6 @@ export function useEmetteur(
                 triggerEmergency('DÉRIVE');
             }
         } else {
-            // Basse précision : On attend 3 confirmations pour éviter les sauts GPS
             consecutiveDriftCountRef.current++;
             if (consecutiveDriftCountRef.current >= 3) {
                 if (vesselStatus !== 'drifting' && vesselStatus !== 'emergency') {
@@ -193,7 +190,6 @@ export function useEmetteur(
             }
         }
     } else {
-        // Retour à l'intérieur du cercle
         consecutiveDriftCountRef.current = 0;
         if (vesselStatus === 'drifting') {
             setVesselStatus('stationary');
@@ -303,23 +299,26 @@ export function useEmetteur(
     setAnchorPos(null);
     isEmergencySmsSentRef.current = false;
     consecutiveDriftCountRef.current = 0;
-    handleStopCleanupRef.current?.(); // Déclenche mapCore.clearBreadcrumbs et masque cercles
+    handleStopCleanupRef.current?.(); 
     toast({ title: "Partage arrêté" });
   }, [firestore, sharingId, toast]);
 
   const changeManualStatus = useCallback((st: VesselStatus['status'], label?: string) => {
     setVesselStatus(st);
-    if (st === 'moving' || st === 'returning' || st === 'landed') {
+    const isStationary = st === 'stationary';
+    
+    if (!isStationary) {
         setAnchorPos(null);
         isEmergencySmsSentRef.current = false;
         consecutiveDriftCountRef.current = 0;
-    } else if (st === 'stationary' && currentPosRef.current) {
+    } else if (currentPosRef.current) {
         setAnchorPos(currentPosRef.current);
     }
+
     updateVesselInFirestore({ 
         status: st, 
         eventLabel: label || null,
-        anchorLocation: st === 'stationary' && currentPosRef.current ? { latitude: currentPosRef.current.lat, longitude: currentPosRef.current.lng } : null
+        anchorLocation: isStationary && currentPosRef.current ? { latitude: currentPosRef.current.lat, longitude: currentPosRef.current.lng } : null
     });
     toast({ title: label || `Statut : ${st}` });
   }, [updateVesselInFirestore, toast]);
