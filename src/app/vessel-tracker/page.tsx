@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
@@ -81,7 +80,8 @@ import {
   Lock,
   Unlock,
   Waves,
-  History
+  History,
+  Phone
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -103,6 +103,7 @@ import {
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 const WINDY_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
+const IMMOBILITY_THRESHOLD_METERS = 20;
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
@@ -144,6 +145,7 @@ export default function VesselTrackerPage() {
   const watchIdRef = useRef<number | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
   const lastTechLogTime = useRef<number>(0);
+  const lastPosRef = useRef<{ lat: number, lng: number } | null>(null);
 
   // IDENTITÉ & FLOTTE
   const [vesselNickname, setVesselNickname] = useState('');
@@ -380,11 +382,16 @@ export default function VesselTrackerPage() {
             }
 
             let nextStatus: VesselStatus['status'] = 'moving';
-            if (knotSpeed < 0.2) nextStatus = 'stationary';
-            else if (knotSpeed > 0.5 && anchorPos) {
-                if (getDistance(latitude, longitude, anchorPos.lat, anchorPos.lng) > mooringRadius) nextStatus = 'drifting';
+            if (knotSpeed < 0.2) {
+                if (!lastPosRef.current) lastPosRef.current = newPos;
+                const movementSinceLast = getDistance(latitude, longitude, lastPosRef.current.lat, lastPosRef.current.lng);
+                if (movementSinceLast < 5) nextStatus = 'stationary';
+            } else if (knotSpeed > 0.5 && anchorPos) {
+                const distFromAnchor = getDistance(latitude, longitude, anchorPos.lat, anchorPos.lng);
+                if (distFromAnchor > mooringRadius) nextStatus = 'drifting';
             }
 
+            lastPosRef.current = newPos;
             vesselStatusRef.current = nextStatus;
             setVesselStatus(nextStatus);
             updateVesselInFirestore({ location: { latitude, longitude }, status: nextStatus, accuracy: Math.round(accuracy) });
@@ -411,6 +418,43 @@ export default function VesselTrackerPage() {
     setAnchorPos(null);
     toast({ title: "Partage arrêté" });
   }, [user, firestore, toast, sharingId]);
+
+  const handleSaveVessel = async () => {
+    if (!user || !firestore) return;
+    const cleanId = customSharingId.trim().toUpperCase();
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            savedVesselIds: cleanId ? arrayUnion(cleanId) : memoizedSavedVesselIds,
+            lastVesselId: cleanId,
+            vesselNickname: vesselNickname
+        });
+        toast({ title: "ID enregistré" });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur sauvegarde" });
+    }
+  };
+
+  const handleRemoveSavedVessel = async (id: string) => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            savedVesselIds: arrayRemove(id)
+        });
+        toast({ title: "Retiré de la liste" });
+    } catch (e) {}
+  };
+
+  const saveVesselPrefs = async (newPrefs: typeof vesselPrefs) => {
+    if (!user || !firestore) return;
+    setVesselPrefs(newPrefs);
+    await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
+  };
+
+  const toggleWakeLock = async () => {
+    if (!('wakeLock' in navigator)) return;
+    if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) {} }
+    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); } catch (err) {} }
+  };
 
   return (
     <div className="w-full space-y-4 pb-32 px-1">
@@ -449,6 +493,17 @@ export default function VesselTrackerPage() {
                 </OverlayView>
             )}
             {anchorPos && <Circle center={anchorPos} radius={mooringRadius} options={{ strokeColor: '#3b82f6', strokeOpacity: 0.8, strokeWeight: 2, fillColor: '#3b82f6', fillOpacity: 0.15 }} />}
+            
+            {mode !== 'sender' && followedVessels?.filter(v => v.isSharing && (!v.isGhostMode || mode === 'receiver')).map(v => v.location && (
+                <OverlayView key={v.id} position={{ lat: v.location.latitude, lng: v.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                    <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
+                        <Badge className="bg-slate-900/90 text-white border-white/20 text-[8px] font-black uppercase whitespace-nowrap">{v.displayName || v.id}</Badge>
+                        <div className={cn("p-1.5 rounded-full border-2 border-white shadow-lg", v.status === 'stationary' ? "bg-orange-500" : "bg-blue-600")}>
+                            {v.status === 'stationary' ? <Anchor className="size-3 text-white" /> : <Navigation className="size-3 text-white" />}
+                        </div>
+                    </div>
+                </OverlayView>
+            ))}
         </GoogleMap>
         
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-[200]">
@@ -470,76 +525,73 @@ export default function VesselTrackerPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
-          {isSharing ? (
-              <Button variant="destructive" className="w-full h-16 font-black uppercase shadow-xl rounded-2xl border-4 border-white/20 gap-3" onClick={handleStopSharing}>
-                  <X className="size-6" /> ARRÊTER LE PARTAGE
-              </Button>
-          ) : (
-              <Button className="w-full h-16 text-sm font-black uppercase tracking-widest shadow-xl rounded-2xl gap-3" onClick={() => setIsSharing(true)}>
-                  <Navigation className="size-6" /> LANCER LE PARTAGE
-              </Button>
-          )}
-      </div>
-
-      {isSharing && (
-          <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-bottom-2">
-              <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalEvent('MARLIN')}><Fish className="size-4 text-blue-600" /> MARLIN</Button>
-              <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalEvent('THON')}><Fish className="size-4 text-red-600" /> THON</Button>
-              <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalEvent('TAZARD')}><Fish className="size-4 text-emerald-600" /> TAZARD</Button>
-              <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalEvent('OISEAUX')}><Bird className="size-4 text-slate-600" /> OISEAUX</Button>
+      {mode === 'sender' && (
+          <div className="flex flex-col gap-3">
+              {isSharing ? (
+                  <Button variant="destructive" className="w-full h-16 font-black uppercase shadow-xl rounded-2xl border-4 border-white/20 gap-3" onClick={handleStopSharing}>
+                      <X className="size-6" /> ARRÊTER LE PARTAGE
+                  </Button>
+              ) : (
+                  <Button className="w-full h-16 text-sm font-black uppercase tracking-widest shadow-xl rounded-2xl gap-3" onClick={() => setIsSharing(true)}>
+                      <Navigation className="size-6" /> LANCER LE PARTAGE
+                  </Button>
+              )}
+              {isSharing && (
+                  <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-bottom-2">
+                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalEvent('MARLIN')}><Fish className="size-4 text-blue-600" /> MARLIN</Button>
+                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalEvent('THON')}><Fish className="size-4 text-red-600" /> THON</Button>
+                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalEvent('TAZARD')}><Fish className="size-4 text-emerald-600" /> TAZARD</Button>
+                      <Button variant="outline" className="h-16 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleTacticalEvent('OISEAUX')}><Bird className="size-4 text-slate-600" /> OISEAUX</Button>
+                  </div>
+              )}
           </div>
       )}
 
       <Card className="border-2 shadow-sm overflow-hidden bg-muted/10">
           <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="tech-log" className="border-none">
-                  <div className="flex items-center justify-between px-4 h-12 bg-white">
-                      <AccordionTrigger className="flex-1 font-black uppercase text-[10px] hover:no-underline">
-                          <div className="flex items-center gap-2"><Settings className="size-3" /> Journal Technique</div>
-                      </AccordionTrigger>
-                      <Button variant="ghost" size="sm" className="h-7 text-[8px] font-black text-destructive gap-1" onClick={(e) => { e.stopPropagation(); handleClearLogs('tech'); }}><Trash2 className="size-3" /> Effacer</Button>
-                  </div>
-                  <AccordionContent className="p-3 space-y-2 max-h-60 overflow-y-auto scrollbar-hide">
-                      {techLogs?.map((log: any) => (
-                          <div key={log.id} className="flex justify-between items-center p-3 bg-white rounded-xl border-2 text-[9px] font-bold shadow-sm">
-                              <div className="flex items-center gap-3">
-                                  <Badge variant="outline" className="text-[8px] h-4 font-black uppercase">{log.status}</Badge>
-                                  <span className="text-primary">{log.durationText}</span>
-                              </div>
-                              <div className="flex items-center gap-3 text-muted-foreground">
-                                  <span>BAT: {log.battery}%</span>
-                                  <span>+/- {log.accuracy}m</span>
-                                  <span>{log.createdAt ? format(log.createdAt.toDate(), 'HH:mm') : '...'}</span>
-                              </div>
-                          </div>
-                      ))}
-                      {(!techLogs || techLogs.length === 0) && <p className="text-center py-8 text-[9px] uppercase opacity-30 font-black">Aucun log technique</p>}
-                  </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="tactical-log" className="border-none mt-1">
-                  <div className="flex items-center justify-between px-4 h-12 bg-white">
-                      <AccordionTrigger className="flex-1 font-black uppercase text-[10px] hover:no-underline">
-                          <div className="flex items-center gap-2"><Fish className="size-3" /> Journal Tactique</div>
-                      </AccordionTrigger>
-                      <Button variant="ghost" size="sm" className="h-7 text-[8px] font-black text-destructive gap-1" onClick={(e) => { e.stopPropagation(); handleClearLogs('tactique'); }}><Trash2 className="size-3" /> Effacer</Button>
-                  </div>
-                  <AccordionContent className="p-3 space-y-2 max-h-60 overflow-y-auto scrollbar-hide">
-                      {tacticalLogs?.map((log: any) => (
-                          <div key={log.id} onClick={() => { if(googleMap) { googleMap.panTo({ lat: log.location.latitude, lng: log.location.longitude }); googleMap.setZoom(16); } }} className="flex justify-between items-center p-3 bg-white rounded-xl border-2 text-[9px] font-black shadow-sm cursor-pointer active:scale-95 transition-all">
-                              <div className="flex items-center gap-3">
-                                  <div className="size-2 rounded-full bg-primary" />
-                                  <span className="uppercase">{log.type}</span>
-                              </div>
-                              <div className="flex items-center gap-3 text-muted-foreground">
-                                  <span className="flex items-center gap-1"><Wind className="size-3"/> {log.wind} ND</span>
-                                  <span>{log.temp}°C</span>
-                                  <span>{log.createdAt ? format(log.createdAt.toDate(), 'HH:mm') : '...'}</span>
-                              </div>
-                          </div>
-                      ))}
-                      {(!tacticalLogs || tacticalLogs.length === 0) && <p className="text-center py-8 text-[9px] uppercase opacity-30 font-black">Aucun signalement tactique</p>}
+              <AccordionItem value="logs" className="border-none">
+                  <AccordionTrigger className="flex items-center justify-between px-4 h-12 bg-white hover:no-underline">
+                      <div className="flex items-center gap-2 font-black uppercase text-[10px]"><HistoryIcon className="size-3" /> Journaux de Bord</div>
+                  </AccordionTrigger>
+                  <AccordionContent className="p-0 border-t border-dashed">
+                      <Tabs defaultValue="technique">
+                          <TabsList className="grid w-full grid-cols-2 h-10 border-b rounded-none bg-slate-50">
+                              <TabsTrigger value="technique" className="text-[10px] font-black uppercase">Tech</TabsTrigger>
+                              <TabsTrigger value="tactique" className="text-[10px] font-black uppercase">Tactique</TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="technique" className="p-3 space-y-2 max-h-60 overflow-y-auto scrollbar-hide">
+                              <div className="flex justify-end mb-2"><Button variant="ghost" size="sm" className="h-6 text-[8px] font-black text-destructive gap-1" onClick={() => handleClearLogs('tech')}><Trash2 className="size-2.5" /> Effacer</Button></div>
+                              {techLogs?.map((log: any) => (
+                                  <div key={log.id} className="flex justify-between items-center p-3 bg-white rounded-xl border-2 text-[9px] font-bold shadow-sm">
+                                      <div className="flex items-center gap-3">
+                                          <Badge variant="outline" className="text-[8px] h-4 font-black uppercase">{log.status}</Badge>
+                                          <span className="text-primary">{log.durationText}</span>
+                                      </div>
+                                      <div className="flex items-center gap-3 text-muted-foreground">
+                                          <span>BAT: {log.battery}%</span>
+                                          <span>+/- {log.accuracy}m</span>
+                                          <span>{log.createdAt ? format(log.createdAt.toDate(), 'HH:mm') : '...'}</span>
+                                      </div>
+                                  </div>
+                              ))}
+                          </TabsContent>
+                          <TabsContent value="tactique" className="p-3 space-y-2 max-h-60 overflow-y-auto scrollbar-hide">
+                              <div className="flex justify-end mb-2"><Button variant="ghost" size="sm" className="h-6 text-[8px] font-black text-destructive gap-1" onClick={() => handleClearLogs('tactique')}><Trash2 className="size-2.5" /> Effacer</Button></div>
+                              {tacticalLogs?.map((log: any) => (
+                                  <div key={log.id} onClick={() => { if(googleMap) { googleMap.panTo({ lat: log.location.latitude, lng: log.location.longitude }); googleMap.setZoom(16); } }} className="flex justify-between items-center p-3 bg-white rounded-xl border-2 text-[9px] font-black shadow-sm cursor-pointer active:scale-95 transition-all">
+                                      <div className="flex items-center gap-3">
+                                          <div className="size-2 rounded-full bg-primary" />
+                                          <span className="uppercase">{log.type}</span>
+                                      </div>
+                                      <div className="flex items-center gap-3 text-muted-foreground">
+                                          <span className="flex items-center gap-1"><Waves className="size-3"/> {log.wind} ND</span>
+                                          <span>{log.temp}°C</span>
+                                          <span>{log.createdAt ? format(log.createdAt.toDate(), 'HH:mm') : '...'}</span>
+                                      </div>
+                                  </div>
+                              ))}
+                          </TabsContent>
+                      </Tabs>
                   </AccordionContent>
               </AccordionItem>
           </Accordion>
