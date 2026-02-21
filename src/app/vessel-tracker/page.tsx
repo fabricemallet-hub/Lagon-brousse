@@ -550,6 +550,12 @@ export default function VesselTrackerPage() {
                                                       {recepteur.availableSounds.map(s => <SelectItem key={s.id} value={s.label} className="text-[10px] uppercase font-black">{s.label}</SelectItem>)}
                                                   </SelectContent>
                                               </Select>
+                                              
+                                              <div className="flex items-center gap-1 bg-white border-2 rounded-lg px-2 h-9">
+                                                  <span className="text-[8px] font-black uppercase text-slate-400">Loop</span>
+                                                  <Switch checked={recepteur.vesselPrefs.watchLoop} onCheckedChange={v => recepteur.updateLocalPrefs({ watchLoop: v })} className="scale-50" />
+                                              </div>
+                                              
                                               <Button variant="ghost" size="icon" className="h-9 w-9 border-2" onClick={() => recepteur.playSound('watch')}><Play className="size-3" /></Button>
                                           </div>
                                       </div>

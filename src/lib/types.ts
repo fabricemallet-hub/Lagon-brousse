@@ -54,6 +54,8 @@ export interface VesselPrefs {
   batteryThreshold: number;
   watchDuration: number;
   watchSound: string;
+  watchLoop: boolean;
+  isWatchEnabled: boolean;
   alerts: {
     moving: VesselAlertConfig;
     stationary: VesselAlertConfig;

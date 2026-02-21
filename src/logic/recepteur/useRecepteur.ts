@@ -8,7 +8,7 @@ import type { UserAccount, SoundLibraryEntry, VesselStatus, VesselPrefs } from '
 
 /**
  * LOGIQUE RÉCEPTEUR (B) : Journal Technique, Sons Expert, Veille Stratégique.
- * v53.2 : Ajout de updateLocalPrefs et savePrefsToFirestore pour validation manuelle.
+ * v53.3 : Ajout de watchLoop dans les prefs et playSound.
  */
 export function useRecepteur(vesselId?: string) {
   const { user } = useUser();
@@ -26,6 +26,7 @@ export function useRecepteur(vesselId?: string) {
     batteryThreshold: 50,
     watchDuration: 60,
     watchSound: 'grenouille',
+    watchLoop: true,
     isWatchEnabled: false,
     alerts: {
       moving: { enabled: true, sound: 'sonar', loop: false },
@@ -86,7 +87,7 @@ export function useRecepteur(vesselId?: string) {
     if (!vesselPrefs.isNotifyEnabled) return;
     
     const config = alertKey === 'watch' 
-        ? { enabled: true, sound: vesselPrefs.watchSound, loop: true }
+        ? { enabled: true, sound: vesselPrefs.watchSound, loop: vesselPrefs.watchLoop }
         : vesselPrefs.alerts[alertKey];
 
     if (!config?.enabled && !soundOverride) return;
