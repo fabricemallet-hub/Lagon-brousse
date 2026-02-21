@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, getDocs, writeBatch } from 'firebase/firestore';
 import type { VesselStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -10,8 +10,8 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v69.0 : "Moteur Autonome"
- * Gère les transitions automatiques Mouvement/Mouillage basées sur la vitesse.
+ * LOGIQUE ÉMETTEUR (A) v70.0 : "Moteur Autonome avec Purge Totale"
+ * Gère les transitions automatiques et la purge radicale des données au départ.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -49,7 +49,6 @@ export function useEmetteur(
   const lastSentStatusRef = useRef<string | null>(null);
   const lastGpsCutRef = useRef<boolean>(false);
   const isEmergencySmsSentRef = useRef<boolean>(false);
-  const consecutiveDriftCountRef = useRef<number>(0);
   
   const currentPosRef = useRef(currentPos);
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
@@ -144,7 +143,7 @@ export function useEmetteur(
     updateVesselInFirestore({ status: 'emergency', eventLabel: type });
     addTechLog('URGENCE', `${type} DÉCLENCHÉ`);
     
-    if (isEmergencyEnabled && emergencyContact && !isEmergencySmsSentRef.current) {
+    if (isEmergencyEnabled && emergencyContact) {
         const nick = vesselNickname || 'KOOLAPIK';
         const msg = isCustomMessageEnabled && vesselSmsMessage ? vesselSmsMessage : "Requiert assistance immédiate.";
         const time = format(new Date(), 'HH:mm');
@@ -154,7 +153,6 @@ export function useEmetteur(
         
         const body = `[${nick.toUpperCase()}] ${msg} [${type}] à ${time}. Position (+/- ${acc}m) : ${posUrl}`;
         window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
-        isEmergencySmsSentRef.current = true;
     }
     toast({ variant: "destructive", title: `ALERTE ${type}` });
   }, [isSharing, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, accuracy, toast]);
@@ -163,16 +161,13 @@ export function useEmetteur(
     const knotSpeed = speed * 1.94384;
     let nextStatus = vesselStatus;
 
-    // 1. DÉTECTION AUTOMATIQUE DU MOUVEMENT (> 5nd)
     if (knotSpeed > 5) {
         if (vesselStatus !== 'moving') {
             nextStatus = 'moving';
             setAnchorPos(null);
             addTechLog('AUTO', 'Navigation détectée (>5 nds)');
-            isEmergencySmsSentRef.current = false;
         }
     } 
-    // 2. DÉTECTION AUTOMATIQUE DU MOUILLAGE (< 2nd après mouvement)
     else if (knotSpeed < 2 && vesselStatus === 'moving') {
         nextStatus = 'stationary';
         const newAnchor = { lat, lng };
@@ -180,7 +175,6 @@ export function useEmetteur(
         addTechLog('AUTO', 'Mouillage stabilisé (<2 nds)');
     }
 
-    // 3. SURVEILLANCE DE DÉRIVE (Si ancre active)
     if ((nextStatus === 'stationary' || nextStatus === 'drifting') && anchorPos) {
         const dist = getDistance(lat, lng, anchorPos.lat, anchorPos.lng);
         if (dist > mooringRadius) {
@@ -194,7 +188,6 @@ export function useEmetteur(
         } else if (nextStatus === 'drifting') {
             nextStatus = 'stationary';
             addTechLog('INFO', 'Retour en zone de sécurité');
-            isEmergencySmsSentRef.current = false;
         }
     }
 
@@ -218,7 +211,6 @@ export function useEmetteur(
     });
   }, [vesselStatus, anchorPos, mooringRadius, addTechLog, triggerEmergency, updateVesselInFirestore]);
 
-  // MODULE SIMULATION
   useEffect(() => {
     if (!simulator?.isActive || !simulator.simPos || !isSharing) return;
     handlePositionLogic(
@@ -259,31 +251,92 @@ export function useEmetteur(
     );
   }, [user, firestore, sharingId, customSharingId, customFleetId, vesselNickname, simulator?.isActive, addTechLog, handlePositionLogic, toast]);
 
+  /**
+   * PURGE RADICALE v70.0
+   * Supprime les journaux distants et notifie les récepteurs de la sortie du groupe.
+   */
   const stopSharing = useCallback(async () => {
     if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     watchIdRef.current = null;
     setIsSharing(false);
+    
     if (firestore && sharingId) {
       const ref = doc(firestore, 'vessels', sharingId);
-      setDoc(ref, { 
+      const batch = writeBatch(firestore);
+      
+      // 1. Purge physique des marqueurs tactiques pour vider les cartes de la flotte
+      const tactCol = collection(firestore, 'vessels', sharingId, 'tactical_logs');
+      const tactSnap = await getDocs(tactCol);
+      tactSnap.forEach(d => batch.delete(d.ref));
+      
+      // 2. Purge physique des journaux techniques
+      const techCol = collection(firestore, 'vessels', sharingId, 'tech_logs');
+      const techSnap = await getDocs(techCol);
+      techSnap.forEach(d => batch.delete(d.ref));
+      
+      // 3. Notification de départ et réinitialisation globale
+      batch.set(ref, { 
         isSharing: false, 
         lastActive: serverTimestamp(),
         anchorLocation: null,
-        status: 'offline'
+        status: 'offline',
+        eventLabel: 'LE NAVIRE A QUITTÉ LE GROUPE',
+        historyClearedAt: serverTimestamp(),
+        tacticalClearedAt: serverTimestamp()
       }, { merge: true });
+      
+      await batch.commit();
     }
+    
     setCurrentPos(null);
     setAnchorPos(null);
-    isEmergencySmsSentRef.current = false;
+    setTechLogs([]);
+    setTacticalLogs([]);
+    lastSentStatusRef.current = null;
+    
+    // Nettoyage de la carte locale
     handleStopCleanupRef.current?.(); 
-    toast({ title: "Partage arrêté" });
+    
+    toast({ 
+        title: "PARTAGE ARRÊTÉ", 
+        description: "Historique purgé et groupe notifié." 
+    });
+  }, [firestore, sharingId, toast]);
+
+  const clearLogs = useCallback(async () => {
+    setTechLogs([]);
+    setTacticalLogs([]);
+    if (firestore && sharingId) {
+        const vRef = doc(firestore, 'vessels', sharingId);
+        
+        // Signal de purge aux récepteurs
+        await updateDoc(vRef, {
+            historyClearedAt: serverTimestamp(),
+            tacticalClearedAt: serverTimestamp()
+        });
+        
+        // Purge physique des collections Firestore
+        const batch = writeBatch(firestore);
+        
+        const tactCol = collection(firestore, 'vessels', sharingId, 'tactical_logs');
+        const tactSnap = await getDocs(tactCol);
+        tactSnap.forEach(d => batch.delete(d.ref));
+        
+        const techCol = collection(firestore, 'vessels', sharingId, 'tech_logs');
+        const techSnap = await getDocs(techCol);
+        techSnap.forEach(d => batch.delete(d.ref));
+        
+        await batch.commit();
+    }
+    // Nettoyage visuel carte
+    handleStopCleanupRef.current?.();
+    toast({ title: "JOURNAUX PURGÉS", description: "Données locales et distantes réinitialisées." });
   }, [firestore, sharingId, toast]);
 
   const changeManualStatus = useCallback((st: VesselStatus['status'], label?: string) => {
     setVesselStatus(st);
     if (st === 'moving') {
         setAnchorPos(null);
-        isEmergencySmsSentRef.current = false;
     } else if (currentPosRef.current) {
         setAnchorPos(currentPosRef.current);
     }
@@ -373,13 +426,13 @@ export function useEmetteur(
     isCustomMessageEnabled,
     setIsCustomMessageEnabled,
     saveSmsSettings,
-    clearLogs: () => { setTechLogs([]); setTacticalLogs([]); }
+    clearLogs
   }), [
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     triggerEmergency, changeManualStatus, anchorPos, mooringRadius, accuracy,
     vesselNickname, customSharingId, customFleetId, sharingId, idsHistory,
     loadFromHistory, removeFromHistory, lastSyncTime, techLogs, tacticalLogs,
     addTacticalLog, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
-    isCustomMessageEnabled, saveSmsSettings
+    isCustomMessageEnabled, saveSmsSettings, clearLogs
   ]);
 }

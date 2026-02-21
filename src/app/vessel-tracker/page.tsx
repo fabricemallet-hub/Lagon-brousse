@@ -347,7 +347,7 @@ export default function VesselTrackerPage() {
 
       <div className="flex bg-slate-900 text-white p-1 rounded-xl shadow-lg border-2 border-primary/20 sticky top-0 z-[100]">
           <Button variant={appMode === 'sender' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setAppMode('sender'); recepteur.initAudio(); }}>Émetteur (A)</Button>
-          <Button variant={appMode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setAppMode('receiver'); recepteur.initAudio(); }}>Récepteur (B)</Button>
+          <Button variant={appMode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setMode('receiver'); recepteur.initAudio(); }}>Récepteur (B)</Button>
           <Button variant={appMode === 'fleet' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setAppMode('fleet'); recepteur.initAudio(); }}>Flotte (C)</Button>
       </div>
 
@@ -415,7 +415,7 @@ export default function VesselTrackerPage() {
                     variant="ghost" size="sm" 
                     className="h-9 px-3 text-[9px] font-black uppercase text-white/60 hover:text-white hover:bg-white/10 flex items-center gap-1.5"
                     onClick={() => {
-                        mapCore.clearBreadcrumbs();
+                        emetteur.clearLogs();
                         toast({ title: "TRACES EFFACÉES", description: "Historique visuel purgé." });
                     }}
                 >
@@ -446,7 +446,6 @@ export default function VesselTrackerPage() {
                     onDragStart={() => mapCore.setIsFollowMode(false)}
                     options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
                 >
-                    {/* RÈGLE DE L'ANCRE UNIQUE ET LIGNE DE TENSION v69.0 */}
                     {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                         <React.Fragment key={`mooring-singleton-${activeAnchorVessel.id}`}>
                             <OverlayView 
@@ -473,7 +472,6 @@ export default function VesselTrackerPage() {
                                 }}
                             />
 
-                            {/* LIGNE DE TENSION ROUGE : Visualisation de l'écart au mouillage */}
                             {activeAnchorVessel.location && (activeAnchorVessel.status === 'stationary' || activeAnchorVessel.status === 'drifting' || activeAnchorVessel.status === 'emergency') && (
                                 <Polyline
                                     key={`tension-line-${activeAnchorVessel.id}`}
@@ -590,7 +588,7 @@ export default function VesselTrackerPage() {
                             onClick={() => {
                                 simulator.stopSim();
                                 recepteur.stopAllAlarms();
-                                mapCore.clearBreadcrumbs();
+                                emetteur.clearLogs();
                             }}
                         >
                             Désactiver Simulation
@@ -931,37 +929,43 @@ export default function VesselTrackerPage() {
                                   <TabsTrigger value="settings" className="text-[10px] font-black uppercase gap-2 text-primary"><Settings className="size-3" /> Réglages Sons</TabsTrigger>
                               </TabsList>
                               
-                              <TabsContent value="tactical" className="m-0 bg-white">
-                                  <div className="p-4 space-y-4">
-                                      <div className="grid grid-cols-4 gap-2">
-                                          {TACTICAL_SPECIES.map(spec => (
-                                              <Button key={spec.label} variant="outline" className="flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 hover:bg-primary/5 active:scale-95 transition-all" onClick={() => emetteur.addTacticalLog(spec.label)}>
-                                                  <spec.icon className="size-5 text-primary" />
-                                                  <span className="text-[8px] font-black">{spec.label}</span>
-                                              </Button>
-                                          ))}
-                                          <Button variant="secondary" className="flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-primary/20 shadow-sm" onClick={() => photoInputRef.current?.click()}>
-                                              <Camera className="size-5 text-primary" />
-                                              <span className="text-[8px] font-black">PRISE</span>
-                                          </Button>
-                                      </div>
-                                      <ScrollArea className="h-48 border-t pt-2 shadow-inner">
-                                          <div className="space-y-1">
-                                            {emetteur.tacticalLogs.map((log, i) => (
-                                                <div key={i} className="p-3 border-b flex justify-between items-center text-[10px] cursor-pointer hover:bg-primary/5 active:bg-primary/10 transition-colors" onClick={() => mapCore.handleRecenter(log.pos)}>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="p-1.5 bg-primary/10 rounded-lg"><Fish className="size-3 text-primary"/></div>
-                                                        <span className="font-black uppercase text-primary">{log.type}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        {log.wind && <span className="font-bold text-blue-600">{log.wind} ND</span>}
-                                                        <span className="font-bold opacity-40">{format(log.time, 'HH:mm')}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                          </div>
-                                      </ScrollArea>
+                              <TabsContent value="tactical" className="m-0 bg-white p-4 space-y-4">
+                                  <div className="flex items-center justify-between bg-muted/10 p-2 rounded-xl border border-dashed">
+                                      <p className="text-[9px] font-black uppercase text-primary tracking-widest flex items-center gap-2 px-1">
+                                          <Zap className="size-3" /> Grille Tactique
+                                      </p>
+                                      <Button variant="ghost" size="sm" className="h-7 text-destructive text-[8px] font-black uppercase border border-destructive/10" onClick={emetteur.clearLogs}>
+                                          <Trash2 className="size-3 mr-1" /> Effacer
+                                      </Button>
                                   </div>
+                                  <div className="grid grid-cols-4 gap-2">
+                                      {TACTICAL_SPECIES.map(spec => (
+                                          <Button key={spec.label} variant="outline" className="flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 hover:bg-primary/5 active:scale-95 transition-all" onClick={() => emetteur.addTacticalLog(spec.label)}>
+                                              <spec.icon className="size-5 text-primary" />
+                                              <span className="text-[8px] font-black">{spec.label}</span>
+                                          </Button>
+                                      ))}
+                                      <Button variant="secondary" className="flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-primary/20 shadow-sm" onClick={() => photoInputRef.current?.click()}>
+                                          <Camera className="size-5 text-primary" />
+                                          <span className="text-[8px] font-black">PRISE</span>
+                                      </Button>
+                                  </div>
+                                  <ScrollArea className="h-48 border-t pt-2 shadow-inner">
+                                      <div className="space-y-1">
+                                        {emetteur.tacticalLogs.map((log, i) => (
+                                            <div key={i} className="p-3 border-b flex justify-between items-center text-[10px] cursor-pointer hover:bg-primary/5 active:bg-primary/10 transition-colors" onClick={() => mapCore.handleRecenter(log.pos)}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-1.5 bg-primary/10 rounded-lg"><Fish className="size-3 text-primary"/></div>
+                                                    <span className="font-black uppercase text-primary">{log.type}</span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    {log.wind && <span className="font-bold text-blue-600">{log.wind} ND</span>}
+                                                    <span className="font-bold opacity-40">{format(log.time, 'HH:mm')}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                      </div>
+                                  </ScrollArea>
                               </TabsContent>
 
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
@@ -974,7 +978,7 @@ export default function VesselTrackerPage() {
                                   </div>
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v69.0 prêt - Surveillance Auto OK</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v70.0 prêt - Purge Auto Active</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className="p-2 border rounded-lg bg-white flex justify-between items-center text-[9px] shadow-sm cursor-pointer hover:bg-slate-100" onClick={() => log.pos && mapCore.handleRecenter(log.pos)}>
                                                   <span className="font-black uppercase">{log.label}</span>

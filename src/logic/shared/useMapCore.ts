@@ -24,8 +24,8 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v69.0 : Gestion de la carte et du tracé intelligent.
- * Pause du tracé bleu en mode mouillage pour laisser place à la ligne de tension rouge.
+ * HOOK PARTAGÉ v70.0 : Gestion de la carte et du tracé intelligent.
+ * Purge complète des marqueurs tactiques lors du nettoyage.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
@@ -138,6 +138,7 @@ export function useMapCore() {
 
   const clearBreadcrumbs = useCallback(() => {
     setBreadcrumbs([]);
+    setTacticalMarkers([]); // PURGE RADICALE v70.0 : On vide aussi les marqueurs tactiques
     setIsCirclesHidden(true);
     lastTracePosRef.current = null;
   }, []);
