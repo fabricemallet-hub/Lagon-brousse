@@ -11,7 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v76.0 : "Confidentialité & Trajectoires"
+ * LOGIQUE ÉMETTEUR (A) v76.2 : "Confidentialité & Trajectoires"
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -36,7 +36,7 @@ export function useEmetteur(
   const [customFleetId, setCustomFleetId] = useState('');
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
-  // Nouveaux états de confidentialité v76.0
+  // États de confidentialité v76.2
   const [isGhostMode, setIsGhostMode] = useState(false);
   const [isTrajectoryHidden, setIsTrajectoryHidden] = useState(false);
 
@@ -140,7 +140,7 @@ export function useEmetteur(
 
     setTechLogs(prev => {
         const lastLog = prev[0];
-        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE' || label === 'MOUILLAGE AUTO';
+        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE' || label === 'MOUILLAGE AUTO' || label === 'RESET';
 
         if (!statusChanged && label === 'AUTO') {
             const duration = differenceInMinutes(now, lastLog.time);
@@ -427,7 +427,10 @@ export function useEmetteur(
     isGhostModeRef.current = newVal;
     localStorage.setItem('lb_vessel_ghost', newVal.toString());
     updateVesselInFirestore({ isGhostMode: newVal });
-    toast({ title: newVal ? "Mode Fantôme activé" : "Mode Fantôme désactivé", description: newVal ? "Invisible pour la flotte C." : "Visible pour tous." });
+    toast({ 
+        title: newVal ? "Mode Fantôme activé" : "Mode Fantôme désactivé", 
+        description: newVal ? "Vous êtes maintenant invisible pour la flotte C." : "Vous êtes à nouveau visible par tous." 
+    });
   }, [isGhostMode, updateVesselInFirestore, toast]);
 
   const toggleTrajectoryHidden = useCallback(() => {
@@ -436,13 +439,16 @@ export function useEmetteur(
     isTrajectoryHiddenRef.current = newVal;
     localStorage.setItem('lb_vessel_traj_hidden', newVal.toString());
     updateVesselInFirestore({ isTrajectoryHidden: newVal });
-    toast({ title: newVal ? "Trajectoire masquée" : "Trajectoire affichée", description: newVal ? "Invisible pour vous et la flotte." : "Visible." });
+    toast({ 
+        title: newVal ? "Trajectoire masquée" : "Trajectoire affichée", 
+        description: newVal ? "La ligne bleue est cachée pour vous et la flotte." : "La ligne bleue est visible." 
+    });
   }, [isTrajectoryHidden, updateVesselInFirestore, toast]);
 
   const resetTrajectory = useCallback(() => {
     handleStopCleanupRef.current?.();
     addTechLog('RESET', 'Trajectoire remise à zéro');
-    toast({ title: "Trajectoire réinitialisée" });
+    toast({ title: "Trajectoire réinitialisée", description: "Le tracé bleu redémarre de zéro." });
   }, [addTechLog, toast]);
 
   return useMemo(() => ({

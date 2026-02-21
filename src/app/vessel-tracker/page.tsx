@@ -174,7 +174,10 @@ const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
             <div className="flex flex-col items-center">
                 <div className="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap flex flex-col items-center gap-0.5 min-w-[80px]">
                     <div className="flex items-center gap-2 w-full justify-between">
-                        <span className="truncate max-w-[60px]">{vessel.displayName || vessel.id}</span>
+                        <div className="flex items-center gap-1 truncate">
+                            {vessel.isGhostMode && <Ghost className="size-2.5 text-primary animate-pulse" />}
+                            <span className="truncate max-w-[60px]">{vessel.displayName || vessel.id}</span>
+                        </div>
                         <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} className="size-3" />
                     </div>
                     <div className="flex items-center gap-1 mt-0.5 border-t border-white/10 pt-0.5 w-full justify-center">
@@ -185,7 +188,6 @@ const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
                         )}>
                             {statusLabel}
                         </span>
-                        {vessel.isGhostMode && <Ghost className="size-2 text-primary" />}
                     </div>
                 </div>
             </div>
@@ -302,13 +304,6 @@ export default function VesselTrackerPage() {
     return `[${nick.toUpperCase()}] ${msg} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
   }, [emetteur.vesselSmsMessage, emetteur.isCustomMessageEnabled, emetteur.vesselNickname]);
 
-  const handleCopyLogEntry = (log: any) => {
-    const pos = log.pos || { lat: -22.27, lng: 166.45 };
-    const text = `Log: ${log.label || log.type} - Time: ${format(log.time, 'HH:mm:ss')} - Pos: ${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)} - Google Maps: https://www.google.com/maps?q=${pos.lat},${pos.lng}`;
-    navigator.clipboard.writeText(text);
-    toast({ title: "Copié !", description: "Coordonnées prêtes à être collées." });
-  };
-
   if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
   if (!isLoaded || isProfileLoading) return <Skeleton className="h-96 w-full" />;
 
@@ -346,7 +341,7 @@ export default function VesselTrackerPage() {
                     defaultZoom={12}
                     onLoad={mapCore.setGoogleMap}
                     onDragStart={() => mapCore.setIsFollowMode(false)}
-                    options={{ disableDefaultUI: true, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}
+                    options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}
                 >
                     {!emetteur.isTrajectoryHidden && mapCore.breadcrumbs.length > 1 && (
                         <Polyline 
@@ -433,7 +428,10 @@ export default function VesselTrackerPage() {
                               <div className="flex items-center gap-3">
                                   <div className="p-2 bg-primary text-white rounded-lg shadow-sm"><Navigation className={cn("size-5", emetteur.vesselStatus === 'moving' && "animate-pulse")} /></div>
                                   <div>
-                                      <CardTitle className="text-sm font-black uppercase text-primary leading-none">{emetteur.sharingId}</CardTitle>
+                                      <div className="flex items-center gap-2">
+                                          {emetteur.isGhostMode && <Ghost className="size-3 text-primary animate-pulse" />}
+                                          <CardTitle className="text-sm font-black uppercase text-primary leading-none">{emetteur.sharingId}</CardTitle>
+                                      </div>
                                       <p className="text-[9px] font-bold text-muted-foreground uppercase mt-1">Capitaine : {emetteur.vesselNickname}</p>
                                   </div>
                               </div>
@@ -544,7 +542,7 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v76.0 prêt - Mode Fantôme OK</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v76.2 prêt - Mode Fantôme OK</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm cursor-pointer transition-all active:scale-[0.98]", log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') ? 'border-red-200 bg-red-50' : 'border-slate-100')} onClick={() => handleCopyLogEntry(log)}>
                                                   <div className="flex justify-between items-start">
@@ -594,11 +592,10 @@ export default function VesselTrackerPage() {
                               </TabsContent>
 
                               <TabsContent value="settings" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
-                                  <Button className="w-full h-14 font-black uppercase tracking-widest shadow-xl rounded-2xl bg-primary text-white" onClick={() => recepteur.savePrefsToFirestore()} disabled={recepteur.isSaving}>ENREGISTRER LES RÉGLAGES</Button>
-                                  
-                                  <div className="space-y-4 p-4 border-2 rounded-2xl bg-slate-900 text-white">
+                                  {/* BLOC CONFIDENTIALITÉ TACTIQUE v76.2 (REMOUNTÉ EN HAUT) */}
+                                  <div className="space-y-4 p-4 border-2 rounded-2xl bg-slate-900 text-white shadow-xl animate-in fade-in slide-in-from-top-2">
                                       <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
-                                          <Ghost className="size-3" /> Confidentialité Tactique
+                                          <Ghost className="size-3" /> Confidentialité Tactique & Trajectoire
                                       </p>
                                       
                                       <div className="flex items-center justify-between py-2 border-b border-white/10">
@@ -612,16 +609,18 @@ export default function VesselTrackerPage() {
                                       <div className="flex items-center justify-between py-2">
                                           <div className="space-y-0.5">
                                               <Label className="text-xs font-black uppercase">Masquer Tracé</Label>
-                                              <p className="text-[8px] font-bold text-slate-400 uppercase">Cache la ligne bleue</p>
+                                              <p className="text-[8px] font-bold text-slate-400 uppercase">Cache la ligne bleue (Moi + Flotte)</p>
                                           </div>
                                           <Switch checked={emetteur.isTrajectoryHidden} onCheckedChange={emetteur.toggleTrajectoryHidden} />
                                       </div>
 
-                                      <Button variant="outline" className="w-full h-10 font-black uppercase text-[9px] border-2 bg-white text-slate-900 mt-2 gap-2" onClick={emetteur.resetTrajectory}>
-                                          <HistoryIcon className="size-3" /> RESET TRAJECTOIRE
+                                      <Button variant="outline" className="w-full h-12 font-black uppercase text-[10px] border-2 bg-white text-slate-900 mt-2 gap-2 shadow-lg hover:bg-slate-50 transition-all active:scale-95" onClick={emetteur.resetTrajectory}>
+                                          <HistoryIcon className="size-4" /> RESET TRAJECTOIRE
                                       </Button>
                                   </div>
 
+                                  <Button className="w-full h-14 font-black uppercase tracking-widest shadow-lg rounded-2xl bg-primary text-white" onClick={() => recepteur.savePrefsToFirestore()} disabled={recepteur.isSaving}>ENREGISTRER LES RÉGLAGES</Button>
+                                  
                                   <div className="flex items-center justify-between p-4 bg-primary/5 rounded-2xl border-2 border-primary/10"><Label className="text-xs font-black uppercase">Activer les signaux sonores</Label><Switch checked={recepteur.vesselPrefs.isNotifyEnabled} onCheckedChange={v => recepteur.updateLocalPrefs({ isNotifyEnabled: v })} /></div>
                                   <div className="space-y-3"><Label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2"><Volume2 className="size-3" /> Volume global</Label><Slider value={[recepteur.vesselPrefs.volume * 100]} max={100} onValueChange={v => recepteur.updateLocalPrefs({ volume: v[0] / 100 })} /></div>
                                   <div className="space-y-4 p-4 border-2 rounded-2xl bg-slate-50">
