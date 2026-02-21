@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useMapCore } from '@/logic/shared/useMapCore';
+import { useMapCore, type TacticalMarker } from '@/logic/shared/useMapCore';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
 import { useRecepteur } from '@/logic/recepteur/useRecepteur';
 import { useFlotte } from '@/logic/flotteC/useFlotte';
@@ -87,6 +87,17 @@ const TACTICAL_SPECIES = [
     { label: 'OISEAUX', icon: Bird }
 ];
 
+const TACTICAL_ICONS: Record<string, any> = {
+    'MARLIN': Target,
+    'THON': Fish,
+    'TAZARD': Fish,
+    'WAHOO': Fish,
+    'BONITE': Fish,
+    'SARDINES': Waves,
+    'OISEAUX': Bird,
+    'PHOTO': Camera
+};
+
 export default function VesselTrackerPage() {
   const [appMode, setAppMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const { toast } = useToast();
@@ -115,6 +126,19 @@ export default function VesselTrackerPage() {
         hasCenteredInitially.current = true;
     }
   }, [emetteur.currentPos, mapCore.googleMap, mapCore]);
+
+  // SYNC TACTIQUE : Listen to followed vessels and self
+  useEffect(() => {
+    const ids = [];
+    if (emetteur.isSharing) ids.push(emetteur.customSharingId.toUpperCase() || 'MASTER');
+    if (recepteur.vesselPrefs && emetteur.customSharingId) ids.push(emetteur.customSharingId.toUpperCase());
+    
+    // Add all saved vessel IDs
+    recepteur.availableSounds && ids.push(...(ids.length > 0 ? [] : [])); // fallback
+
+    const unsub = mapCore.syncTacticalMarkers(ids);
+    return () => unsub();
+  }, [emetteur.isSharing, emetteur.customSharingId, mapCore.syncTacticalMarkers]);
 
   // Sync LED Clignotante pour l'émetteur
   const [isLedActive, setIsLedActive] = useState(false);
@@ -191,10 +215,10 @@ export default function VesselTrackerPage() {
                     gestureHandling: 'greedy' 
                 }}
             >
-                {/* POINT BLEU */}
+                {/* POINT BLEU (MOI) */}
                 {emetteur.currentPos && (
                     <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                        <div style={{ transform: 'translate(-50%, -50%)' }} className="relative">
+                        <div style={{ transform: 'translate(-50%, -50%)' }} className="relative z-[1000]">
                             <div className="size-10 bg-blue-500/20 rounded-full animate-ping absolute inset-0" />
                             <div className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg flex items-center justify-center">
                                 <Navigation className="size-3 text-white fill-white" />
@@ -211,11 +235,34 @@ export default function VesselTrackerPage() {
                     />
                 )}
 
+                {/* MARQUEURS TACTIQUES FLOTTE */}
+                {!mapCore.isTacticalHidden && mapCore.tacticalMarkers.map(marker => {
+                    const Icon = TACTICAL_ICONS[marker.type] || Fish;
+                    return (
+                        <OverlayView key={marker.id} position={marker.pos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                            <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center group cursor-pointer z-[500]">
+                                <div className="px-2 py-1 bg-white/90 backdrop-blur-md rounded border shadow-lg text-[8px] font-black uppercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap mb-1">
+                                    {marker.type} - {marker.vesselName}<br/>
+                                    {format(marker.time, 'HH:mm')}
+                                    {marker.weather && (
+                                        <div className="mt-1 pt-1 border-t border-slate-200 text-blue-600">
+                                            {marker.weather.windSpeed}nd • {marker.weather.temp}°C
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="p-1.5 bg-accent rounded-full border-2 border-white shadow-xl">
+                                    <Icon className="size-3.5 text-white" />
+                                </div>
+                            </div>
+                        </OverlayView>
+                    );
+                })}
+
                 {/* MOUILLAGE */}
                 {emetteur.anchorPos && (
                     <>
                         <OverlayView position={emetteur.anchorPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                            <div style={{ transform: 'translate(-50%, -50%)' }} className="size-8 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
+                            <div style={{ transform: 'translate(-50%, -50%)' }} className="size-8 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]">
                                 <Anchor className="size-4 text-white" />
                             </div>
                         </OverlayView>
@@ -270,6 +317,7 @@ export default function VesselTrackerPage() {
                               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Surnom du Navire</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-11 border-2 font-black uppercase" /></div>
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Navire (Partage Direct)</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ID UNIQUE" className="h-11 border-2 font-black uppercase text-center tracking-widest" /></div>
+                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Groupe Flotte C</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE FACULTATIF" className="h-11 border-2 font-black uppercase text-center" /></div>
                                   
                                   <div className="space-y-3">
                                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Historique des IDs</p>
@@ -311,7 +359,10 @@ export default function VesselTrackerPage() {
                                         <Anchor className="size-4 mr-2" /> {emetteur.vesselStatus === 'stationary' ? 'Mouillage Actif' : 'Activer Mouillage'}
                                       </Button>
                                       <div className="p-2 border-2 rounded-xl bg-muted/10 space-y-1">
-                                          <Label className="text-[8px] font-black uppercase opacity-60">Rayon Dérive: {emetteur.mooringRadius}m</Label>
+                                          <div className="flex justify-between items-center px-1">
+                                              <Label className="text-[8px] font-black uppercase opacity-60">Rayon Dérive</Label>
+                                              <span className="text-[9px] font-black">{emetteur.mooringRadius}m</span>
+                                          </div>
                                           <Slider value={[emetteur.mooringRadius]} min={10} max={200} step={10} onValueChange={v => emetteur.setMooringRadius(v[0])} />
                                       </div>
                                   </div>
@@ -333,14 +384,14 @@ export default function VesselTrackerPage() {
                       <ScrollArea className="h-[350px]">
                           <div className="p-3 space-y-2">
                               {recepteur.techLogs.length > 0 ? recepteur.techLogs.map((log, i) => (
-                                  <div key={i} className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm">
+                                  <div key={i} className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm cursor-pointer active:bg-slate-50" onClick={() => log.pos && mapCore.handleRecenter(log.pos)}>
                                       <div className="flex flex-col">
                                         <span className={cn("font-black text-[10px] uppercase", log.label === 'DÉRIVE' ? 'text-red-600' : 'text-primary')}>{log.label}</span>
                                         <span className="text-[8px] font-bold opacity-40">{log.time ? format(log.time.toDate ? log.time.toDate() : log.time, 'HH:mm:ss') : '...'}</span>
                                       </div>
                                       <div className="flex items-center gap-2">
                                           <span className="text-[9px] font-black">{log.battery}%</span>
-                                          <BatteryIconComp level={log.battery} />
+                                          <BatteryIcon level={log.battery / 100} charging={false} />
                                       </div>
                                   </div>
                               )) : <div className="py-20 text-center opacity-20"><RefreshCw className="size-8 mx-auto mb-2" /><p className="text-[10px] font-black uppercase">Attente de données...</p></div>}
@@ -357,16 +408,16 @@ export default function VesselTrackerPage() {
                       <ScrollArea className="h-[350px]">
                           <div className="p-3 space-y-3">
                               {flotte.tacticalLogs.map((log, i) => (
-                                  <div key={i} className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm">
+                                  <div key={i} className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm cursor-pointer active:bg-slate-50" onClick={() => log.pos && mapCore.handleRecenter(log.pos)}>
                                       <div className="flex items-center gap-3">
                                           <div className="p-2 bg-primary/10 rounded-lg"><Fish className="size-4 text-primary"/></div>
                                           <div className="flex flex-col">
                                               <span className="font-black text-xs uppercase text-primary">{log.type}</span>
-                                              <span className="text-[8px] font-bold opacity-40 uppercase">{log.sender}</span>
+                                              <span className="text-[8px] font-bold opacity-40 uppercase">{log.sender || 'Navire'}</span>
                                           </div>
                                       </div>
                                       <div className="text-right">
-                                          <p className="text-[10px] font-black text-blue-600">{log.wind} ND</p>
+                                          {log.wind && <p className="text-[10px] font-black text-blue-600">{log.wind} ND</p>}
                                           <p className="text-[8px] font-bold opacity-40">{log.time ? format(log.time.toDate ? log.time.toDate() : log.time, 'HH:mm') : '...'}</p>
                                       </div>
                                   </div>
@@ -377,16 +428,27 @@ export default function VesselTrackerPage() {
               </TabsContent>
           </Tabs>
 
-          {/* RÉGLAGES AUDIO */}
+          {/* RÉGLAGES AUDIO & VISUELS */}
           <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="audio-prefs" className="border-none">
                   <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
-                      <Volume2 className="size-4 text-primary" />
-                      <span className="text-[10px] font-black uppercase">Alertes Audio & Veille</span>
+                      <Settings className="size-4 text-primary" />
+                      <span className="text-[10px] font-black uppercase">Réglages Sons & Visuels</span>
                   </AccordionTrigger>
                   <AccordionContent className="pt-4 space-y-6">
                       <Card className="p-4 border-2 rounded-2xl space-y-6 bg-white shadow-inner">
+                          {/* Option Nettoyage Tactique */}
                           <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-[10px] font-black uppercase text-slate-700">Afficher points tactiques</Label>
+                                <Switch checked={!mapCore.isTacticalHidden} onCheckedChange={(v) => mapCore.setIsTacticalHidden(!v)} />
+                              </div>
+                              <Button variant="ghost" className="w-full h-10 border-2 border-dashed font-black uppercase text-[10px] text-destructive" onClick={() => mapCore.setTacticalMarkers([])}>
+                                  <Trash2 className="size-3 mr-2" /> Effacer les points de la carte
+                              </Button>
+                          </div>
+
+                          <div className="space-y-4 border-t pt-4">
                               <div className="flex items-center justify-between border-b pb-2">
                                   <Label className="text-[10px] font-black uppercase text-primary flex items-center gap-2">
                                       <Timer className="size-3" /> Veille Stratégique
@@ -434,7 +496,7 @@ export default function VesselTrackerPage() {
                                       <div key={key} className="p-3 border-2 rounded-xl space-y-3 bg-slate-50/50">
                                           <div className="flex items-center justify-between">
                                               <Label className="text-[9px] font-black uppercase text-slate-700 flex items-center gap-2">
-                                                  <Bell className="size-3" /> {key.toUpperCase()}
+                                                  <Bell className="size-3" /> {key.toUpperCase().replace('MOVING', 'MOUVEMENT').replace('STATIONARY', 'MOUILLAGE').replace('OFFLINE', 'SIGNAL PERDU')}
                                               </Label>
                                               <Switch 
                                                 checked={config.enabled} 
@@ -474,17 +536,7 @@ export default function VesselTrackerPage() {
           }
       }} />
 
-      {/* ANNUAIRE */}
-      <Card className="border-2 shadow-sm bg-muted/5">
-          <CardHeader className="p-4 pb-2 border-b"><CardTitle className="text-[10px] font-black uppercase flex items-center gap-2"><Phone className="size-3" /> Annuaire Maritime NC</CardTitle></CardHeader>
-          <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="space-y-2"><p className="text-[9px] font-black uppercase text-red-600 border-b pb-1">Urgences</p><p className="text-xs font-black">COSS Mer : 16</p><p className="text-xs font-black">SAMU Terre : 15</p></div>
-              <div className="space-y-2"><p className="text-[9px] font-black uppercase text-blue-600 border-b pb-1">Services</p><p className="text-xs font-black">Météo Marine : 36 67 36</p></div>
-              <div className="space-y-2"><p className="text-[9px] font-black uppercase text-indigo-600 border-b pb-1">VHF</p><p className="text-xs font-black">Port Autonome : Canal 12</p></div>
-          </CardContent>
-      </Card>
-
-      {/* JOURNAUX DE BORD - FIXE AU BAS (Z-INDEX 10001) */}
+      {/* JOURNAUX DE BORD UNIFIÉS - FIXE AU BAS */}
       <div id="cockpit-logs" className="fixed bottom-16 left-0 right-0 z-[10001] pointer-events-none px-1">
           <div className="max-w-2xl mx-auto pointer-events-auto">
               <Accordion type="single" collapsible className="bg-white/95 backdrop-blur-md rounded-t-[2.5rem] shadow-[0_-8px_30px_rgba(0,0,0,0.2)] border-x-2 border-t-2">
@@ -499,7 +551,7 @@ export default function VesselTrackerPage() {
                       <AccordionContent className="p-0">
                           <Tabs defaultValue="tactical" className="w-full">
                               <TabsList className="grid w-full grid-cols-2 h-10 rounded-none bg-muted/20 border-y">
-                                  <TabsTrigger value="tactical" className="text-[10px] font-black uppercase">Tactique</TabsTrigger>
+                                  <TabsTrigger value="tactical" className="text-[10px] font-black uppercase">Tactique (Carte)</TabsTrigger>
                                   <TabsTrigger value="technical" className="text-[10px] font-black uppercase">Technique</TabsTrigger>
                               </TabsList>
                               
@@ -543,7 +595,10 @@ export default function VesselTrackerPage() {
                                                               <span className="text-[8px] font-bold opacity-40 uppercase">{format(log.time, 'HH:mm')}</span>
                                                           </div>
                                                       </div>
-                                                      <LocateFixed className="size-3 text-primary/40" />
+                                                      <div className="flex items-center gap-3">
+                                                          {log.weather && <span className="text-[9px] font-black text-blue-600">{log.weather.windSpeed}ND</span>}
+                                                          <LocateFixed className="size-3 text-primary/40" />
+                                                      </div>
                                                   </div>
                                               )) : (
                                                   <div className="py-10 text-center opacity-30 italic text-[10px] uppercase font-black">Aucune prise enregistrée</div>
@@ -603,10 +658,10 @@ export default function VesselTrackerPage() {
   );
 }
 
-function BatteryIconComp({ level, charging, className }: { level?: number; charging?: boolean; className?: string }) {
+function BatteryIcon({ level, charging, className }: { level?: number; charging?: boolean; className?: string }) {
   const props = { className: cn('w-4 h-4', className) };
   if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
-  if (level !== undefined && level < 20) return <BatteryLow {...props} className="text-red-500" />;
-  if (level !== undefined && level < 60) return <BatteryMedium {...props} className="text-amber-500" />;
+  if (level !== undefined && level < 0.2) return <BatteryLow {...props} className="text-red-500" />;
+  if (level !== undefined && level < 0.6) return <BatteryMedium {...props} className="text-amber-500" />;
   return <BatteryFull {...props} className="text-green-500" />;
 }

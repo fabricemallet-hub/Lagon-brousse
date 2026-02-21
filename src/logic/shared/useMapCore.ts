@@ -3,31 +3,48 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { getDistance } from '@/lib/utils';
+import { useFirestore } from '@/firebase';
+import { collection, query, orderBy, onSnapshot, where, type DocumentData } from 'firebase/firestore';
 
 export type ViewMode = 'alpha' | 'beta' | 'gamma';
 
+export interface TacticalMarker {
+    id: string;
+    type: string;
+    pos: { lat: number, lng: number };
+    time: Date;
+    vesselName: string;
+    photoUrl?: string;
+    weather?: {
+        windSpeed: number;
+        temp: number;
+        windDir: number;
+    };
+}
+
 /**
- * HOOK PARTAGÉ : Gestion de la carte, des traces et du verrouillage.
- * Version 47.1 : Automatisation du rendu et du centrage initial.
+ * HOOK PARTAGÉ : Gestion de la carte, des traces et des marqueurs tactiques.
+ * v50.0 : Ajout du listener de points tactiques pour toute la flotte.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
+  const firestore = useFirestore();
   const [viewMode, setViewMode] = useState<ViewMode>('alpha');
   const [googleMap, setGoogleMap] = useState<google.maps.Map | null>(null);
-  const [isFollowMode, setIsFollowMode] = useState(true); // Verrouillage actif par défaut
+  const [isFollowMode, setIsFollowMode] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   const [breadcrumbs, setBreadcrumbs] = useState<{ lat: number, lng: number, timestamp: number }[]>([]);
   const polylineRef = useRef<google.maps.Polyline | null>(null);
   const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
 
+  const [tacticalMarkers, setTacticalMarkers] = useState<TacticalMarker[]>([]);
+  const [isTacticalHidden, setIsTacticalHidden] = useState(false);
+
   // FORCE LE RENDU ET RESTAURE LE CENTRE
   useEffect(() => {
     if (googleMap) {
-      // 1. Déclenche le resize pour éviter la carte grise
       google.maps.event.trigger(googleMap, 'resize');
-
-      // 2. Restaure la dernière position connue si disponible
       const saved = localStorage.getItem('lb_last_map_center');
       if (saved) {
         try {
@@ -54,6 +71,44 @@ export function useMapCore() {
       }
     }
   }, [googleMap]);
+
+  // SYNC TACTIQUE : Écoute les points de la flotte
+  const syncTacticalMarkers = useCallback((vesselIds: string[]) => {
+    if (!firestore || vesselIds.length === 0) return () => {};
+
+    const unsubscribers = vesselIds.map(vid => {
+        const q = query(
+            collection(firestore, 'vessels', vid, 'tactical_logs'),
+            orderBy('time', 'desc')
+        );
+
+        return onSnapshot(q, (snapshot) => {
+            setTacticalMarkers(prev => {
+                const otherVesselsMarkers = prev.filter(m => !vesselIds.includes(m.id.split('_')[0]));
+                const newMarkers: TacticalMarker[] = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.pos) {
+                        newMarkers.push({
+                            id: `${vid}_${doc.id}`,
+                            type: data.type,
+                            pos: data.pos,
+                            time: data.time?.toDate() || new Date(),
+                            vesselName: data.vesselName || vid,
+                            photoUrl: data.photoUrl,
+                            weather: data.weather
+                        });
+                    }
+                });
+                // On fusionne les anciens marqueurs des autres vaisseaux avec les nouveaux de ce vaisseau
+                const merged = [...prev.filter(m => !m.id.startsWith(vid)), ...newMarkers];
+                return merged.slice(0, 100); // Limite raisonnable
+            });
+        });
+    });
+
+    return () => unsubscribers.forEach(unsub => unsub());
+  }, [firestore]);
 
   const updateBreadcrumbs = useCallback((lat: number, lng: number) => {
     const now = Date.now();
@@ -118,6 +173,11 @@ export function useMapCore() {
     clearBreadcrumbs,
     handleRecenter,
     saveMapState,
-    polylineRef
+    polylineRef,
+    tacticalMarkers,
+    setTacticalMarkers,
+    syncTacticalMarkers,
+    isTacticalHidden,
+    setIsTacticalHidden
   };
 }

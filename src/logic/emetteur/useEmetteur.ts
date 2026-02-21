@@ -2,13 +2,15 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { doc, setDoc, serverTimestamp, deleteDoc, collection, addDoc, query, orderBy, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, deleteDoc, collection, addDoc, query, orderBy, getDoc, updateDoc } from 'firebase/firestore';
 import type { VesselStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { getDistance } from '@/lib/utils';
+import { fetchWindyWeather } from '@/lib/windy-api';
 
 /**
  * LOGIQUE ÉMETTEUR (A) : Envoi GPS, Gestion IDs, Historique, Journaux Technique & Tactique.
+ * v50.0 : Ajout enrichissement Windy IA pour les points tactiques.
  */
 export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => void, onStopCleanup?: () => void) {
   const { user } = useUser();
@@ -32,7 +34,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
   const [techLogs, setTechLogs] = useState<any[]>([
-    { label: 'SYSTÈME', details: 'v40.0 prêt - En attente de signal GPS', time: new Date() }
+    { label: 'SYSTÈME', details: 'v50.0 prêt - En attente de signal GPS', time: new Date() }
   ]);
   const [tacticalLogs, setTacticalLogs] = useState<any[]>([]);
   const lastLoggedBattery = useRef<number>(100);
@@ -54,7 +56,8 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
         if (savedVesselId) {
             const savedTech = JSON.parse(localStorage.getItem(`lb_tech_logs_${savedVesselId}`) || '[]');
             if (savedTech.length > 0) setTechLogs(savedTech);
-            setTacticalLogs(JSON.parse(localStorage.getItem(`lb_tact_logs_${savedVesselId}`) || '[]'));
+            const savedTact = JSON.parse(localStorage.getItem(`lb_tact_logs_${savedVesselId}`) || '[]');
+            setTacticalLogs(savedTact);
         }
       } catch (e) { console.error(e); }
     }
@@ -92,7 +95,6 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     }).catch(() => {});
   }, [firestore, sharingId, accuracy, currentPos]);
 
-  // HEARTBEAT EFFECT (Signal continu)
   useEffect(() => {
     if (!isSharing || !sharingId) return;
     const interval = setInterval(() => {
@@ -107,11 +109,28 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
         return;
     }
 
+    // ENRICHISSEMENT WINDY IA
+    let weatherData = null;
+    try {
+        const weather = await fetchWindyWeather(currentPos.lat, currentPos.lng);
+        if (weather.success) {
+            weatherData = {
+                windSpeed: weather.windSpeed,
+                temp: weather.temp,
+                windDir: weather.windDir
+            };
+        }
+    } catch (e) {
+        console.warn("Météo non disponible pour le point tactique", e);
+    }
+
     const logEntry = {
         type: type.toUpperCase(),
         time: new Date(),
         pos: currentPos,
-        photoUrl: photoUrl || null
+        photoUrl: photoUrl || null,
+        vesselName: vesselNickname || sharingId,
+        weather: weatherData
     };
 
     setTacticalLogs(prev => {
@@ -120,11 +139,21 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
         return next;
     });
 
+    // Envoi au navire (pour son historique)
     addDoc(collection(firestore, 'vessels', sharingId, 'tactical_logs'), {
         ...logEntry,
         time: serverTimestamp()
-    }).then(() => toast({ title: `Signalement ${type} enregistré` }));
-  }, [firestore, sharingId, currentPos, toast]);
+    }).then(() => toast({ title: `Signalement ${type} partagé` }));
+
+    // Si une flotte est active, on envoie aussi dans la collection de flotte pour une visibilité groupée
+    if (customFleetId) {
+        addDoc(collection(firestore, 'vessels', customFleetId.trim().toUpperCase(), 'tactical_logs'), {
+            ...logEntry,
+            time: serverTimestamp(),
+            isFleetWide: true
+        }).catch(() => {});
+    }
+  }, [firestore, sharingId, currentPos, toast, vesselNickname, customFleetId]);
 
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>) => {
     if (!user || !firestore || !isSharing) return;
@@ -249,7 +278,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     addTechLog('ARRÊT', 'Partage désactivé');
     
     if (firestore && sharingId) {
-      await deleteDoc(doc(firestore, 'vessels', sharingId));
+      await updateDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp() });
     }
     
     clearMooring();
@@ -320,7 +349,15 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     tacticalLogs,
     addTacticalLog,
     addTechLog,
-    clearLogs: () => { setTechLogs([]); setTacticalLogs([]); localStorage.removeItem(`lb_tech_logs_${sharingId}`); localStorage.removeItem(`lb_tact_logs_${sharingId}`); },
+    clearLogs: () => { 
+        setTechLogs([]); 
+        setTacticalLogs([]); 
+        localStorage.removeItem(`lb_tech_logs_${sharingId}`); 
+        localStorage.removeItem(`lb_tact_logs_${sharingId}`); 
+        if (firestore) {
+            updateDoc(doc(firestore, 'vessels', sharingId), { tacticalClearedAt: serverTimestamp() });
+        }
+    },
     anchorCircleRef,
     anchorMarkerRef
   };
