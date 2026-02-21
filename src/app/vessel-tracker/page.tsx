@@ -95,6 +95,78 @@ const TACTICAL_ICONS: Record<string, any> = {
     'PHOTO': Camera
 };
 
+const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
+  if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
+  const props = { className: cn("size-4", className) };
+  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
+  if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
+  if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
+  return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
+};
+
+// Composant de Marqueur de Navire Dynamique (v55.0)
+const VesselMarker = ({ vessel, isMe = false }: { vessel: any, isMe?: boolean }) => {
+    const status = vessel.status || 'moving';
+    const heading = vessel.heading || 0;
+    
+    let Icon = Navigation;
+    let bgColor = 'bg-blue-600';
+    let animationClass = '';
+    let iconClass = 'size-4 text-white';
+
+    switch (status) {
+        case 'stationary':
+            Icon = Anchor;
+            bgColor = 'bg-orange-500';
+            break;
+        case 'drifting':
+            Icon = Anchor;
+            bgColor = 'bg-red-600';
+            animationClass = 'animate-blink-red';
+            break;
+        case 'emergency':
+            Icon = ShieldAlert;
+            bgColor = 'bg-red-600';
+            animationClass = 'animate-pulse-red';
+            break;
+        case 'returning':
+            Icon = Navigation;
+            bgColor = 'bg-indigo-600';
+            break;
+        case 'landed':
+            Icon = Home;
+            bgColor = 'bg-green-600';
+            break;
+        case 'moving':
+        default:
+            Icon = Navigation;
+            bgColor = 'bg-blue-600';
+            break;
+    }
+
+    return (
+        <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 group cursor-pointer z-[1000]">
+            <div className="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap flex items-center gap-2">
+                <span className="truncate max-w-[80px]">{vessel.displayName || vessel.id}</span>
+                {isMe && <Badge className="bg-primary text-white text-[7px] h-3 px-1">MOI</Badge>}
+                <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} className="size-2.5" />
+            </div>
+            <div 
+                className={cn(
+                    "p-2 rounded-full border-2 border-white shadow-xl transition-all", 
+                    bgColor, 
+                    animationClass
+                )}
+                style={{
+                    transform: (status === 'moving' || status === 'returning') ? `rotate(${heading}deg)` : 'none'
+                }}
+            >
+                <Icon className={iconClass} />
+            </div>
+        </div>
+    );
+};
+
 export default function VesselTrackerPage() {
   const [appMode, setAppMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
@@ -203,7 +275,15 @@ export default function VesselTrackerPage() {
                     gestureHandling: 'greedy' 
                 }}
             >
-                {emetteur.currentPos && (
+                {/* Rendu des navires de la flotte (inclut soi-même) */}
+                {followedVessels?.filter(v => v.isSharing).map(vessel => (
+                    <OverlayView key={vessel.id} position={{ lat: vessel.location.latitude, lng: vessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                        <VesselMarker vessel={vessel} isMe={vessel.id === emetteur.sharingId} />
+                    </OverlayView>
+                ))}
+
+                {/* Secours visuel si non partagé mais GPS actif */}
+                {!emetteur.isSharing && emetteur.currentPos && (
                     <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -50%)' }} className="relative z-[1000]">
                             <div className="size-10 bg-blue-500/20 rounded-full animate-ping absolute inset-0" />
@@ -348,13 +428,13 @@ export default function VesselTrackerPage() {
                                       </p>
                                   </div>
                                   <div className="grid grid-cols-2 gap-2">
-                                      <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => emetteur.triggerEmergency('ASSISTANCE')}>
-                                          <RefreshCw className="size-4 text-primary" /> Assistance
+                                      <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => emetteur.changeManualStatus('returning', 'RETOUR MAISON')}>
+                                          <Navigation className="size-4 text-indigo-600" /> Retour
                                       </Button>
                                       <Button 
                                         variant="outline" 
                                         className={cn("h-14 font-black uppercase text-[10px] border-2 bg-background gap-2", emetteur.vesselStatus === 'stationary' && "bg-orange-500 text-white border-orange-600 shadow-inner")} 
-                                        onClick={() => { if (emetteur.anchorPos) emetteur.setAnchorPos(null); else emetteur.setAnchorPos(emetteur.currentPos); }}
+                                        onClick={() => { if (emetteur.anchorPos) emetteur.changeManualStatus('moving', 'REPRISE NAVIGATION'); else emetteur.changeManualStatus('stationary', 'MOUILLAGE ACTIF'); }}
                                       >
                                           <Anchor className={cn("size-4", emetteur.vesselStatus === 'stationary' ? "text-white" : "text-orange-600")} /> Mouillage
                                       </Button>

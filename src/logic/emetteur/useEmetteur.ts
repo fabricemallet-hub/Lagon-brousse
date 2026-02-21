@@ -6,10 +6,12 @@ import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, getDoc } f
 import type { VesselStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { getDistance } from '@/lib/utils';
 
 /**
  * LOGIQUE ÉMETTEUR (A) : "Le Cerveau"
- * Gère l'identité, le partage Firestore, l'historique et la persistance SMS (v54.0).
+ * Gère l'identité, le partage Firestore, l'historique et les changements de statut dynamiques.
+ * v55.0 : Ajout de la détection de dérive et de la persistance du statut.
  */
 export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => void, onStopCleanup?: () => void) {
   const { user } = useUser();
@@ -22,6 +24,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
   const [anchorPos, setAnchorPos] = useState<{ lat: number, lng: number } | null>(null);
   const [mooringRadius, setMooringRadius] = useState(100);
   const [accuracy, setAccuracy] = useState<number>(0);
+  const [currentHeading, setCurrentHeading] = useState<number>(0);
   
   const [vesselNickname, setVesselNickname] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
@@ -29,7 +32,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
   const [idsHistory, setIdsHistory] = useState<{ vId: string, fId: string }[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
-  // SMS & Urgence Settings (v54.0 - Persistance Locale)
+  // SMS & Urgence Settings
   const [emergencyContact, setEmergencyContact] = useState('');
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
@@ -41,13 +44,14 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
   const watchIdRef = useRef<number | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
 
-  // CHARGEMENT PERSISTANCE LOCALE (Inclus SMS v54.0)
+  // CHARGEMENT PERSISTANCE LOCALE
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedNickname = localStorage.getItem('lb_vessel_nickname');
       const savedVesselId = localStorage.getItem('lb_vessel_id');
       const savedFleetId = localStorage.getItem('lb_fleet_id');
       const savedHistory = localStorage.getItem('lb_ids_history');
+      const savedStatus = localStorage.getItem('lb_vessel_status') as VesselStatus['status'];
       
       const savedEmergencyContact = localStorage.getItem('lb_emergency_contact');
       const savedSmsMessage = localStorage.getItem('lb_vessel_sms_message');
@@ -56,6 +60,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
       if (savedNickname) setVesselNickname(savedNickname);
       if (savedVesselId) setCustomSharingId(savedVesselId);
       if (savedFleetId) setCustomFleetId(savedFleetId);
+      if (savedStatus) setVesselStatus(savedStatus);
       if (savedEmergencyContact) setEmergencyContact(savedEmergencyContact);
       if (savedSmsMessage) setVesselSmsMessage(savedSmsMessage);
       if (savedEmergencyEnabled !== null) setIsEmergencyEnabled(savedEmergencyEnabled === 'true');
@@ -69,6 +74,13 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
       }
     }
   }, []);
+
+  // Persistance du statut
+  useEffect(() => {
+    if (vesselStatus) {
+        localStorage.setItem('lb_vessel_status', vesselStatus);
+    }
+  }, [vesselStatus]);
 
   const saveSmsSettings = useCallback(() => {
     localStorage.setItem('lb_emergency_contact', emergencyContact);
@@ -151,26 +163,36 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
         
         setAccuracy(Math.round(acc));
         setCurrentPos(newPos);
+        setCurrentHeading(heading || 0);
         onPositionUpdate?.(latitude, longitude);
 
-        if (vesselStatus !== 'emergency' && vesselStatus !== 'returning' && vesselStatus !== 'landed') {
-            const nextStatus = knotSpeed < 0.2 ? 'stationary' : 'moving';
+        let nextStatus = vesselStatus;
+
+        // Logique de dérive automatique si au mouillage
+        if (vesselStatus === 'stationary' && anchorPos) {
+            const distFromAnchor = getDistance(latitude, longitude, anchorPos.lat, anchorPos.lng);
+            if (distFromAnchor > mooringRadius) {
+                nextStatus = 'drifting';
+                setVesselStatus('drifting');
+            }
+        } else if (vesselStatus === 'drifting' && anchorPos) {
+            const distFromAnchor = getDistance(latitude, longitude, anchorPos.lat, anchorPos.lng);
+            if (distFromAnchor <= mooringRadius) {
+                nextStatus = 'stationary';
+                setVesselStatus('stationary');
+            }
+        } else if (vesselStatus !== 'emergency' && vesselStatus !== 'returning' && vesselStatus !== 'landed') {
+            nextStatus = knotSpeed < 0.2 ? 'stationary' : 'moving';
             setVesselStatus(nextStatus);
-            updateVesselInFirestore({ 
-                location: { latitude, longitude }, 
-                status: nextStatus, 
-                speed: Math.round(knotSpeed), 
-                heading: heading || 0,
-                fleetId: fId || null
-            });
-        } else {
-            updateVesselInFirestore({ 
-                location: { latitude, longitude }, 
-                speed: Math.round(knotSpeed), 
-                heading: heading || 0,
-                fleetId: fId || null
-            });
         }
+
+        updateVesselInFirestore({ 
+            location: { latitude, longitude }, 
+            status: nextStatus, 
+            speed: Math.round(knotSpeed), 
+            heading: heading || 0,
+            fleetId: fId || null
+        });
       },
       () => toast({ variant: 'destructive', title: "Signal GPS perdu" }),
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
@@ -224,6 +246,17 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     }
   }, [isSharing, vesselStatus, anchorPos, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, currentPos, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, accuracy, toast]);
 
+  const changeManualStatus = (st: VesselStatus['status'], label?: string) => {
+    setVesselStatus(st);
+    if (st === 'moving' || st === 'returning' || st === 'landed') {
+        setAnchorPos(null);
+    } else if (st === 'stationary' && currentPos) {
+        setAnchorPos(currentPos);
+    }
+    updateVesselInFirestore({ status: st, eventLabel: label || null });
+    toast({ title: label || `Statut : ${st}` });
+  };
+
   const loadFromHistory = (vId: string, fId: string) => {
     setCustomSharingId(vId);
     setCustomFleetId(fId);
@@ -250,8 +283,10 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     startSharing,
     stopSharing,
     currentPos,
+    currentHeading,
     vesselStatus,
     triggerEmergency,
+    changeManualStatus,
     anchorPos,
     setAnchorPos,
     mooringRadius,

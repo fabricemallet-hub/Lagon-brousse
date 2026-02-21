@@ -77,7 +77,6 @@
     @apply bg-background text-foreground;
     min-height: 100vh;
     position: relative;
-    /* On laisse le navigateur gérer le zoom et le scroll naturellement */
   }
 }
 
@@ -89,6 +88,24 @@
   @keyframes glow {
     0%, 100% { filter: drop-shadow(0 0 2px hsl(var(--accent))) drop-shadow(0 0 5px hsl(var(--accent))); }
     50% { filter: drop-shadow(0 0 5px hsl(var(--accent))) drop-shadow(0 0 10px hsl(var(--accent))); }
+  }
+
+  .animate-blink-red {
+    animation: blink-red 1s infinite;
+  }
+
+  @keyframes blink-red {
+    0%, 100% { background-color: rgb(220 38 38); opacity: 1; transform: scale(1); }
+    50% { background-color: rgb(153 27 27); opacity: 0.7; transform: scale(1.1); }
+  }
+
+  .animate-pulse-red {
+    animation: pulse-red 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse-red {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); transform: scale(1); }
+    70% { box-shadow: 0 0 0 15px rgba(220, 38, 38, 0); transform: scale(1.2); }
   }
   
   .scrollbar-hide::-webkit-scrollbar {
