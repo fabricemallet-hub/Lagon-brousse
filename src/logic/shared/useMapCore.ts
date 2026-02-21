@@ -24,8 +24,8 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v70.0 : Gestion de la carte et du tracé intelligent.
- * Purge complète des marqueurs tactiques lors du nettoyage.
+ * HOOK PARTAGÉ v76.3 : Gestion de la carte et du tracé intelligent.
+ * Correction clearBreadcrumbs : Ne masque plus les cercles de sécurité lors d'un reset.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
@@ -138,8 +138,8 @@ export function useMapCore() {
 
   const clearBreadcrumbs = useCallback(() => {
     setBreadcrumbs([]);
-    setTacticalMarkers([]); // PURGE RADICALE v70.0 : On vide aussi les marqueurs tactiques
-    setIsCirclesHidden(true);
+    setTacticalMarkers([]); 
+    // v76.3 : On ne touche plus à isCirclesHidden ici pour garder l'ancre et le cercle lors d'un reset de trajectoire
     lastTracePosRef.current = null;
   }, []);
 

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -11,7 +10,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v76.2 : "Confidentialité & Trajectoires"
+ * LOGIQUE ÉMETTEUR (A) v76.3 : "Reprise après Reset"
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -447,7 +446,17 @@ export function useEmetteur(
 
   const resetTrajectory = useCallback(() => {
     handleStopCleanupRef.current?.();
-    addTechLog('RESET', 'Trajectoire remise à zéro');
+    addTechLog('RESET', 'Purge tracé bleu');
+    
+    // Reprise immédiate du tracé à partir de la position actuelle si disponible
+    if (currentPosRef.current) {
+        handlePositionUpdateRef.current?.(
+            currentPosRef.current.lat, 
+            currentPosRef.current.lng, 
+            vesselStatusRef.current
+        );
+    }
+    
     toast({ title: "Trajectoire réinitialisée", description: "Le tracé bleu redémarre de zéro." });
   }, [addTechLog, toast]);
 

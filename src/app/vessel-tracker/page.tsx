@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -92,7 +91,8 @@ import {
   Move,
   Copy,
   BatteryLow,
-  BatteryMedium
+  BatteryMedium,
+  History
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -100,7 +100,7 @@ import { cn, getDistance } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import type { UserAccount, VesselStatus, SoundLibraryEntry } from '@/lib/types';
+import type { UserAccount, VesselStatus, SoundLibraryEntry, TechLogEntry } from '@/lib/types';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -250,20 +250,11 @@ export default function VesselTrackerPage() {
 
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  const activeAnchorVessel = useMemo(() => {
-    if (mapCore.isCirclesHidden) return null;
-    if (emetteur.isSharing && (emetteur.vesselStatus === 'stationary' || emetteur.vesselStatus === 'drifting') && emetteur.anchorPos) {
-        return { 
-            id: emetteur.sharingId, 
-            status: emetteur.vesselStatus, 
-            anchorLocation: { latitude: emetteur.anchorPos.lat, longitude: emetteur.anchorPos.lng },
-            location: emetteur.currentPos ? { latitude: emetteur.currentPos.lat, longitude: emetteur.currentPos.lng } : null,
-            mooringRadius: emetteur.mooringRadius 
-        };
-    }
-    if (!followedVessels) return null;
-    return followedVessels.find(v => v.isSharing && v.anchorLocation);
-  }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, mapCore.isCirclesHidden]);
+  const smsPreview = useMemo(() => {
+    const nick = emetteur.vesselNickname || 'KOOLAPIK';
+    const msg = emetteur.isCustomMessageEnabled && emetteur.vesselSmsMessage ? emetteur.vesselSmsMessage : "Requiert assistance immédiate.";
+    return `[${nick.toUpperCase()}] ${msg} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
+  }, [emetteur.vesselSmsMessage, emetteur.isCustomMessageEnabled, emetteur.vesselNickname]);
 
   useEffect(() => {
     if (followedVessels) {
@@ -298,14 +289,29 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const smsPreview = useMemo(() => {
-    const nick = emetteur.vesselNickname || 'KOOLAPIK';
-    const msg = emetteur.isCustomMessageEnabled && emetteur.vesselSmsMessage ? emetteur.vesselSmsMessage : "Requiert assistance immédiate.";
-    return `[${nick.toUpperCase()}] ${msg} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
-  }, [emetteur.vesselSmsMessage, emetteur.isCustomMessageEnabled, emetteur.vesselNickname]);
+  const activeAnchorVessel = useMemo(() => {
+    if (mapCore.isCirclesHidden) return null;
+    if (emetteur.isSharing && (emetteur.vesselStatus === 'stationary' || emetteur.vesselStatus === 'drifting') && emetteur.anchorPos) {
+        return { 
+            id: emetteur.sharingId, 
+            status: emetteur.vesselStatus, 
+            anchorLocation: { latitude: emetteur.anchorPos.lat, longitude: emetteur.anchorPos.lng },
+            location: emetteur.currentPos ? { latitude: emetteur.currentPos.lat, longitude: emetteur.currentPos.lng } : null,
+            mooringRadius: emetteur.mooringRadius 
+        };
+    }
+    if (!followedVessels) return null;
+    return followedVessels.find(v => v.isSharing && v.anchorLocation);
+  }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, mapCore.isCirclesHidden]);
 
   if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
   if (!isLoaded || isProfileLoading) return <Skeleton className="h-96 w-full" />;
+
+  const handleCopyLogEntry = (log: TechLogEntry | any) => {
+      const text = `${log.label} (${format(log.time, 'HH:mm')}) : ${log.details} - Statut: ${log.status}`;
+      navigator.clipboard.writeText(text);
+      toast({ title: "Journal copié" });
+  };
 
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
@@ -485,7 +491,7 @@ export default function VesselTrackerPage() {
                   <CardContent className="p-5 space-y-4">
                       <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID du Navire à suivre</Label>
                           <div className="flex gap-2">
-                              <Input placeholder="ENTREZ L'ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest bg-white flex-grow" />
+                              <Input placeholder="ENTREZ L'ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow" />
                               <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={() => recepteur.initAudio()}>Suivre</Button>
                           </div>
                       </div>
@@ -542,14 +548,14 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v76.2 prêt - Mode Fantôme OK</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v76.3 prêt - Mode Fantôme OK</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm cursor-pointer transition-all active:scale-[0.98]", log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') ? 'border-red-200 bg-red-50' : 'border-slate-100')} onClick={() => handleCopyLogEntry(log)}>
                                                   <div className="flex justify-between items-start">
                                                       <div className="flex flex-col gap-0.5">
                                                           <span className={cn("font-black uppercase text-[10px]", log.label.includes('ÉNERGIE') || log.label.includes('URGENCE') ? 'text-red-600' : 'text-slate-800')}>
                                                               {log.label} {log.durationMinutes > 0 ? `(${log.durationMinutes} min)` : ''}
-                                                              {log.label === 'AUTO' && (
+                                                              {['AUTO', 'RESET', 'CHGT MANUEL', 'CHGT STATUT'].includes(log.label) && (
                                                                   <span className={cn("ml-1", 
                                                                       log.status === 'moving' ? "text-blue-600" :
                                                                       log.status === 'stationary' ? "text-orange-600" :
@@ -592,7 +598,6 @@ export default function VesselTrackerPage() {
                               </TabsContent>
 
                               <TabsContent value="settings" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
-                                  {/* BLOC CONFIDENTIALITÉ TACTIQUE v76.2 (REMOUNTÉ EN HAUT) */}
                                   <div className="space-y-4 p-4 border-2 rounded-2xl bg-slate-900 text-white shadow-xl animate-in fade-in slide-in-from-top-2">
                                       <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
                                           <Ghost className="size-3" /> Confidentialité Tactique & Trajectoire
