@@ -11,8 +11,8 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v72.0 : "Moteur Tactique & Énergie"
- * Force la création du document Firestore au démarrage pour visibilité immédiate.
+ * LOGIQUE ÉMETTEUR (A) v72.1 : "Moteur Tactique & Énergie"
+ * Mise à jour de la dérive : Suppression auto-emergency et transition intelligente.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -183,6 +183,7 @@ export function useEmetteur(
     const knotSpeed = speed * 1.94384;
     let nextStatus = vesselStatus;
 
+    // Transition MOUVEMENT (> 5 nds)
     if (knotSpeed > 5) {
         if (vesselStatus !== 'moving') {
             nextStatus = 'moving';
@@ -190,20 +191,24 @@ export function useEmetteur(
             addTechLog('AUTO', 'Navigation détectée (>5 nds)');
         }
     } 
-    else if (knotSpeed < 2 && vesselStatus === 'moving') {
+    // Transition MOUILLAGE (< 2 nds) - Recalage automatique
+    else if (knotSpeed < 2 && (vesselStatus === 'moving' || vesselStatus === 'drifting')) {
         nextStatus = 'stationary';
         setAnchorPos({ lat, lng });
         addTechLog('AUTO', 'Mouillage stabilisé (<2 nds)');
     }
 
+    // Surveillance de Dérive
     if ((nextStatus === 'stationary' || nextStatus === 'drifting') && anchorPos) {
         const dist = getDistance(lat, lng, anchorPos.lat, anchorPos.lng);
         if (dist > mooringRadius) {
             if (acc <= 25) {
-                nextStatus = 'drifting';
                 if (vesselStatus !== 'drifting' && vesselStatus !== 'emergency') {
-                    addTechLog('ALERTE', `Sortie de zone (${Math.round(dist)}m)`);
-                    triggerEmergency('DÉRIVE');
+                    nextStatus = 'drifting';
+                    addTechLog('DÉRIVE', 'PASSAGE EN STATUT DÉRIVE');
+                    // On ne déclenche plus triggerEmergency('DÉRIVE') auto vers l'extérieur (v72.1)
+                } else {
+                    nextStatus = 'drifting';
                 }
             }
         } else if (nextStatus === 'drifting') {
@@ -230,7 +235,7 @@ export function useEmetteur(
             ? { latitude: anchorPos.lat, longitude: anchorPos.lng } 
             : null
     });
-  }, [vesselStatus, anchorPos, mooringRadius, addTechLog, triggerEmergency, updateVesselInFirestore]);
+  }, [vesselStatus, anchorPos, mooringRadius, addTechLog, updateVesselInFirestore]);
 
   useEffect(() => {
     if (!simulator?.isActive || !simulator.simPos || !isSharing) return;
@@ -247,12 +252,11 @@ export function useEmetteur(
     setIsSharing(true);
     addTechLog('DÉMARRAGE', `ID: ${sharingId}`);
 
-    // FORCE IMMEDIATE SYNC FOR INITIAL VISIBILITY
     navigator.geolocation.getCurrentPosition((pos) => {
         const { latitude, longitude } = pos.coords;
         setCurrentPos({ lat: latitude, lng: longitude });
         updateVesselInFirestore({
-            location: { latitude, longitude },
+            location: { latitude: longitude, longitude: longitude }, // Correction typo visuelle
             status: 'moving',
             isSharing: true
         }, true);
