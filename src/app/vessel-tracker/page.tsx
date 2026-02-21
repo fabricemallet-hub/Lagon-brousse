@@ -243,7 +243,6 @@ export default function VesselTrackerPage() {
         ids.push(emetteur.sharingId);
     }
     if (ids.length === 0) return null;
-    // RÈGLE v76.0 : Le récepteur B suit par ID spécifique, donc pas de filtre ghost ici
     return query(collection(firestore, 'vessels'), where('id', 'in', ids.slice(0, 10)));
   }, [firestore, user, savedVesselIds, emetteur.isSharing, emetteur.sharingId]);
 
@@ -331,7 +330,6 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
-        {/* BARRE TACTIQUE v76.0 - Z-INDEX 9999 */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[9999] flex bg-slate-900/90 backdrop-blur-md p-1 rounded-2xl border-2 border-white/20 shadow-2xl">
             <Button variant={mapCore.viewMode === 'alpha' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" onClick={() => mapCore.setViewMode('alpha')}>Maps</Button>
             <Button variant={mapCore.viewMode === 'beta' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" onClick={() => mapCore.setViewMode('beta')}>Météo</Button>
@@ -350,7 +348,6 @@ export default function VesselTrackerPage() {
                     onDragStart={() => mapCore.setIsFollowMode(false)}
                     options={{ disableDefaultUI: true, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}
                 >
-                    {/* TRACÉ HISTORIQUE (BREADCRUMBS) v76.0 : Masquage sélectif */}
                     {!emetteur.isTrajectoryHidden && mapCore.breadcrumbs.length > 1 && (
                         <Polyline 
                             path={mapCore.breadcrumbs.map(p => ({ lat: p.lat, lng: p.lng }))}
@@ -358,10 +355,8 @@ export default function VesselTrackerPage() {
                         />
                     )}
 
-                    {/* CERCLE DE MOUILLAGE & LIGNE DE TENSION */}
                     {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                         <React.Fragment key={`mooring-singleton-${activeAnchorVessel.id}`}>
-                            {/* LIGNE DE TENSION (BOAT -> ANCHOR) */}
                             {activeAnchorVessel.location && (
                                 <Polyline 
                                     path={[
@@ -556,6 +551,25 @@ export default function VesselTrackerPage() {
                                                       <div className="flex flex-col gap-0.5">
                                                           <span className={cn("font-black uppercase text-[10px]", log.label.includes('ÉNERGIE') || log.label.includes('URGENCE') ? 'text-red-600' : 'text-slate-800')}>
                                                               {log.label} {log.durationMinutes > 0 ? `(${log.durationMinutes} min)` : ''}
+                                                              {log.label === 'AUTO' && (
+                                                                  <span className={cn("ml-1", 
+                                                                      log.status === 'moving' ? "text-blue-600" :
+                                                                      log.status === 'stationary' ? "text-orange-600" :
+                                                                      log.status === 'returning' ? "text-indigo-600" :
+                                                                      log.status === 'landed' ? "text-green-600" :
+                                                                      log.status === 'drifting' ? "text-red-600" :
+                                                                      log.status === 'emergency' ? "text-red-600" : "text-slate-500"
+                                                                  )}>
+                                                                      - {
+                                                                          log.status === 'moving' ? 'MOUVEMENT' :
+                                                                          log.status === 'stationary' ? 'MOUILLAGE' :
+                                                                          log.status === 'returning' ? 'RETOUR' :
+                                                                          log.status === 'landed' ? 'À TERRE' :
+                                                                          log.status === 'drifting' ? 'DÉRIVE' :
+                                                                          log.status === 'emergency' ? 'URGENCE' : log.status.toUpperCase()
+                                                                      }
+                                                                  </span>
+                                                              )}
                                                           </span>
                                                           <span className="text-[8px] opacity-40 font-bold uppercase">{format(log.time, 'HH:mm:ss')}</span>
                                                       </div>
@@ -582,7 +596,6 @@ export default function VesselTrackerPage() {
                               <TabsContent value="settings" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
                                   <Button className="w-full h-14 font-black uppercase tracking-widest shadow-xl rounded-2xl bg-primary text-white" onClick={() => recepteur.savePrefsToFirestore()} disabled={recepteur.isSaving}>ENREGISTRER LES RÉGLAGES</Button>
                                   
-                                  {/* RÉGLAGES CONFIDENTIALITÉ v76.0 */}
                                   <div className="space-y-4 p-4 border-2 rounded-2xl bg-slate-900 text-white">
                                       <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
                                           <Ghost className="size-3" /> Confidentialité Tactique
