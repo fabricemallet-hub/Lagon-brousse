@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -144,7 +143,7 @@ const VesselMarker = ({ vessel, isMe = false }: { vessel: VesselStatus, isMe?: b
 
     switch (status) {
         case 'stationary':
-            Icon = Navigation; // On garde la navigation pour le navire mobile
+            Icon = Navigation; 
             bgColor = 'bg-blue-600';
             break;
         case 'drifting':
@@ -229,9 +228,9 @@ export default function VesselTrackerPage() {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
-  const { data: profile } = useDoc<UserAccount>(userDocRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
-  const savedVesselIds = useMemo(() => profile?.savedVesselIds || [], [profile?.savedVesselIds]);
+  const savedVesselIds = useMemo(() => userProfile?.savedVesselIds || [], [userProfile?.savedVesselIds]);
   
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -244,6 +243,13 @@ export default function VesselTrackerPage() {
   }, [firestore, user, savedVesselIds, emetteur.isSharing, emetteur.sharingId]);
 
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
+
+  // CONNEXION DU MOTEUR D'ALERTES SONORES
+  useEffect(() => {
+    if (followedVessels) {
+        recepteur.processVesselAlerts(followedVessels);
+    }
+  }, [followedVessels, recepteur.processVesselAlerts]);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const hasCenteredInitially = useRef(false);
@@ -301,6 +307,11 @@ export default function VesselTrackerPage() {
                   mapCore.windyLayer === 'waves' ? 'waves' : 'wind';
     return `https://embed.windy.com/embed2.html?lat=${centerLat}&lon=${centerLng}&zoom=${currentZoom}&level=surface&overlay=${layer}&menu=&message=&marker=&calendar=&pressure=&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1`;
   }, [centerLat, centerLng, currentZoom, mapCore.windyLayer]);
+
+  const handleStartSharingEnhanced = () => {
+    recepteur.initAudio(); // Déblocage Audio
+    emetteur.startSharing();
+  };
 
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
@@ -416,7 +427,6 @@ export default function VesselTrackerPage() {
                         
                         return (
                             <React.Fragment key={`anchor-group-${vessel.id}`}>
-                                {/* L'Ancre orange n'apparaît que si le statut est stationary (Mouillage Actif) */}
                                 {status === 'stationary' && (
                                     <OverlayView position={{ lat: vessel.anchorLocation!.latitude, lng: vessel.anchorLocation!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                         <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]">
@@ -425,7 +435,6 @@ export default function VesselTrackerPage() {
                                     </OverlayView>
                                 )}
                                 
-                                {/* Le cercle bleu (ou rouge clignotant) centré sur l'ancre */}
                                 <Circle 
                                     center={{ lat: vessel.anchorLocation!.latitude, lng: vessel.anchorLocation!.longitude }}
                                     radius={radius}
@@ -687,7 +696,7 @@ export default function VesselTrackerPage() {
                                     </div>
                                   )}
 
-                                  <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl gap-3 group transition-all active:scale-95" onClick={emetteur.startSharing}>
+                                  <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl gap-3 group transition-all active:scale-95" onClick={handleStartSharingEnhanced}>
                                       <Zap className="size-5 fill-white group-hover:animate-pulse" /> Lancer le Partage GPS
                                   </Button>
                               </div>
@@ -786,7 +795,7 @@ export default function VesselTrackerPage() {
                                 onChange={e => setVesselIdToFollow(e.target.value)} 
                                 className="font-black text-center h-12 border-2 uppercase tracking-widest bg-white flex-grow" 
                               />
-                              <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={() => { recepteur.savePrefs({ lastFollowedId: vesselIdToFollow.toUpperCase() }); toast({ title: "ID enregistré" }); }}>
+                              <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={() => { recepteur.initAudio(); recepteur.savePrefs({ lastFollowedId: vesselIdToFollow.toUpperCase() }); toast({ title: "Suivi activé" }); }}>
                                   <CheckCircle2 className="size-4" />
                               </Button>
                           </div>
@@ -886,7 +895,7 @@ export default function VesselTrackerPage() {
                                   </div>
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v40.0 prêt - En attente de signal GPS</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v62.0 prêt - Audio Débloqué</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className="p-2 border rounded-lg bg-white flex justify-between items-center text-[9px] shadow-sm cursor-pointer hover:bg-slate-100" onClick={() => log.pos && mapCore.handleRecenter(log.pos)}>
                                                   <span className="font-black uppercase">{log.label}</span>
@@ -906,14 +915,14 @@ export default function VesselTrackerPage() {
                                               if (ok) {
                                                   toast({ 
                                                       title: "RÉGLAGES VALIDÉS", 
-                                                      description: "Vos préférences sonores ont été enregistrées sur votre profil.",
+                                                      description: "Vos préférences sonores ont été enregistrées.",
                                                       variant: "default"
                                                   });
                                               } else {
                                                   toast({ 
                                                       variant: "destructive",
                                                       title: "Erreur",
-                                                      description: "La sauvegarde a échoué. Vérifiez votre connexion."
+                                                      description: "La sauvegarde a échoué."
                                                   });
                                               }
                                           }}

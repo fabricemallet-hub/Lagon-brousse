@@ -1,25 +1,24 @@
-
 'use client';
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { useAudioEngine } from '@/hooks/useAudioEngine';
 import type { UserAccount, SoundLibraryEntry, VesselStatus, VesselPrefs } from '@/lib/types';
 
 /**
- * LOGIQUE RÉCEPTEUR (B) : Journal Technique, Sons Expert, Veille Stratégique.
- * v58.1 : Fix boucle de rendu infinie via Deep Guard sur les prefs.
+ * LOGIQUE RÉCEPTEUR (B) v62.0
+ * Gère la surveillance de flotte, la détection de dérive et le moteur d'alarmes.
  */
 export function useRecepteur(vesselId?: string) {
-  const { user } = useUser();
+  const { user } = user ? useUser() : { user: null };
   const firestore = useFirestore();
   const { toast } = useToast();
+  const audioEngine = useAudioEngine();
 
-  const [activeAlarms, setActiveAlarms] = useState<Record<string, HTMLAudioElement>>({});
-  const [audioAuthorized, setAudioAuthorized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const silentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const lastAlarmTriggerRef = useRef<Record<string, { status: string, time: number }>>({});
   
   const defaultPrefs: VesselPrefs = {
     volume: 0.8,
@@ -41,13 +40,13 @@ export function useRecepteur(vesselId?: string) {
 
   const [vesselPrefs, setVesselPrefs] = useState<VesselPrefs>(defaultPrefs);
 
-  const soundsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sound_library'), orderBy('label', 'asc')) : null, [firestore]);
-  const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
-
   const userDocRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: profile } = useDoc<UserAccount>(userDocRef);
 
-  // Deep Guard pour éviter les boucles infinies de state
+  const soundsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sound_library'), orderBy('label', 'asc')) : null, [firestore]);
+  const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
+
+  // Sync des préférences avec Deep Guard
   useEffect(() => {
     if (profile?.vesselPrefs) {
       setVesselPrefs(prev => {
@@ -57,72 +56,79 @@ export function useRecepteur(vesselId?: string) {
         return {
           ...prev,
           ...profile.vesselPrefs,
-          alerts: {
-            ...prev.alerts,
-            ...(profile.vesselPrefs.alerts || {})
-          }
+          alerts: { ...prev.alerts, ...(profile.vesselPrefs.alerts || {}) }
         };
       });
     }
   }, [profile?.vesselPrefs]);
 
+  /**
+   * Moteur de surveillance de flotte (Triggers Sonores)
+   */
+  const processVesselAlerts = useCallback((followedVessels: VesselStatus[]) => {
+    if (!vesselPrefs.isNotifyEnabled || !dbSounds) return;
+
+    followedVessels.forEach(vessel => {
+        const vesselId = vessel.id;
+        const currentStatus = vessel.isSharing ? (vessel.status || 'moving') : 'offline';
+        const lastTrigger = lastAlarmTriggerRef.current[vesselId];
+        
+        // 1. Détection Perte de Signal (Watchdog 30s)
+        const lastActiveTime = vessel.lastActive?.toMillis() || 0;
+        const isActuallyOffline = vessel.isSharing && (Date.now() - lastActiveTime > 30000);
+        
+        let triggerKey: keyof VesselPrefs['alerts'] | null = null;
+        let forceMaxVolume = false;
+
+        if (vessel.status === 'emergency' || vessel.eventLabel === 'MAYDAY') {
+            triggerKey = 'assistance';
+            forceMaxVolume = true;
+        } else if (vessel.status === 'drifting') {
+            triggerKey = 'stationary'; // Son mouillage pour la dérive
+        } else if (isActuallyOffline || currentStatus === 'offline') {
+            triggerKey = 'offline';
+        } else if (vessel.status === 'moving' && lastTrigger?.status !== 'moving') {
+            triggerKey = 'moving';
+        }
+
+        // Exécution de l'alarme si changement ou première fois
+        if (triggerKey && (lastTrigger?.status !== triggerKey || forceMaxVolume)) {
+            const config = vesselPrefs.alerts[triggerKey];
+            if (config.enabled) {
+                const sound = dbSounds.find(s => s.label.toLowerCase() === config.sound.toLowerCase() || s.id === config.sound);
+                if (sound) {
+                    audioEngine.play(
+                        triggerKey, 
+                        sound.url, 
+                        forceMaxVolume ? 1 : vesselPrefs.volume, 
+                        config.loop
+                    );
+                    lastAlarmTriggerRef.current[vesselId] = { status: triggerKey, time: Date.now() };
+                }
+            }
+        }
+
+        // Reset du trigger si retour à la normale
+        if (vessel.status === 'moving' && lastTrigger?.status === 'stationary') {
+            audioEngine.stop('stationary');
+            delete lastAlarmTriggerRef.current[vesselId];
+        }
+    });
+  }, [vesselPrefs, dbSounds, audioEngine]);
+
   const initAudio = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    if (!silentAudioRef.current) {
-      const audio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFRm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==");
-      audio.loop = true;
-      audio.volume = 0.01;
-      audio.play().then(() => {
-        silentAudioRef.current = audio;
-        setAudioAuthorized(true);
-      }).catch(() => {
-        setAudioAuthorized(false);
-      });
-    }
-  }, []);
+    audioEngine.unlockAudio();
+  }, [audioEngine]);
 
   const stopAllAlarms = useCallback(() => {
-    Object.values(activeAlarms).forEach(a => {
-        a.pause();
-        a.currentTime = 0;
-    });
-    setActiveAlarms({});
-  }, [activeAlarms]);
-
-  const playSound = useCallback((alertKey: keyof VesselPrefs['alerts'] | 'watch', soundOverride?: string) => {
-    if (!vesselPrefs.isNotifyEnabled) return;
-    
-    const config = alertKey === 'watch' 
-        ? { enabled: true, sound: vesselPrefs.watchSound, loop: vesselPrefs.watchLoop }
-        : vesselPrefs.alerts[alertKey];
-
-    if (!config?.enabled && !soundOverride) return;
-
-    const soundLabel = soundOverride || config.sound;
-    const sound = dbSounds?.find(s => s.label.toLowerCase() === soundLabel.toLowerCase() || s.id === soundLabel);
-    
-    if (sound) {
-      if (activeAlarms[alertKey]) {
-          activeAlarms[alertKey].pause();
-      }
-
-      const audio = new Audio(sound.url);
-      audio.volume = vesselPrefs.volume;
-      audio.loop = config.loop || false;
-      audio.play().catch(() => {});
-      
-      if (audio.loop) {
-        setActiveAlarms(prev => ({ ...prev, [alertKey]: audio }));
-      }
-    }
-  }, [dbSounds, vesselPrefs, activeAlarms]);
+    audioEngine.stopAll();
+    lastAlarmTriggerRef.current = {};
+  }, [audioEngine]);
 
   const updateLocalPrefs = useCallback((updates: Partial<VesselPrefs>) => {
     setVesselPrefs(prev => {
         const next = { ...prev, ...updates };
-        if (updates.alerts) {
-            next.alerts = { ...prev.alerts, ...updates.alerts };
-        }
+        if (updates.alerts) next.alerts = { ...prev.alerts, ...updates.alerts };
         return next;
     });
   }, []);
@@ -135,17 +141,9 @@ export function useRecepteur(vesselId?: string) {
       setIsSaving(false);
       return true;
     } catch (e) {
-      console.error("Erreur sauvegarde sons:", e);
       setIsSaving(false);
       return false;
     }
-  }, [user, firestore, vesselPrefs]);
-
-  const savePrefs = useCallback(async (updates: Partial<VesselPrefs>) => {
-    if (!user || !firestore) return;
-    const newPrefs = { ...vesselPrefs, ...updates };
-    setVesselPrefs(newPrefs);
-    await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs });
   }, [user, firestore, vesselPrefs]);
 
   return useMemo(() => ({
@@ -153,15 +151,18 @@ export function useRecepteur(vesselId?: string) {
     updateLocalPrefs,
     savePrefsToFirestore,
     isSaving,
-    savePrefs,
     availableSounds: dbSounds || [],
-    playSound,
+    playSound: (key: keyof VesselPrefs['alerts'], overrideUrl?: string) => {
+        if (overrideUrl) audioEngine.play(key, overrideUrl, vesselPrefs.volume, false);
+        else {
+            const config = vesselPrefs.alerts[key];
+            const sound = dbSounds?.find(s => s.label.toLowerCase() === config.sound.toLowerCase() || s.id === config.sound);
+            if (sound) audioEngine.play(key, sound.url, vesselPrefs.volume, config.loop);
+        }
+    },
     stopAllAlarms,
-    isAlarmActive: Object.keys(activeAlarms).length > 0,
+    isAlarmActive: false, // Géré en interne par audioEngine
     initAudio,
-    audioAuthorized
-  }), [
-    vesselPrefs, updateLocalPrefs, savePrefsToFirestore, isSaving, savePrefs, 
-    dbSounds, playSound, stopAllAlarms, activeAlarms, initAudio, audioAuthorized
-  ]);
+    processVesselAlerts
+  }), [vesselPrefs, updateLocalPrefs, savePrefsToFirestore, isSaving, dbSounds, initAudio, stopAllAlarms, audioEngine]);
 }
