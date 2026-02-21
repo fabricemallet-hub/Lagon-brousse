@@ -5,10 +5,11 @@ import { useUser, useFirestore } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import type { VesselStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 /**
  * LOGIQUE ÉMETTEUR (A) : "Le Cerveau"
- * Gère l'identité, le partage Firestore, l'historique et la persistance.
+ * Gère l'identité, le partage Firestore, l'historique et la persistance SMS (v54.0).
  */
 export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => void, onStopCleanup?: () => void) {
   const { user } = useUser();
@@ -28,7 +29,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
   const [idsHistory, setIdsHistory] = useState<{ vId: string, fId: string }[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
-  // SMS & Urgence Settings
+  // SMS & Urgence Settings (v54.0 - Persistance Locale)
   const [emergencyContact, setEmergencyContact] = useState('');
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
@@ -40,17 +41,25 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
   const watchIdRef = useRef<number | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
 
-  // CHARGEMENT PERSISTANCE LOCALE
+  // CHARGEMENT PERSISTANCE LOCALE (Inclus SMS v54.0)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedNickname = localStorage.getItem('lb_vessel_nickname');
       const savedVesselId = localStorage.getItem('lb_vessel_id');
       const savedFleetId = localStorage.getItem('lb_fleet_id');
       const savedHistory = localStorage.getItem('lb_ids_history');
+      
+      const savedEmergencyContact = localStorage.getItem('lb_emergency_contact');
+      const savedSmsMessage = localStorage.getItem('lb_vessel_sms_message');
+      const savedEmergencyEnabled = localStorage.getItem('lb_emergency_enabled');
 
       if (savedNickname) setVesselNickname(savedNickname);
       if (savedVesselId) setCustomSharingId(savedVesselId);
       if (savedFleetId) setCustomFleetId(savedFleetId);
+      if (savedEmergencyContact) setEmergencyContact(savedEmergencyContact);
+      if (savedSmsMessage) setVesselSmsMessage(savedSmsMessage);
+      if (savedEmergencyEnabled !== null) setIsEmergencyEnabled(savedEmergencyEnabled === 'true');
+
       if (savedHistory) {
         try {
           setIdsHistory(JSON.parse(savedHistory));
@@ -60,6 +69,13 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
       }
     }
   }, []);
+
+  const saveSmsSettings = useCallback(() => {
+    localStorage.setItem('lb_emergency_contact', emergencyContact);
+    localStorage.setItem('lb_vessel_sms_message', vesselSmsMessage);
+    localStorage.setItem('lb_emergency_enabled', String(isEmergencyEnabled));
+    toast({ title: "Paramètres SMS sauvegardés" });
+  }, [emergencyContact, vesselSmsMessage, isEmergencyEnabled, toast]);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
@@ -111,12 +127,10 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     const vId = customSharingId.trim().toUpperCase();
     const fId = customFleetId.trim().toUpperCase();
 
-    // SAUVEGARDE PERSISTANCE
     localStorage.setItem('lb_vessel_nickname', vesselNickname);
     localStorage.setItem('lb_vessel_id', vId);
     localStorage.setItem('lb_fleet_id', fId);
 
-    // MISE À JOUR HISTORIQUE (LIMIT 5)
     if (vId) {
         setIdsHistory(prev => {
             const filtered = prev.filter(h => h.vId !== vId);
@@ -168,8 +182,6 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     watchIdRef.current = null;
     setIsSharing(false);
     if (firestore && sharingId) {
-      // Pour l'émetteur A, on peut soit passer isSharing: false, soit supprimer (votre prompt demandait supprimer)
-      // On opte pour la suppression pour "zéro trace" comme demandé au point 2 du prompt précédent
       const ref = doc(firestore, 'vessels', sharingId);
       setDoc(ref, { isSharing: false, lastActive: serverTimestamp() }, { merge: true });
     }
@@ -199,13 +211,18 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
         addTechLog('URGENCE', `${type} DÉCLENCHÉ`);
         
         if (isEmergencyEnabled && emergencyContact) {
+            const nick = vesselNickname || 'KOOLAPIK';
+            const msg = isCustomMessageEnabled && vesselSmsMessage ? vesselSmsMessage : "Requiert assistance immédiate.";
+            const time = format(new Date(), 'HH:mm');
+            const acc = accuracy || 0;
             const posUrl = currentPos ? `https://www.google.com/maps?q=${currentPos.lat.toFixed(6)},${currentPos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
-            const body = `[${vesselNickname.toUpperCase()}] ${isCustomMessageEnabled ? vesselSmsMessage : "Besoin assistance."} [${type}] Position : ${posUrl}`;
+            
+            const body = `[${nick.toUpperCase()}] ${msg} [${type}] à ${time}. Position (+/- ${acc}m) : ${posUrl}`;
             window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
         }
         toast({ variant: "destructive", title: `ALERTE ${type}` });
     }
-  }, [isSharing, vesselStatus, anchorPos, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, currentPos, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, toast]);
+  }, [isSharing, vesselStatus, anchorPos, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, currentPos, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, accuracy, toast]);
 
   const loadFromHistory = (vId: string, fId: string) => {
     setCustomSharingId(vId);
@@ -262,6 +279,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     setIsEmergencyEnabled,
     isCustomMessageEnabled,
     setIsCustomMessageEnabled,
+    saveSmsSettings,
     clearLogs: () => { setTechLogs([]); setTacticalLogs([]); }
   };
 }
