@@ -107,7 +107,18 @@ export default function VesselTrackerPage() {
             mapCore.googleMap.panTo({ lat, lng });
         }
     },
-    () => mapCore.clearBreadcrumbs() 
+    () => {
+        mapCore.clearBreadcrumbs();
+        // Clear mooring on stop
+        if (mapCore.anchorCircleRef.current) {
+            mapCore.anchorCircleRef.current.setMap(null);
+            mapCore.anchorCircleRef.current = null;
+        }
+        if (mapCore.anchorMarkerRef.current) {
+            mapCore.anchorMarkerRef.current.setMap(null);
+            mapCore.anchorMarkerRef.current = null;
+        }
+    }
   );
   
   const recepteur = useRecepteur(emetteur.sharingId);
@@ -152,10 +163,10 @@ export default function VesselTrackerPage() {
 
   const smsPreview = useMemo(() => {
     const nickname = (emetteur.vesselNickname || 'Navire').toUpperCase();
-    const type = 'MAYDAY';
+    const type = emetteur.vesselStatus === 'emergency' ? 'DÉTRESSE' : 'ASSISTANCE';
     const customText = (emetteur.isCustomMessageEnabled && emetteur.vesselSmsMessage) ? emetteur.vesselSmsMessage : "Demande assistance immédiate.";
     return `[${nickname}] ${customText} [${type}] Position : https://www.google.com/maps?q=${emetteur.currentPos?.lat || 0},${emetteur.currentPos?.lng || 0}`;
-  }, [emetteur.vesselNickname, emetteur.isCustomMessageEnabled, emetteur.vesselSmsMessage, emetteur.currentPos]);
+  }, [emetteur.vesselNickname, emetteur.isCustomMessageEnabled, emetteur.vesselSmsMessage, emetteur.currentPos, emetteur.vesselStatus]);
 
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
@@ -174,6 +185,16 @@ export default function VesselTrackerPage() {
           <Button variant={appMode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setAppMode('receiver'); recepteur.initAudio(); }}>Récepteur (B)</Button>
           <Button variant={appMode === 'fleet' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setAppMode('fleet'); recepteur.initAudio(); }}>Flotte (C)</Button>
       </div>
+
+      {!recepteur.audioAuthorized && (
+        <Alert className="bg-primary/10 border-primary/20 border-2">
+            <Zap className="size-4 text-primary" />
+            <AlertTitle className="text-xs font-black uppercase">Initialisation Audio</AlertTitle>
+            <AlertDescription className="text-[10px] font-bold">
+                Appuyez n'importe où sur l'écran pour activer les alertes sonores de sécurité.
+            </AlertDescription>
+        </Alert>
+      )}
 
       {/* CARTE */}
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
@@ -212,9 +233,10 @@ export default function VesselTrackerPage() {
                     const Icon = TACTICAL_ICONS[marker.type] || Fish;
                     return (
                         <OverlayView key={marker.id} position={marker.pos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                            <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center group cursor-pointer z-[500]">
+                            <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center group cursor-pointer z-[500]" onClick={() => mapCore.handleRecenter(marker.pos)}>
                                 <div className="px-2 py-1 bg-white/90 backdrop-blur-md rounded border shadow-lg text-[8px] font-black uppercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap mb-1">
                                     {marker.type} - {marker.vesselName} • {format(marker.time, 'HH:mm')}
+                                    {marker.weather && <div className="text-primary mt-0.5">{marker.weather.windSpeed} ND • {marker.weather.temp}°C</div>}
                                 </div>
                                 <div className="p-1.5 bg-accent rounded-full border-2 border-white shadow-xl">
                                     <Icon className="size-3.5 text-white" />
@@ -247,7 +269,7 @@ export default function VesselTrackerPage() {
             </Button>
         </div>
         <div className="absolute top-4 right-4 z-[9999] flex flex-col gap-2">
-            <Button onClick={() => mapCore.setIsFollowMode(!mapCore.isFollowMode)} className={cn("h-10 w-10 border-2 shadow-xl rounded-xl", mapCore.isFollowMode ? "bg-primary text-white" : "bg-white text-primary")}>
+            <Button onClick={() => mapCore.setIsFollowMode(!mapCore.isFollowMode)} className={cn("h-10 w-10 border-2 shadow-xl rounded-xl transition-all", mapCore.isFollowMode ? "bg-primary text-white" : "bg-white text-primary")}>
                 {mapCore.isFollowMode ? <Lock className="size-5" /> : <Unlock className="size-5" />}
             </Button>
             <Button onClick={handleRecenter} className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl hover:bg-white flex items-center justify-center">
@@ -256,16 +278,16 @@ export default function VesselTrackerPage() {
         </div>
       </div>
 
-      {/* PANNEAUX DE CONTROLE */}
+      {/* PANNEAUX DE CONTROLE SUPÉRIEURS */}
       <div className="grid grid-cols-1 gap-4">
           {appMode === 'sender' && (
               <Card className="border-2 shadow-lg rounded-3xl overflow-hidden border-primary/20">
                   <CardHeader className="bg-primary/5 p-5 border-b flex flex-row justify-between items-center">
                       <div>
                         <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-primary">
-                            <Navigation className="size-4 text-primary" /> Identité &amp; Partage
+                            <Navigation className="size-4 text-primary" /> Identité &amp; IDs
                         </CardTitle>
-                        <CardDescription className="text-[9px] font-bold uppercase mt-0.5">Configuration de votre signal Live</CardDescription>
+                        <CardDescription className="text-[9px] font-bold uppercase mt-0.5">Partage vers Récepteur et Flotte</CardDescription>
                       </div>
                       {emetteur.isSharing && (
                         <div className="flex items-center gap-2">
@@ -337,7 +359,11 @@ export default function VesselTrackerPage() {
                                   <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => emetteur.triggerEmergency('ASSISTANCE')}>
                                       <RefreshCw className="size-4 text-primary" /> Assistance
                                   </Button>
-                                  <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2 bg-background gap-2", emetteur.vesselStatus === 'stationary' && "bg-orange-500 text-white border-orange-600 shadow-inner")} onClick={emetteur.setAnchorPos ? () => { if (emetteur.anchorPos) emetteur.setAnchorPos(null); else emetteur.setAnchorPos(emetteur.currentPos); } : undefined}>
+                                  <Button 
+                                    variant="outline" 
+                                    className={cn("h-14 font-black uppercase text-[10px] border-2 bg-background gap-2", emetteur.vesselStatus === 'stationary' && "bg-orange-500 text-white border-orange-600 shadow-inner")} 
+                                    onClick={() => { if (emetteur.anchorPos) emetteur.setAnchorPos(null); else emetteur.setAnchorPos(emetteur.currentPos); }}
+                                  >
                                       <Anchor className={cn("size-4", emetteur.vesselStatus === 'stationary' ? "text-white" : "text-orange-600")} /> Mouillage
                                   </Button>
                               </div>
@@ -350,40 +376,37 @@ export default function VesselTrackerPage() {
               </Card>
           )}
 
-          <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="sms-safety" className="border-none">
-                  <AccordionTrigger className="flex items-center gap-2 py-3 px-4 bg-orange-50 border-2 border-orange-100 rounded-xl hover:no-underline">
-                      <Smartphone className="size-4 text-orange-600" />
-                      <span className="text-[10px] font-black uppercase text-orange-800">Réglages d'Urgence (SMS)</span>
-                  </AccordionTrigger>
-                  <AccordionContent className="pt-4 space-y-4">
-                      <div className="p-4 border-2 rounded-2xl bg-white space-y-4 shadow-inner">
-                          <div className="space-y-1.5">
-                              <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Numéro du contact à terre</Label>
-                              <Input value={emetteur.emergencyContact} onChange={e => emetteur.setEmergencyContact(e.target.value)} placeholder="ex: 742929" className="h-12 border-2 font-black text-lg" />
-                          </div>
-                          <div className="space-y-1.5">
-                              <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Message personnalisé</Label>
-                              <Textarea value={emetteur.vesselSmsMessage} onChange={e => emetteur.setVesselSmsMessage(e.target.value)} placeholder="Détails du problème..." className="border-2 font-medium" />
-                          </div>
-                          <div className="space-y-2 pt-2 border-t border-dashed">
-                              <p className="text-[9px] font-black uppercase text-primary flex items-center gap-2">
-                                  <Eye className="size-3" /> Aperçu du message :
-                              </p>
-                              <div className="p-3 bg-muted/30 rounded-xl border-2 italic text-[10px] font-medium leading-relaxed text-slate-600">
-                                  "{smsPreview}"
-                              </div>
-                          </div>
-                          <Button className="w-full h-12 font-black uppercase tracking-widest bg-primary gap-2 shadow-lg">
-                              <Save className="size-4" /> Sauvegarder réglages SMS
-                          </Button>
+          {appMode === 'receiver' && (
+              <Card className="border-2 shadow-lg rounded-3xl overflow-hidden border-blue-200">
+                  <CardHeader className="bg-blue-50 p-5 border-b flex flex-row justify-between items-center">
+                      <div>
+                        <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-blue-800">
+                            <Smartphone className="size-4" /> Suivi Récepteur
+                        </CardTitle>
+                        <CardDescription className="text-[9px] font-bold uppercase mt-0.5">Surveillance à terre</CardDescription>
                       </div>
-                  </AccordionContent>
-              </AccordionItem>
-          </Accordion>
+                  </CardHeader>
+                  <CardContent className="p-5 space-y-4">
+                      <div className="space-y-1.5">
+                          <Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID du Navire à suivre</Label>
+                          <div className="flex gap-2">
+                              <Input 
+                                placeholder="ENTREZ L'ID..." 
+                                value={vesselIdToFollow} 
+                                onChange={e => setVesselIdToFollow(e.target.value)} 
+                                className="font-black text-center h-12 border-2 uppercase tracking-widest bg-white flex-grow" 
+                              />
+                              <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={() => { recepteur.savePrefs({ lastFollowedId: vesselIdToFollow.toUpperCase() }); toast({ title: "ID enregistré" }); }}>
+                                  <Check className="size-4" />
+                              </Button>
+                          </div>
+                      </div>
+                  </CardContent>
+              </Card>
+          )}
       </div>
 
-      {/* COCKPIT DE BORD UNIFIÉ */}
+      {/* COCKPIT DE BORD UNIFIÉ (DRAWER FIXE) */}
       <div id="cockpit-logs" className="fixed bottom-16 left-0 right-0 z-[10001] px-1 pointer-events-none">
           <div className="max-w-2xl mx-auto pointer-events-auto">
               {/* BLOC URGENCE PRIORITAIRE */}
@@ -420,23 +443,23 @@ export default function VesselTrackerPage() {
                       <AccordionTrigger className="h-12 px-6 hover:no-underline">
                           <div className="flex items-center gap-3">
                               <ClipboardList className="size-5 text-primary" />
-                              <span className="text-sm font-black uppercase tracking-tighter">Cockpit &amp; Journaux</span>
-                              <Badge variant="outline" className="bg-primary/5 border-primary/20 text-[8px] font-black">LIVE</Badge>
+                              <span className="text-sm font-black uppercase tracking-tighter text-slate-800">Cockpit : Journal &amp; Réglages</span>
+                              <Badge variant="outline" className="bg-primary/5 border-primary/20 text-[8px] font-black animate-pulse">LIVE</Badge>
                           </div>
                       </AccordionTrigger>
                       <AccordionContent className="p-0">
                           <Tabs defaultValue="tactical" className="w-full">
-                              <TabsList className="grid w-full grid-cols-3 h-10 rounded-none bg-muted/20 border-y">
-                                  <TabsTrigger value="tactical" className="text-[10px] font-black uppercase">Tactique</TabsTrigger>
-                                  <TabsTrigger value="technical" className="text-[10px] font-black uppercase">Technique</TabsTrigger>
-                                  <TabsTrigger value="settings" className="text-[10px] font-black uppercase text-primary">Réglages Sons</TabsTrigger>
+                              <TabsList className="grid w-full grid-cols-3 h-12 rounded-none bg-muted/20 border-y">
+                                  <TabsTrigger value="tactical" className="text-[10px] font-black uppercase gap-2"><Fish className="size-3" /> Tactique</TabsTrigger>
+                                  <TabsTrigger value="technical" className="text-[10px] font-black uppercase gap-2"><HistoryIcon className="size-3" /> Technique</TabsTrigger>
+                                  <TabsTrigger value="settings" className="text-[10px] font-black uppercase gap-2 text-primary"><Settings className="size-3" /> Réglages Sons</TabsTrigger>
                               </TabsList>
                               
                               <TabsContent value="tactical" className="m-0 bg-white">
                                   <div className="p-4 space-y-4">
                                       <div className="grid grid-cols-4 gap-2">
                                           {TACTICAL_SPECIES.map(spec => (
-                                              <Button key={spec.label} variant="outline" className="flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 hover:bg-primary/5 active:scale-95" onClick={() => emetteur.addTacticalLog(spec.label)}>
+                                              <Button key={spec.label} variant="outline" className="flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 hover:bg-primary/5 active:scale-95 transition-all" onClick={() => emetteur.addTacticalLog(spec.label)}>
                                                   <spec.icon className="size-5 text-primary" />
                                                   <span className="text-[8px] font-black">{spec.label}</span>
                                               </Button>
@@ -446,15 +469,18 @@ export default function VesselTrackerPage() {
                                               <span className="text-[8px] font-black">PRISE</span>
                                           </Button>
                                       </div>
-                                      <ScrollArea className="h-40 border-t pt-2">
+                                      <ScrollArea className="h-48 border-t pt-2 shadow-inner">
                                           <div className="space-y-1">
                                             {emetteur.tacticalLogs.map((log, i) => (
-                                                <div key={i} className="p-2 border-b flex justify-between items-center text-[10px] cursor-pointer hover:bg-muted/50" onClick={() => mapCore.handleRecenter(log.pos)}>
-                                                    <span className="font-black uppercase text-primary flex items-center gap-2">
-                                                        {log.type === 'PHOTO' ? <Camera className="size-3"/> : <Fish className="size-3"/>}
-                                                        {log.type}
-                                                    </span>
-                                                    <span className="font-bold opacity-40">{format(log.time, 'HH:mm')}</span>
+                                                <div key={i} className="p-3 border-b flex justify-between items-center text-[10px] cursor-pointer hover:bg-primary/5 active:bg-primary/10 transition-colors" onClick={() => mapCore.handleRecenter(log.pos)}>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="p-1.5 bg-primary/10 rounded-lg"><Fish className="size-3 text-primary"/></div>
+                                                        <span className="font-black uppercase text-primary">{log.type}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        {log.wind && <span className="font-bold text-blue-600">{log.wind} ND</span>}
+                                                        <span className="font-bold opacity-40">{format(log.time, 'HH:mm')}</span>
+                                                    </div>
                                                 </div>
                                             ))}
                                           </div>
@@ -470,7 +496,7 @@ export default function VesselTrackerPage() {
                                       </div>
                                       <Button variant="ghost" size="sm" className="h-7 text-destructive text-[8px] font-black uppercase border border-destructive/10" onClick={emetteur.clearLogs}><Trash2 className="size-3 mr-1" /> Effacer</Button>
                                   </div>
-                                  <ScrollArea className="h-40">
+                                  <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
                                           <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v40.0 prêt - En attente de signal GPS</div>
                                           {emetteur.techLogs.map((log, i) => (
@@ -483,18 +509,18 @@ export default function VesselTrackerPage() {
                                   </ScrollArea>
                               </TabsContent>
 
-                              <TabsContent value="settings" className="m-0 bg-white p-4 space-y-6">
-                                <div className="flex items-center justify-between bg-primary/5 p-3 rounded-xl border-2 border-primary/10">
+                              <TabsContent value="settings" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
+                                <div className="flex items-center justify-between bg-primary/5 p-4 rounded-2xl border-2 border-primary/10">
                                     <div className="space-y-0.5">
-                                        <Label className="text-xs font-black uppercase">Signaux Sonores Globaux</Label>
-                                        <p className="text-[8px] font-bold text-muted-foreground uppercase">Activer toutes les alertes audio</p>
+                                        <Label className="text-xs font-black uppercase">Activer les signaux sonores globaux</Label>
+                                        <p className="text-[8px] font-bold text-muted-foreground uppercase">Pilotage général du thread audio</p>
                                     </div>
                                     <Switch checked={recepteur.vesselPrefs.isNotifyEnabled} onCheckedChange={v => recepteur.savePrefs({ isNotifyEnabled: v })} />
                                 </div>
 
                                 <div className="space-y-3">
                                     <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                                        <Volume2 className="size-3" /> Volume Général ({Math.round(recepteur.vesselPrefs.volume * 100)}%)
+                                        <Volume2 className="size-3" /> Volume (Intensity {Math.round(recepteur.vesselPrefs.volume * 100)}%)
                                     </Label>
                                     <Slider value={[recepteur.vesselPrefs.volume * 100]} max={100} step={1} onValueChange={v => recepteur.savePrefs({ volume: v[0] / 100 })} />
                                 </div>
@@ -512,7 +538,7 @@ export default function VesselTrackerPage() {
                                         <div className="flex items-center gap-2">
                                             <Select value={recepteur.vesselPrefs.watchSound} onValueChange={v => recepteur.savePrefs({ watchSound: v })}>
                                                 <SelectTrigger className="h-9 text-[10px] font-black uppercase w-full bg-white border-2">
-                                                    <SelectValue placeholder="Son..." />
+                                                    <SelectValue placeholder="Son de veille..." />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {recepteur.availableSounds.map(s => <SelectItem key={s.id} value={s.label} className="text-[10px] uppercase font-black">{s.label}</SelectItem>)}
@@ -523,19 +549,21 @@ export default function VesselTrackerPage() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
+                                <div className="space-y-2 p-4 border-2 rounded-2xl bg-red-50/20 border-red-100">
                                     <Label className="text-[10px] font-black uppercase text-red-600 flex items-center gap-2"><Battery className="size-3" /> Seuil Batterie Faible</Label>
                                     <div className="flex items-center gap-4">
                                         <Slider className="flex-1" value={[recepteur.vesselPrefs.batteryThreshold]} min={5} max={90} step={5} onValueChange={v => recepteur.savePrefs({ batteryThreshold: v[0] })} />
-                                        <Badge variant="outline" className="font-black text-xs">{recepteur.vesselPrefs.batteryThreshold}%</Badge>
+                                        <Badge variant="outline" className="font-black text-xs bg-white">{recepteur.vesselPrefs.batteryThreshold}%</Badge>
                                     </div>
                                 </div>
 
                                 <div className="space-y-3 pt-2 border-t border-dashed">
-                                    <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Réglages Sons Individuels</p>
+                                    <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                                        <HistoryIcon className="size-3" /> Réglages Individuels (Son 2.png)
+                                    </p>
                                     <div className="grid gap-3">
                                         {Object.entries(recepteur.vesselPrefs.alerts || {}).map(([key, config]) => (
-                                            <div key={key} className="p-3 border-2 rounded-xl space-y-3 bg-slate-50/50">
+                                            <div key={key} className="p-3 border-2 rounded-xl space-y-3 bg-slate-50/50 shadow-sm">
                                                 <div className="flex items-center justify-between">
                                                     <Label className="text-[9px] font-black uppercase text-slate-700 flex items-center gap-2">
                                                         <Bell className="size-3" /> {key === 'moving' ? 'MOUVEMENT' : key === 'stationary' ? 'MOUILLAGE' : key === 'offline' ? 'SIGNAL PERDU' : key === 'assistance' ? 'ASSISTANCE' : key === 'tactical' ? 'SIGNAL TACTIQUE' : 'BATTERIE FAIBLE'}
@@ -544,7 +572,7 @@ export default function VesselTrackerPage() {
                                                 </div>
                                                 <div className={cn("flex items-center gap-2", !config.enabled && "opacity-40")}>
                                                     <Select value={config.sound} onValueChange={v => recepteur.savePrefs({ alerts: { ...recepteur.vesselPrefs.alerts, [key]: { ...config, sound: v } } })}>
-                                                        <SelectTrigger className="h-8 text-[9px] font-black uppercase flex-1 bg-white">
+                                                        <SelectTrigger className="h-8 text-[9px] font-black uppercase flex-1 bg-white border-2">
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
