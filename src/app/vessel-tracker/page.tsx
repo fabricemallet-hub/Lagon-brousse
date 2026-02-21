@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -116,7 +115,7 @@ const TACTICAL_ICONS: Record<string, any> = {
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
   const props = { className: cn("size-4", className) };
-  if (charging) return <BatteryFull {...props} className={cn(props.className, "text-blue-500")} />;
+  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
   if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
   if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
   return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
@@ -217,12 +216,11 @@ export default function VesselTrackerPage() {
   }, [user, firestore]);
   const { data: profile } = useDoc<UserAccount>(userDocRef);
 
-  // RÉCUPÉRATION DES NAVIRES SUIVIS (FIX: followedVessels definition)
+  // RÉCUPÉRATION DES NAVIRES SUIVIS
   const savedVesselIds = profile?.savedVesselIds || [];
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     const ids = [...savedVesselIds];
-    // On ajoute soi-même à la liste des navires à afficher si on partage
     if (emetteur.isSharing && !ids.includes(emetteur.sharingId)) {
         ids.push(emetteur.sharingId);
     }
@@ -397,23 +395,104 @@ export default function VesselTrackerPage() {
       <div className="grid grid-cols-1 gap-4">
           {appMode === 'sender' && (
               <div className="space-y-4">
-                  <Card className="border-2 shadow-lg rounded-3xl overflow-hidden border-primary/20">
-                      <CardHeader className="bg-primary/5 p-5 border-b flex flex-row justify-between items-center">
-                          <div>
-                            <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-primary">
-                                <Navigation className="size-4 text-primary" /> Identité &amp; IDs
-                            </CardTitle>
-                            <CardDescription className="text-[9px] font-bold uppercase mt-0.5">Partage vers Récepteur et Flotte</CardDescription>
-                          </div>
-                          {emetteur.isSharing && (
-                            <div className="flex items-center gap-2">
-                                <div className={cn("size-3 rounded-full bg-green-500 shadow-sm transition-all", isLedActive ? "scale-125 glow" : "opacity-30")} />
-                                <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 font-black text-[8px] uppercase h-5">LIVE</Badge>
-                            </div>
-                          )}
-                      </CardHeader>
-                      <CardContent className="p-5 space-y-5">
-                          {!emetteur.isSharing ? (
+                  {emetteur.isSharing ? (
+                      <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-top-2">
+                          <Card className="border-2 shadow-lg rounded-3xl overflow-hidden border-primary/20">
+                              <CardHeader className="bg-primary/5 p-4 border-b flex flex-row justify-between items-center">
+                                  <div className="flex items-center gap-3">
+                                      <div className="p-2 bg-primary text-white rounded-lg shadow-sm">
+                                          <Navigation className={cn("size-5", emetteur.vesselStatus === 'moving' && "animate-pulse")} />
+                                      </div>
+                                      <div>
+                                          <CardTitle className="text-sm font-black uppercase text-primary leading-none">{emetteur.sharingId}</CardTitle>
+                                          <p className="text-[9px] font-bold text-muted-foreground uppercase mt-1">Capitaine : {emetteur.vesselNickname}</p>
+                                      </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                      <div className={cn("size-3 rounded-full bg-green-500 shadow-sm transition-all", isLedActive ? "scale-125 glow" : "opacity-30")} />
+                                      <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 font-black text-[8px] uppercase h-5">LIVE</Badge>
+                                  </div>
+                              </CardHeader>
+                              <CardContent className="p-4 space-y-4">
+                                  {/* Ligne Supérieure : Statuts Destination */}
+                                  <div className="grid grid-cols-2 gap-2">
+                                      <Button 
+                                          variant="outline" 
+                                          className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", 
+                                              emetteur.vesselStatus === 'returning' ? "bg-indigo-600 text-white border-indigo-700 shadow-inner" : "bg-indigo-50 border-indigo-100 text-indigo-700 hover:bg-indigo-100"
+                                          )}
+                                          onClick={() => emetteur.changeManualStatus('returning', 'RETOUR MAISON')}
+                                      >
+                                          <Navigation className="size-4" /> Retour Maison
+                                      </Button>
+                                      <Button 
+                                          variant="outline" 
+                                          className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", 
+                                              emetteur.vesselStatus === 'landed' ? "bg-green-600 text-white border-green-700 shadow-inner" : "bg-green-50 border-green-100 text-green-700 hover:bg-green-100"
+                                          )}
+                                          onClick={() => emetteur.changeManualStatus('landed', 'HOME À TERRE')}
+                                      >
+                                          <Home className="size-4" /> Home à Terre
+                                      </Button>
+                                  </div>
+
+                                  {/* Ligne Centrale : Surveillance Dérive */}
+                                  <div className="p-4 bg-orange-50/30 border-2 border-orange-100 rounded-2xl space-y-4">
+                                      <div className="flex items-center justify-between">
+                                          <Button 
+                                              className={cn("h-12 px-6 font-black uppercase text-[10px] gap-2 shadow-lg transition-all active:scale-95", 
+                                                  emetteur.vesselStatus === 'stationary' || emetteur.vesselStatus === 'drifting' ? "bg-orange-600 hover:bg-orange-700" : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                                              )}
+                                              onClick={() => {
+                                                  if (emetteur.anchorPos) emetteur.changeManualStatus('moving', 'REPRISE NAVIGATION');
+                                                  else emetteur.changeManualStatus('stationary', 'MOUILLAGE ACTIF');
+                                              }}
+                                          >
+                                              <Anchor className="size-4" /> 
+                                              {emetteur.anchorPos ? "MOUILLAGE ACTIF" : "ACTIVER MOUILLAGE"}
+                                          </Button>
+                                          <div className="text-right">
+                                              <p className="text-[10px] font-black uppercase text-orange-800">Rayon Dérive</p>
+                                              <p className="text-lg font-black text-orange-950 leading-none">{emetteur.mooringRadius}m</p>
+                                          </div>
+                                      </div>
+                                      <div className="px-1">
+                                          <Slider 
+                                              value={[emetteur.mooringRadius]} 
+                                              min={10} 
+                                              max={200} 
+                                              step={10} 
+                                              onValueChange={(v) => emetteur.setMooringRadius(v[0])} 
+                                          />
+                                          <div className="flex justify-between text-[8px] font-black uppercase opacity-40 mt-1">
+                                              <span>10m</span>
+                                              <span>200m</span>
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  {/* Pied de Panneau : Arrêt */}
+                                  <Button 
+                                      variant="destructive" 
+                                      className="w-full h-16 font-black uppercase text-xs tracking-widest shadow-xl rounded-2xl gap-3 border-4 border-white/20 transition-all active:scale-95" 
+                                      onClick={emetteur.stopSharing}
+                                  >
+                                      <X className="size-6 bg-white text-red-600 rounded-full p-1" /> ARRÊTER LE PARTAGE
+                                  </Button>
+                              </CardContent>
+                          </Card>
+                      </div>
+                  ) : (
+                      <Card className="border-2 shadow-lg rounded-3xl overflow-hidden border-primary/20">
+                          <CardHeader className="bg-primary/5 p-5 border-b flex flex-row justify-between items-center">
+                              <div>
+                                <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-primary">
+                                    <Navigation className="size-4 text-primary" /> Identité &amp; IDs
+                                </CardTitle>
+                                <CardDescription className="text-[9px] font-bold uppercase mt-0.5">Partage vers Récepteur et Flotte</CardDescription>
+                              </div>
+                          </CardHeader>
+                          <CardContent className="p-5 space-y-5">
                               <div className="space-y-5">
                                   <div className="space-y-1.5">
                                       <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Mon Surnom</Label>
@@ -461,35 +540,9 @@ export default function VesselTrackerPage() {
                                       <Zap className="size-5 fill-white group-hover:animate-pulse" /> Lancer le Partage GPS
                                   </Button>
                               </div>
-                          ) : (
-                              <div className="space-y-4">
-                                  <div className="p-5 bg-primary/5 rounded-2xl border-2 border-primary/20 text-center relative overflow-hidden">
-                                      <Navigation className="absolute -right-2 -bottom-2 size-12 opacity-5 rotate-12" />
-                                      <p className="text-[10px] font-black uppercase text-primary tracking-[0.2em] mb-1">Identité Active</p>
-                                      <h4 className="text-2xl font-black uppercase tracking-tighter text-slate-800">{emetteur.sharingId}</h4>
-                                      <p className="text-[9px] font-bold text-muted-foreground uppercase mt-1 italic">
-                                        Capitaine : {emetteur.vesselNickname || 'Inconnu'} • {emetteur.customFleetId ? `Flotte: ${emetteur.customFleetId.toUpperCase()}` : 'Pas de groupe'}
-                                      </p>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-2">
-                                      <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => emetteur.changeManualStatus('returning', 'RETOUR MAISON')}>
-                                          <Navigation className="size-4 text-indigo-600" /> Retour
-                                      </Button>
-                                      <Button 
-                                        variant="outline" 
-                                        className={cn("h-14 font-black uppercase text-[10px] border-2 bg-background gap-2", emetteur.vesselStatus === 'stationary' && "bg-orange-500 text-white border-orange-600 shadow-inner")} 
-                                        onClick={() => { if (emetteur.anchorPos) emetteur.changeManualStatus('moving', 'REPRISE NAVIGATION'); else emetteur.changeManualStatus('stationary', 'MOUILLAGE ACTIF'); }}
-                                      >
-                                          <Anchor className={cn("size-4", emetteur.vesselStatus === 'stationary' ? "text-white" : "text-orange-600")} /> Mouillage
-                                      </Button>
-                                  </div>
-                                  <Button variant="destructive" className="w-full h-16 font-black uppercase rounded-2xl border-2 shadow-lg gap-3 transition-all active:scale-95" onClick={emetteur.stopSharing}>
-                                      <X className="size-5" /> Arrêter le partage
-                                  </Button>
-                              </div>
-                          )}
-                      </CardContent>
-                  </Card>
+                          </CardContent>
+                      </Card>
+                  )}
 
                   <Accordion type="single" collapsible className="w-full">
                       <AccordionItem value="sms-emergency" className="border-none">

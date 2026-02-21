@@ -11,7 +11,7 @@ import { getDistance } from '@/lib/utils';
 /**
  * LOGIQUE ÉMETTEUR (A) : "Le Cerveau"
  * Gère l'identité, le partage Firestore, l'historique et les changements de statut dynamiques.
- * v55.0 : Ajout de la détection de dérive et de la persistance du statut.
+ * v56.0 : Finalisation de la gestion du rayon de mouillage et du nettoyage des overlays.
  */
 export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => void, onStopCleanup?: () => void) {
   const { user } = useUser();
@@ -52,6 +52,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
       const savedFleetId = localStorage.getItem('lb_fleet_id');
       const savedHistory = localStorage.getItem('lb_ids_history');
       const savedStatus = localStorage.getItem('lb_vessel_status') as VesselStatus['status'];
+      const savedRadius = localStorage.getItem('lb_mooring_radius');
       
       const savedEmergencyContact = localStorage.getItem('lb_emergency_contact');
       const savedSmsMessage = localStorage.getItem('lb_vessel_sms_message');
@@ -61,6 +62,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
       if (savedVesselId) setCustomSharingId(savedVesselId);
       if (savedFleetId) setCustomFleetId(savedFleetId);
       if (savedStatus) setVesselStatus(savedStatus);
+      if (savedRadius) setMooringRadius(parseInt(savedRadius));
       if (savedEmergencyContact) setEmergencyContact(savedEmergencyContact);
       if (savedSmsMessage) setVesselSmsMessage(savedSmsMessage);
       if (savedEmergencyEnabled !== null) setIsEmergencyEnabled(savedEmergencyEnabled === 'true');
@@ -75,12 +77,11 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     }
   }, []);
 
-  // Persistance du statut
+  // Persistance du statut et du rayon
   useEffect(() => {
-    if (vesselStatus) {
-        localStorage.setItem('lb_vessel_status', vesselStatus);
-    }
-  }, [vesselStatus]);
+    if (vesselStatus) localStorage.setItem('lb_vessel_status', vesselStatus);
+    localStorage.setItem('lb_mooring_radius', mooringRadius.toString());
+  }, [vesselStatus, mooringRadius]);
 
   const saveSmsSettings = useCallback(() => {
     localStorage.setItem('lb_emergency_contact', emergencyContact);
@@ -122,6 +123,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
       isSharing: true,
       lastActive: serverTimestamp(),
       fleetId: customFleetId.trim().toUpperCase() || null,
+      mooringRadius: mooringRadius,
       ...batteryInfo
     };
 
@@ -131,7 +133,7 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
           lastSentStatusRef.current = data.status || lastSentStatusRef.current;
       })
       .catch(() => {});
-  }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId]);
+  }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId, mooringRadius]);
 
   const startSharing = () => {
     if (!navigator.geolocation || !user || !firestore) return;
@@ -191,7 +193,8 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
             status: nextStatus, 
             speed: Math.round(knotSpeed), 
             heading: heading || 0,
-            fleetId: fId || null
+            fleetId: fId || null,
+            anchorLocation: anchorPos ? { latitude: anchorPos.lat, longitude: anchorPos.lng } : null
         });
       },
       () => toast({ variant: 'destructive', title: "Signal GPS perdu" }),
@@ -205,7 +208,12 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     setIsSharing(false);
     if (firestore && sharingId) {
       const ref = doc(firestore, 'vessels', sharingId);
-      setDoc(ref, { isSharing: false, lastActive: serverTimestamp() }, { merge: true });
+      setDoc(ref, { 
+        isSharing: false, 
+        lastActive: serverTimestamp(),
+        anchorLocation: null,
+        status: 'offline'
+      }, { merge: true });
     }
     setCurrentPos(null);
     setAnchorPos(null);
@@ -253,7 +261,11 @@ export function useEmetteur(onPositionUpdate?: (lat: number, lng: number) => voi
     } else if (st === 'stationary' && currentPos) {
         setAnchorPos(currentPos);
     }
-    updateVesselInFirestore({ status: st, eventLabel: label || null });
+    updateVesselInFirestore({ 
+        status: st, 
+        eventLabel: label || null,
+        anchorLocation: st === 'stationary' && currentPos ? { latitude: currentPos.lat, longitude: currentPos.lng } : null
+    });
     toast({ title: label || `Statut : ${st}` });
   };
 
