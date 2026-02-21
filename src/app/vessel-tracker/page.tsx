@@ -138,7 +138,7 @@ const VesselMarker = ({ vessel, isMe = false }: { vessel: VesselStatus, isMe?: b
     const heading = vessel.heading || 0;
     
     let Icon = Navigation;
-    let bgColor = 'bg-green-600'; // Default: Mouvement
+    let bgColor = 'bg-green-600'; 
     let animationClass = '';
     let iconClass = 'size-4 text-white';
     let statusLabel = 'EN ROUTE';
@@ -215,11 +215,12 @@ const VesselMarker = ({ vessel, isMe = false }: { vessel: VesselStatus, isMe?: b
 };
 
 export default function VesselTrackerPage() {
-  const [appMode, setAppMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
-  const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  
+  const [appMode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
+  const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   
   const mapCore = useMapCore();
   const simulator = useSimulator();
@@ -250,7 +251,7 @@ export default function VesselTrackerPage() {
   }, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
-  const savedVesselIds = useMemo(() => userProfile?.savedVesselIds || [], [userProfile?.savedVesselIds]);
+  const savedVesselIds = userProfile?.savedVesselIds || [];
   
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -263,6 +264,8 @@ export default function VesselTrackerPage() {
   }, [firestore, user, savedVesselIds, emetteur.isSharing, emetteur.sharingId]);
 
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
+
+  const [history, setHistory] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean }[]>([]);
 
   const activeAnchorVessel = useMemo(() => {
     if (!followedVessels || mapCore.isCirclesHidden) return null;
@@ -313,7 +316,7 @@ export default function VesselTrackerPage() {
   const handleCopyLogEntry = (log: any) => {
     if (!log.pos) return;
     const time = format(log.time, 'HH:mm:ss');
-    const text = `Lat: ${log.pos.lat.toFixed(6)}, Lng: ${log.pos.lng.toFixed(6)} - [${log.label}] à ${time} - Lien: https://www.google.com/maps?q=${log.pos.lat},${log.pos.lng}`;
+    const text = `Lat: ${log.pos.lat.toFixed(6)}, Lng: ${log.pos.lng.toFixed(6)} - [${log.label || log.type || log.statusLabel}] à ${time} - Lien: https://www.google.com/maps?q=${log.pos.lat},${log.pos.lng}`;
     navigator.clipboard.writeText(text).then(() => {
         toast({ title: "POSITION COPIÉE", description: "Format prêt pour SMS/WhatsApp" });
     });
@@ -333,6 +336,15 @@ export default function VesselTrackerPage() {
     recepteur.initAudio(); 
     emetteur.startSharing();
   };
+
+  const smsPreview = useMemo(() => {
+    const nick = emetteur.vesselNickname || 'KOOLAPIK';
+    const msg = emetteur.isCustomMessageEnabled && emetteur.vesselSmsMessage ? emetteur.vesselSmsMessage : "Requiert assistance immédiate.";
+    return `[${nick.toUpperCase()}] ${msg} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
+  }, [emetteur.vesselSmsMessage, emetteur.isCustomMessageEnabled, emetteur.vesselNickname]);
+
+  if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
+  if (!isLoaded || isProfileLoading) return <Skeleton className="h-96 w-full" />;
 
   const ackList = Object.entries(recepteur.acknowledgedAlerts);
 
@@ -361,9 +373,9 @@ export default function VesselTrackerPage() {
       )}
 
       <div className="flex bg-slate-900 text-white p-1 rounded-xl shadow-lg border-2 border-primary/20 sticky top-0 z-[100]">
-          <Button variant={appMode === 'sender' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setAppMode('sender'); recepteur.initAudio(); }}>Émetteur (A)</Button>
-          <Button variant={appMode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setAppMode('receiver'); recepteur.initAudio(); }}>Récepteur (B)</Button>
-          <Button variant={appMode === 'fleet' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setAppMode('fleet'); recepteur.initAudio(); }}>Flotte (C)</Button>
+          <Button variant={appMode === 'sender' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setMode('sender'); recepteur.initAudio(); }}>Émetteur (A)</Button>
+          <Button variant={appMode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setMode('receiver'); recepteur.initAudio(); }}>Récepteur (B)</Button>
+          <Button variant={appMode === 'fleet' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => { setMode('fleet'); recepteur.initAudio(); }}>Flotte (C)</Button>
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
@@ -473,7 +485,6 @@ export default function VesselTrackerPage() {
                             </OverlayView>
                             
                             <Circle 
-                                key={`circle-${activeAnchorVessel.id}-${activeAnchorVessel.mooringRadius}`}
                                 center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }}
                                 radius={activeAnchorVessel.mooringRadius || 100}
                                 options={{
@@ -489,7 +500,6 @@ export default function VesselTrackerPage() {
 
                             {activeAnchorVessel.location && (activeAnchorVessel.status === 'stationary' || activeAnchorVessel.status === 'drifting' || activeAnchorVessel.status === 'emergency') && (
                                 <Polyline
-                                    key={`tension-line-${activeAnchorVessel.id}`}
                                     path={[
                                         { lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude },
                                         { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }
