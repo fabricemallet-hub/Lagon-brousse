@@ -12,7 +12,7 @@ import { getDistance } from '@/lib/utils';
 /**
  * LOGIQUE ÉMETTEUR (A) : "Le Cerveau"
  * Gère l'identité, le partage Firestore, l'historique et les changements de statut dynamiques.
- * v58.3 : Fix ReferenceError saveSmsSettings + Stabilisation callbacks.
+ * v61.0 : Optimisation séparation Ancre/Navire + Détection dérive auto.
  */
 export function useEmetteur(
     onPositionUpdate?: (lat: number, lng: number) => void, 
@@ -48,6 +48,7 @@ export function useEmetteur(
   const watchIdRef = useRef<number | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
   const lastGpsCutRef = useRef<boolean>(false);
+  const isEmergencySmsSentRef = useRef<boolean>(false);
   
   const currentPosRef = useRef(currentPos);
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
@@ -136,6 +137,54 @@ export function useEmetteur(
       .catch(() => {});
   }, [user, firestore, isSharing, sharingId, vesselNickname, customFleetId, mooringRadius, simulator?.isComCut]);
 
+  const triggerEmergency = useCallback((type: 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE' | 'DÉRIVE') => {
+    if (!isSharing) {
+        toast({ variant: "destructive", title: "Partage requis", description: "Activez le partage GPS avant de signaler une détresse." });
+        return;
+    }
+
+    setVesselStatus('emergency');
+    updateVesselInFirestore({ status: 'emergency', eventLabel: type });
+    addTechLog('URGENCE', `${type} DÉCLENCHÉ`);
+    
+    if (isEmergencyEnabled && emergencyContact && !isEmergencySmsSentRef.current) {
+        const nick = vesselNickname || 'KOOLAPIK';
+        const msg = isCustomMessageEnabled && vesselSmsMessage ? vesselSmsMessage : "Requiert assistance immédiate.";
+        const time = format(new Date(), 'HH:mm');
+        const acc = accuracy || 0;
+        const pos = currentPosRef.current;
+        const posUrl = pos ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
+        
+        const body = `[${nick.toUpperCase()}] ${msg} [${type}] à ${time}. Position (+/- ${acc}m) : ${posUrl}`;
+        window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+        isEmergencySmsSentRef.current = true;
+    }
+    toast({ variant: "destructive", title: `ALERTE ${type}` });
+  }, [isSharing, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, accuracy, toast]);
+
+  // LOGIQUE DE DÉTECTION DE DÉRIVE
+  useEffect(() => {
+    if (!isSharing || !currentPos || !anchorPos || (vesselStatus !== 'stationary' && vesselStatus !== 'drifting' && vesselStatus !== 'emergency')) return;
+
+    const dist = getDistance(currentPos.lat, currentPos.lng, anchorPos.lat, anchorPos.lng);
+    
+    if (dist > mooringRadius) {
+        if (vesselStatus !== 'drifting' && vesselStatus !== 'emergency') {
+            setVesselStatus('drifting');
+            updateVesselInFirestore({ status: 'drifting', eventLabel: 'DÉRIVE DÉTECTÉE' });
+            addTechLog('ALERTE', `Sortie du rayon de sécurité (${Math.round(dist)}m)`);
+            triggerEmergency('DÉRIVE');
+        }
+    } else {
+        if (vesselStatus === 'drifting') {
+            setVesselStatus('stationary');
+            updateVesselInFirestore({ status: 'stationary', eventLabel: 'RETOUR DANS LE CERCLE' });
+            addTechLog('INFO', 'Navire revenu dans sa zone de sécurité');
+            isEmergencySmsSentRef.current = false;
+        }
+    }
+  }, [isSharing, currentPos, anchorPos, mooringRadius, vesselStatus, updateVesselInFirestore, addTechLog, triggerEmergency]);
+
   // MODULE SIMULATION : Injection de données
   useEffect(() => {
     if (!simulator?.isActive || !simulator.simPos || !isSharing) return;
@@ -155,29 +204,17 @@ export function useEmetteur(
         lastGpsCutRef.current = false;
     }
 
-    let nextStatus = vesselStatus;
-    if (vesselStatus === 'stationary' && anchorPos) {
-        const dist = getDistance(lat, lng, anchorPos.lat, anchorPos.lng);
-        if (dist > mooringRadius) {
-            nextStatus = 'drifting';
-            setVesselStatus('drifting');
-        }
-    } else if (vesselStatus === 'drifting' && anchorPos) {
-        const dist = getDistance(lat, lng, anchorPos.lat, anchorPos.lng);
-        if (dist <= mooringRadius) {
-            nextStatus = 'stationary';
-            setVesselStatus('stationary');
-        }
-    } else if (vesselStatus !== 'emergency' && vesselStatus !== 'returning' && vesselStatus !== 'landed') {
-        nextStatus = speed < 0.2 ? 'stationary' : 'moving';
+    // Le statut est géré par l'effet de détection de dérive ci-dessus
+    if (vesselStatus === 'moving') {
+        const nextStatus = speed < 0.2 ? 'stationary' : 'moving';
         if (nextStatus !== vesselStatus) setVesselStatus(nextStatus);
     }
 
     updateVesselInFirestore({ 
         location: { latitude: lat, longitude: lng }, 
-        status: nextStatus,
         accuracy: acc,
-        speed: Math.round(speed)
+        speed: Math.round(speed),
+        anchorLocation: anchorPos ? { latitude: anchorPos.lat, longitude: anchorPos.lng } : null
     });
 
   }, [simulator?.isActive, simulator?.simPos, simulator?.simSpeed, simulator?.simAccuracy, simulator?.isGpsCut, isSharing, anchorPos, mooringRadius, vesselStatus, addTechLog, updateVesselInFirestore]);
@@ -217,28 +254,8 @@ export function useEmetteur(
         setCurrentHeading(heading || 0);
         onPositionUpdateRef.current?.(latitude, longitude);
 
-        let nextStatus = vesselStatus;
-
-        if (vesselStatus === 'stationary' && anchorPos) {
-            const distFromAnchor = getDistance(latitude, longitude, anchorPos.lat, anchorPos.lng);
-            if (distFromAnchor > mooringRadius) {
-                nextStatus = 'drifting';
-                setVesselStatus('drifting');
-            }
-        } else if (vesselStatus === 'drifting' && anchorPos) {
-            const distFromAnchor = getDistance(latitude, longitude, anchorPos.lat, anchorPos.lng);
-            if (distFromAnchor <= mooringRadius) {
-                nextStatus = 'stationary';
-                setVesselStatus('stationary');
-            }
-        } else if (vesselStatus !== 'emergency' && vesselStatus !== 'returning' && vesselStatus !== 'landed') {
-            nextStatus = knotSpeed < 0.2 ? 'stationary' : 'moving';
-            if (nextStatus !== vesselStatus) setVesselStatus(nextStatus);
-        }
-
         updateVesselInFirestore({ 
-            location: { latitude: longitude, longitude: latitude }, 
-            status: nextStatus, 
+            location: { latitude: latitude, longitude: longitude }, 
             speed: Math.round(knotSpeed), 
             heading: heading || 0,
             fleetId: fId || null,
@@ -265,57 +282,26 @@ export function useEmetteur(
     }
     setCurrentPos(null);
     setAnchorPos(null);
+    isEmergencySmsSentRef.current = false;
     onStopCleanupRef.current?.();
     toast({ title: "Partage arrêté" });
   }, [firestore, sharingId, toast]);
-
-  const triggerEmergency = useCallback((type: 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE') => {
-    if (!isSharing) {
-        toast({ variant: "destructive", title: "Partage requis", description: "Activez le partage GPS avant de signaler une détresse." });
-        return;
-    }
-
-    const isCurrentlyActive = vesselStatus === 'emergency' && lastSentStatusRef.current === type;
-
-    if (isCurrentlyActive) {
-        const nextStatus = anchorPos ? 'stationary' : 'moving';
-        setVesselStatus(nextStatus);
-        updateVesselInFirestore({ status: nextStatus, eventLabel: null });
-        addTechLog('ANNULATION', `Alerte ${type} levée`);
-        toast({ title: "ALERTE ANNULÉE" });
-    } else {
-        setVesselStatus('emergency');
-        updateVesselInFirestore({ status: 'emergency', eventLabel: type });
-        addTechLog('URGENCE', `${type} DÉCLENCHÉ`);
-        
-        if (isEmergencyEnabled && emergencyContact) {
-            const nick = vesselNickname || 'KOOLAPIK';
-            const msg = isCustomMessageEnabled && vesselSmsMessage ? vesselSmsMessage : "Requiert assistance immédiate.";
-            const time = format(new Date(), 'HH:mm');
-            const acc = accuracy || 0;
-            const posUrl = currentPos ? `https://www.google.com/maps?q=${currentPos.lat.toFixed(6)},${currentPos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
-            
-            const body = `[${nick.toUpperCase()}] ${msg} [${type}] à ${time}. Position (+/- ${acc}m) : ${posUrl}`;
-            window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
-        }
-        toast({ variant: "destructive", title: `ALERTE ${type}` });
-    }
-  }, [isSharing, vesselStatus, anchorPos, updateVesselInFirestore, addTechLog, isEmergencyEnabled, emergencyContact, currentPos, vesselNickname, isCustomMessageEnabled, vesselSmsMessage, accuracy, toast]);
 
   const changeManualStatus = useCallback((st: VesselStatus['status'], label?: string) => {
     setVesselStatus(st);
     if (st === 'moving' || st === 'returning' || st === 'landed') {
         setAnchorPos(null);
-    } else if (st === 'stationary' && currentPos) {
-        setAnchorPos(currentPos);
+        isEmergencySmsSentRef.current = false;
+    } else if (st === 'stationary' && currentPosRef.current) {
+        setAnchorPos(currentPosRef.current);
     }
     updateVesselInFirestore({ 
         status: st, 
         eventLabel: label || null,
-        anchorLocation: st === 'stationary' && currentPos ? { latitude: currentPos.lat, longitude: currentPos.lng } : null
+        anchorLocation: st === 'stationary' && currentPosRef.current ? { latitude: currentPosRef.current.lat, longitude: currentPosRef.current.lng } : null
     });
     toast({ title: label || `Statut : ${st}` });
-  }, [currentPos, updateVesselInFirestore, toast]);
+  }, [updateVesselInFirestore, toast]);
 
   const saveSmsSettings = useCallback(async () => {
     localStorage.setItem('lb_emergency_contact', emergencyContact);

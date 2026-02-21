@@ -144,11 +144,11 @@ const VesselMarker = ({ vessel, isMe = false }: { vessel: VesselStatus, isMe?: b
 
     switch (status) {
         case 'stationary':
-            Icon = Anchor;
-            bgColor = 'bg-orange-500';
+            Icon = Navigation; // On garde la navigation pour le navire mobile
+            bgColor = 'bg-blue-600';
             break;
         case 'drifting':
-            Icon = Anchor;
+            Icon = Navigation;
             bgColor = 'bg-red-600';
             animationClass = 'animate-blink-red';
             break;
@@ -186,7 +186,7 @@ const VesselMarker = ({ vessel, isMe = false }: { vessel: VesselStatus, isMe?: b
                     animationClass
                 )}
                 style={{
-                    transform: (status === 'moving' || status === 'returning') ? `rotate(${heading}deg)` : 'none'
+                    transform: (status === 'moving' || status === 'returning' || status === 'stationary' || status === 'drifting') ? `rotate(${heading}deg)` : 'none'
                 }}
             >
                 <Icon className={iconClass} />
@@ -295,7 +295,6 @@ export default function VesselTrackerPage() {
   const centerLng = mapCore.googleMap?.getCenter()?.lng() || INITIAL_CENTER.lng;
   const currentZoom = mapCore.googleMap?.getZoom() || 11;
 
-  // Calcul du calque Windy dynamique
   const windyUrl = useMemo(() => {
     const layer = mapCore.windyLayer === 'wind' ? 'wind' : 
                   mapCore.windyLayer === 'temp' ? 'temp' : 
@@ -327,7 +326,6 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
-        {/* NAV BAR FLOTTANTE : MAPS / MÉTÉO / WINDY */}
         <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-[10006] flex flex-col items-center gap-2">
             <div className="flex bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-white/20 shadow-2xl">
                 <Button
@@ -409,7 +407,7 @@ export default function VesselTrackerPage() {
                     onDragStart={() => mapCore.setIsFollowMode(false)}
                     options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy' }}
                 >
-                    {/* Cercles de mouillage pour toute la flotte suivie */}
+                    {/* RENDU DES CERCLES ET ANCRES FIXES */}
                     {followedVessels?.filter(v => v.isSharing && v.anchorLocation).map(vessel => {
                         const isMe = vessel.id === emetteur.sharingId;
                         const status = isMe ? emetteur.vesselStatus : vessel.status;
@@ -418,11 +416,16 @@ export default function VesselTrackerPage() {
                         
                         return (
                             <React.Fragment key={`anchor-group-${vessel.id}`}>
-                                <OverlayView position={{ lat: vessel.anchorLocation!.latitude, lng: vessel.anchorLocation!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                    <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-orange-500/80 rounded-full border border-white flex items-center justify-center shadow-md z-[800]">
-                                        <Anchor className="size-3 text-white" />
-                                    </div>
-                                </OverlayView>
+                                {/* L'Ancre orange n'apparaît que si le statut est stationary (Mouillage Actif) */}
+                                {status === 'stationary' && (
+                                    <OverlayView position={{ lat: vessel.anchorLocation!.latitude, lng: vessel.anchorLocation!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                        <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]">
+                                            <Anchor className="size-3.5 text-white" />
+                                        </div>
+                                    </OverlayView>
+                                )}
+                                
+                                {/* Le cercle bleu (ou rouge clignotant) centré sur l'ancre */}
                                 <Circle 
                                     center={{ lat: vessel.anchorLocation!.latitude, lng: vessel.anchorLocation!.longitude }}
                                     radius={radius}
@@ -440,6 +443,7 @@ export default function VesselTrackerPage() {
                         );
                     })}
 
+                    {/* RENDU DES NAVIRES MOBILES */}
                     {followedVessels?.filter(v => v.isSharing).map(vessel => (
                         <OverlayView key={vessel.id} position={{ lat: vessel.location?.latitude || 0, lng: vessel.location?.longitude || 0 }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                             <VesselMarker vessel={vessel} isMe={vessel.id === emetteur.sharingId} />

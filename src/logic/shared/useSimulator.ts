@@ -4,7 +4,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
 /**
- * HOOK SIMULATEUR v60.0 : Gère l'état et les commandes de simulation tactique.
+ * HOOK SIMULATEUR v61.0 : Gère l'état et les commandes de simulation tactique.
  * Optimisé à 1Hz pour éviter les violations de performance.
  */
 export function useSimulator() {
@@ -36,22 +36,22 @@ export function useSimulator() {
     setIsActive(true);
   }, []);
 
-  // Déplacement dans le cercle (Simulation clapot)
+  // Déplacement dans le cercle (Simulation clapot) - Ne touche jamais la bordure
   const nudge = useCallback((anchorPos: {lat: number, lng: number} | null, radius: number) => {
     if (!anchorPos) return;
     const degPerMeter = 1 / 111320;
-    const safeRadius = radius * 0.7; // Reste bien à l'intérieur
+    const safeRadius = radius * 0.6; // Reste bien à l'intérieur (60% du rayon)
     const offsetLat = (Math.random() - 0.5) * (safeRadius * degPerMeter);
     const offsetLng = (Math.random() - 0.5) * (safeRadius * degPerMeter);
     setSimPos({ lat: anchorPos.lat + offsetLat, lng: anchorPos.lng + offsetLng });
     setIsActive(true);
   }, []);
 
-  // Forcer la dérive (Déclenchement alarme)
+  // Forcer la dérive (Déclenchement alarme) - Projette à coup sûr en dehors
   const forceDrift = useCallback((anchorPos: {lat: number, lng: number} | null, radius: number) => {
     if (!anchorPos) return;
     const degPerMeter = 1 / 111320;
-    const driftDist = radius + 20; // Sort de 20m pour garantir le déclenchement de l'alarme
+    const driftDist = radius + 30; // Sort de 30m pour garantir le déclenchement de l'alarme
     setSimPos({ lat: anchorPos.lat + (driftDist * degPerMeter), lng: anchorPos.lng });
     setIsActive(true);
   }, []);
