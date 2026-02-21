@@ -19,6 +19,13 @@ import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { 
   Navigation, 
   Anchor, 
   LocateFixed, 
@@ -90,16 +97,6 @@ export default function VesselTrackerPage() {
       return () => clearTimeout(timer);
     }
   }, [emetteur.lastSyncTime]);
-
-  const handleRecenterTo = (pos: { lat: number, lng: number }) => {
-      mapCore.handleRecenter(pos);
-  };
-
-  const handleClearTrace = () => {
-    mapCore.clearBreadcrumbs();
-    emetteur.addTechLog('TRACE RESET', `Trace réinitialisée à ${format(new Date(), 'HH:mm')}`);
-    toast({ title: "Trace effacée" });
-  };
 
   return (
     <div className="w-full space-y-4 pb-32 px-1">
@@ -326,7 +323,7 @@ export default function VesselTrackerPage() {
 
           <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="audio-prefs" className="border-none">
-                  <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                  <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
                       <Volume2 className="size-4 text-primary" />
                       <span className="text-[10px] font-black uppercase">Alertes Audio & Veille</span>
                   </AccordionTrigger>
@@ -337,11 +334,11 @@ export default function VesselTrackerPage() {
                                   <Label className="text-[10px] font-black uppercase text-primary flex items-center gap-2">
                                       <Timer className="size-3" /> Veille Stratégique
                                   </Label>
-                                  <Badge variant="outline" className="font-black bg-white">{recepteur.vesselPrefs.watchDuration} h</Badge>
+                                  <Badge variant="outline" className="font-black bg-white">{recepteur.vesselPrefs.watchDuration >= 60 ? `${Math.floor(recepteur.vesselPrefs.watchDuration / 60)}h` : `${recepteur.vesselPrefs.watchDuration}m`}</Badge>
                               </div>
                               <Slider 
                                 value={[recepteur.vesselPrefs.watchDuration]} 
-                                min={1} max={24} step={1}
+                                min={1} max={1440} step={60}
                                 onValueChange={v => recepteur.savePrefs({ watchDuration: v[0] })}
                               />
                               <div className="flex items-center gap-4">
