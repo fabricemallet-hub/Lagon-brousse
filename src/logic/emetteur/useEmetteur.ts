@@ -11,8 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v87.2 : Gestion de l'historique des flottes, pont Sandbox et déclencheurs d'urgence.
- * Correction des fonctions manquantes : triggerEmergency et changeManualStatus.
+ * LOGIQUE ÉMETTEUR (A) v93.0 : Localisation FR et gestion des Purges.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -352,6 +351,7 @@ export function useEmetteur(
     setAnchorPos(null);
     setSmoothedDistance(null);
     distanceHistoryRef.current = [];
+    setTechLogs([]); // Purge automatique à l'arrêt (RAM uniquement)
     toast({ title: "PARTAGE ARRÊTÉ" });
   }, [firestore, sharingId, toast, addTechLog, updateVesselInFirestore]);
 

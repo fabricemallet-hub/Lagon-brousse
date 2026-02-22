@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -828,10 +829,20 @@ export default function VesselTrackerPage() {
                                   </ScrollArea>
                               </TabsContent>
 
-                              <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
+                              <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4 space-y-4">
+                                  <div className="flex justify-between items-center px-1">
+                                      <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v86.0 prêt</div>
+                                      <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          className="h-7 text-[8px] font-black uppercase text-destructive border border-destructive/20 bg-white"
+                                          onClick={emetteur.clearLogs}
+                                      >
+                                          <Trash2 className="size-3 mr-1" /> Purger l'historique
+                                      </Button>
+                                  </div>
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v86.0 prêt</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm border-slate-100", (log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') || log.label === 'DÉRIVE' || log.label === 'SIGNAL' || log.label === 'SANDBOX' || log.label === 'LABO' || log.label === 'PURGE' || log.label === 'RESET' || log.label === 'CHGT STATUT' || log.label === 'CHGT MANUEL' || log.label === 'SIGNAL') && 'border-red-200 bg-red-50')}>
                                                   <div className="flex justify-between items-start">
@@ -844,7 +855,15 @@ export default function VesselTrackerPage() {
                                                                   log.status === 'returning' ? "text-indigo-600" :
                                                                   log.status === 'landed' ? "text-green-600" : "text-red-600"
                                                               )}>
-                                                                  - {log.status.toUpperCase()}
+                                                                  - {
+                                                                      log.status === 'moving' ? 'EN MOUVEMENT' :
+                                                                      log.status === 'stationary' ? 'STATIONNAIRE' :
+                                                                      log.status === 'returning' ? 'RETOUR' :
+                                                                      log.status === 'landed' ? 'À TERRE' : 
+                                                                      log.status === 'offline' ? 'HORS LIGNE' :
+                                                                      log.status === 'emergency' ? 'URGENCE' :
+                                                                      log.status.toUpperCase()
+                                                                  }
                                                               </span>
                                                           </span>
                                                           <span className="text-[8px] opacity-40 font-bold uppercase">{format(log.time, 'HH:mm:ss')}</span>
