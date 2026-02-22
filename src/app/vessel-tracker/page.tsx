@@ -103,11 +103,12 @@ import {
   StopCircle,
   Activity,
   Signal,
-  ArrowUp
+  ArrowUp,
+  Compass
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { cn, getDistance } from '@/lib/utils';
+import { cn, getDistance, calculateProjectedPosition } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -224,7 +225,7 @@ export default function VesselTrackerPage() {
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     const ids = [...savedVesselIds];
-    if (emetteur.isSharing && !ids.includes(emetteur.sharingId)) ids.push(emetteur.sharingId);
+    if (isSharing && !ids.includes(emetteur.sharingId)) ids.push(emetteur.sharingId);
     if (ids.length === 0) return null;
     return query(collection(firestore, 'vessels'), where('id', 'in', ids.slice(0, 10)));
   }, [firestore, user, savedVesselIds, emetteur.isSharing, emetteur.sharingId]);
@@ -308,15 +309,21 @@ export default function VesselTrackerPage() {
                 anchorLocation: { latitude: emetteur.anchorPos.lat, longitude: emetteur.anchorPos.lng }, 
                 location: emetteur.currentPos ? { latitude: emetteur.currentPos.lat, longitude: emetteur.currentPos.lng } : null, 
                 mooringRadius: emetteur.mooringRadius,
-                accuracy: emetteur.accuracy
+                accuracy: emetteur.accuracy,
+                speed: emetteur.currentSpeed,
+                heading: emetteur.currentHeading
             };
         }
         const otherVessels = followedVessels?.filter(v => v.id !== emetteur.sharingId && v.isSharing && v.anchorLocation) || [];
-        return otherVessels[0] || null;
+        const v = otherVessels[0] || null;
+        if (v) return { ...v, speed: v.speed, heading: v.heading };
+        return null;
     }
     if (!followedVessels) return null;
-    return followedVessels.find(v => v.isSharing && v.anchorLocation);
-  }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, emetteur.accuracy, mapCore.isCirclesHidden]);
+    const v = followedVessels.find(v => v.isSharing && v.anchorLocation);
+    if (v) return { ...v, speed: v.speed, heading: v.heading };
+    return null;
+  }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, emetteur.accuracy, emetteur.currentSpeed, emetteur.currentHeading, mapCore.isCirclesHidden]);
 
   const currentDriftDist = emetteur.smoothedDistance;
 
@@ -417,7 +424,7 @@ export default function VesselTrackerPage() {
             <Button variant={mapCore.viewMode === 'gamma' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl transition-all" onClick={() => mapCore.setViewMode('gamma')}>Windy</Button>
         </div>
 
-        <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={12} onLoad={mapCore.setGoogleMap} onDragStart={() => mapCore.setIsFollowMode(false)} onClick={handleMapClick} options={{ disableDefaultUI: true, mapTypeControl: false, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}>
+        <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={12} onLoad={mapCore.setGoogleMap} onDragStart={() => mapCore.setIsFollowMode(false)} onClick={handleMapClick} options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}>
             {!emetteur.isTrajectoryHidden && mapCore.breadcrumbs.length > 1 && <Polyline path={mapCore.breadcrumbs.map(p => ({ lat: p.lat, lng: p.lng }))} options={{ strokeColor: '#3b82f6', strokeOpacity: 0.6, strokeWeight: 2, zIndex: 1 }} />}
             
             {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
@@ -453,6 +460,46 @@ export default function VesselTrackerPage() {
                         </div>
                     </OverlayView>
 
+                    {activeAnchorVessel.status === 'drifting' && activeAnchorVessel.location && (
+                        <React.Fragment>
+                            {(() => {
+                                const proj = calculateProjectedPosition(
+                                    activeAnchorVessel.location.latitude,
+                                    activeAnchorVessel.location.longitude,
+                                    activeAnchorVessel.speed || 0,
+                                    activeAnchorVessel.heading || 0,
+                                    recepteur.vesselPrefs.driftProjectionMinutes || 5
+                                );
+                                return (
+                                    <React.Fragment>
+                                        <Circle 
+                                            onLoad={c => activeCirclesRef.current.push(c)}
+                                            center={proj}
+                                            radius={15} 
+                                            options={{ 
+                                                strokeColor: '#ef4444', 
+                                                strokeOpacity: 1, 
+                                                strokeWeight: 2, 
+                                                fillColor: '#ffffff', 
+                                                fillOpacity: 0.4, 
+                                                clickable: false, 
+                                                zIndex: 10 
+                                            }} 
+                                        />
+                                        <OverlayView position={proj} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                            <div style={{ transform: 'translate(-50%, -320%)', zIndex: 10000 }} className="flex flex-col items-center pointer-events-none mb-3">
+                                                <div className="px-[10px] py-[4px] rounded-lg backdrop-blur-md border border-white text-[11px] font-black uppercase shadow-2xl whitespace-nowrap bg-orange-600/90 text-white">
+                                                    Estimation position dans {recepteur.vesselPrefs.driftProjectionMinutes || 5} min
+                                                </div>
+                                                <div className="w-0.5 h-3 bg-white/40 shadow-sm" />
+                                            </div>
+                                        </OverlayView>
+                                    </React.Fragment>
+                                );
+                            })()}
+                        </React.Fragment>
+                    )}
+
                     <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]"><Anchor className="size-3.5 text-white" /></div>
                     </OverlayView>
@@ -465,14 +512,12 @@ export default function VesselTrackerPage() {
                 </React.Fragment>
             )}
             
-            {/* v87.1 : Rendu optimisé des membres de la flotte (sans le navire du capitaine) */}
             {followedVessels?.filter(v => v.isSharing && v.location && v.id !== emetteur.sharingId).map(vessel => (
                 <OverlayView key={vessel.id} position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                     <VesselMarker vessel={vessel} />
                 </OverlayView>
             ))}
 
-            {/* v87.1 : Rendu prioritaire et fluide du navire local (Capitaine) */}
             {emetteur.isSharing && emetteur.currentPos && (
                 <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                     <VesselMarker vessel={{ 
@@ -724,6 +769,24 @@ export default function VesselTrackerPage() {
                                   </div>
 
                                   <div className="space-y-4 p-4 border-2 rounded-2xl bg-muted/10">
+                                      <p className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2 mb-2"><History className="size-3" /> Projection de Trajectoire</p>
+                                      <div className="space-y-4">
+                                          <div className="flex justify-between items-center px-1">
+                                              <Label className="text-[10px] font-black uppercase opacity-60">Temps de projection dérive</Label>
+                                              <Badge variant="outline" className="font-black bg-white">{recepteur.vesselPrefs.driftProjectionMinutes || 5} min</Badge>
+                                          </div>
+                                          <Slider 
+                                              value={[recepteur.vesselPrefs.driftProjectionMinutes || 5]} 
+                                              min={1} max={30} step={1}
+                                              onValueChange={v => { recepteur.initAudio(); recepteur.updateLocalPrefs({ driftProjectionMinutes: v[0] }); }} 
+                                          />
+                                          <p className="text-[8px] font-bold text-muted-foreground uppercase leading-tight italic">
+                                              Position estimée en cas de dérive (calcul basé sur le cap et la vitesse actuelle).
+                                          </p>
+                                      </div>
+                                  </div>
+
+                                  <div className="space-y-4 p-4 border-2 rounded-2xl bg-muted/10">
                                       <div className="flex items-center justify-between mb-4">
                                           <p className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2"><Volume2 className="size-3" /> Pilotage Global & Sons</p>
                                           <Button variant="secondary" size="sm" onClick={handleTestAudioSystem} className="h-8 text-[8px] font-black uppercase gap-2 border shadow-sm">
@@ -821,7 +884,6 @@ export default function VesselTrackerPage() {
                                                 recepteur.initAudio(); 
                                                 recepteur.stopAllAlarms(); 
                                                 simulator.setIsActive(v); 
-                                                // v87.1 : Activer le partage automatiquement pour les tests Labo
                                                 if(v && !emetteur.isSharing) emetteur.startSharing();
                                             }} />
                                         </div>
@@ -841,7 +903,6 @@ export default function VesselTrackerPage() {
                                                             simulator.setSimPos(emetteur.currentPos || { lat: -22.27, lng: 166.45 });
                                                         }
                                                         simulator.setIsMoving(!simulator.isMoving);
-                                                        // v87.1 : Assurer le partage
                                                         if(!emetteur.isSharing) emetteur.startSharing();
                                                     }}
                                                 >

@@ -31,6 +31,7 @@ export function useRecepteur(vesselId?: string) {
     watchSound: 'sonar',
     watchLoop: true,
     isWatchEnabled: false,
+    driftProjectionMinutes: 5,
     alerts: {
       moving: { enabled: true, sound: 'sonar', loop: false },
       stationary: { enabled: true, sound: 'bell', loop: true },

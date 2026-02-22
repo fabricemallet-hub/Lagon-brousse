@@ -58,6 +58,7 @@ export interface VesselPrefs {
   watchLoop: boolean;
   isWatchEnabled: boolean;
   mooringRadius?: number;
+  driftProjectionMinutes?: number;
   alerts: {
     moving: VesselAlertConfig;
     stationary: VesselAlertConfig;
@@ -444,6 +445,8 @@ export interface VesselStatus {
   mooringRadius?: number;
   shootingAngle?: ShootingAngle;
   fleetId?: string;
+  speed?: number;
+  heading?: number;
   windSpeed?: number;
   windDir?: number;
   wavesHeight?: number;

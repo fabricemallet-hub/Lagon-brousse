@@ -86,3 +86,34 @@ export const getBearing = (lat1: number, lon1: number, lat2: number, lon2: numbe
   let brng = Math.atan2(y, x) * (180 / Math.PI);
   return (brng + 360) % 360;
 };
+
+/**
+ * Projette une position GPS (Dead Reckoning)
+ */
+export const calculateProjectedPosition = (
+  lat: number,
+  lng: number,
+  speed: number, // en noeuds
+  heading: number, // en degrés
+  minutes: number
+) => {
+  const R = 6371e3; // Rayon de la Terre en mètres
+  const d = (speed * 0.514444) * (minutes * 60); // Distance en mètres (1 noeud = 0.514444 m/s)
+  const brng = (heading * Math.PI) / 180; // Bearing en radians
+  const lat1 = (lat * Math.PI) / 180;
+  const lon1 = (lng * Math.PI) / 180;
+
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(d / R) +
+    Math.cos(lat1) * Math.sin(d / R) * Math.cos(brng)
+  );
+  const lon2 = lon1 + Math.atan2(
+    Math.sin(brng) * Math.sin(d / R) * Math.cos(lat1),
+    Math.cos(d / R) - Math.sin(lat1) * Math.sin(lat2)
+  );
+
+  return {
+    lat: (lat2 * 180) / Math.PI,
+    lng: (lon2 * 180) / Math.PI,
+  };
+};
