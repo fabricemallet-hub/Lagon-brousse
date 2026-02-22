@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useMapCore } from '@/logic/shared/useMapCore';
 import { useSimulator } from '@/logic/shared/useSimulator';
@@ -192,8 +194,8 @@ export default function VesselTrackerPage() {
 
   const handleStopCleanup = useCallback(() => { mapCore.clearBreadcrumbs(); }, [mapCore]);
 
-  const userDocRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
+  const userProfileRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userProfileRef);
 
   const savedVesselIds = userProfile?.savedVesselIds || [];
   
@@ -201,7 +203,6 @@ export default function VesselTrackerPage() {
   const recepteur = useRecepteur(emetteur.sharingId);
   const flotte = useFlotte(emetteur.sharingId, emetteur.vesselNickname);
   
-  // v99.0 : Radar IA prend désormais le statut pour mise en veille
   const radar = useRadarIA(emetteur.currentPos, emetteur.currentSpeed, emetteur.vesselStatus);
   
   const isAdmin = useMemo(() => {
@@ -213,7 +214,6 @@ export default function VesselTrackerPage() {
 
   const [isImpactProbable, setIsImpactProbable] = useState(false);
 
-  // v99.0 : Nettoyage des écouteurs globaux
   useEffect(() => {
     const handleGlobalMessage = (e: MessageEvent) => {
         // Logique Windy ou autre API tierce
