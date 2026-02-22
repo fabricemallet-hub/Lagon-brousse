@@ -277,7 +277,6 @@ export default function VesselTrackerPage() {
     }
   }, [emetteur.currentPos, mapCore.googleMap, mapCore.handleRecenter]);
 
-  // v89.0: Détection de collision au point projeté
   useEffect(() => {
     if (emetteur.vesselStatus === 'drifting' && emetteur.currentPos && mapCore.googleMap) {
         const proj = calculateProjectedPosition(
@@ -314,15 +313,12 @@ export default function VesselTrackerPage() {
     }
   }, [emetteur.vesselStatus, emetteur.currentPos, emetteur.currentSpeed, emetteur.currentHeading, recepteur.vesselPrefs.driftProjectionMinutes, mapCore.googleMap, toast]);
 
-  // v91.0: Détection de dérive vers un récif (Sentinel + Tension)
   const isDangerDriftTowardsReef = useMemo(() => {
     if (!emetteur.isSharing || emetteur.vesselStatus !== 'stationary' || !emetteur.anchorPos || !emetteur.currentPos || radar.dangers.length === 0) return false;
     
-    // Distance de l'ancre
     const dist = getDistance(emetteur.anchorPos.lat, emetteur.anchorPos.lng, emetteur.currentPos.lat, emetteur.currentPos.lng);
-    if (dist < 5) return false; // Trop proche du centre pour définir un axe de dérive fiable
+    if (dist < 5) return false;
 
-    // Direction du bateau par rapport à l'ancre (Vecteur de tension)
     const driftBearing = getBearing(
         emetteur.anchorPos.lat, 
         emetteur.anchorPos.lng, 
@@ -330,7 +326,6 @@ export default function VesselTrackerPage() {
         emetteur.currentPos.lng
     );
     
-    // On regarde si un danger détecté par Sentinel est dans cet axe (secteur de 45°)
     return radar.dangers.some(d => {
         const dangerBearingFromBoat = getBearing(
             emetteur.currentPos!.lat, 
@@ -340,8 +335,6 @@ export default function VesselTrackerPage() {
         );
         let diff = Math.abs(driftBearing - dangerBearingFromBoat);
         if (diff > 180) diff = 360 - diff;
-        
-        // Si on dérive vers lui (angle < 45°) et qu'il est très proche (< 150m)
         return diff < 45 && d.distance < 150;
     });
   }, [emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, radar.dangers]);
@@ -375,7 +368,6 @@ export default function VesselTrackerPage() {
   const activeAnchorVessel = useMemo(() => {
     if (mapCore.isCirclesHidden) return null;
 
-    // v94.0 : Priorité absolue au simulateur pour le retour visuel immédiat en mode LABO
     if (simulator.isActive && simulator.simPos) {
         const aPos = emetteur.anchorPos || simulator.simPos;
         return { 
@@ -384,7 +376,7 @@ export default function VesselTrackerPage() {
             anchorLocation: { latitude: aPos.lat, longitude: aPos.lng }, 
             location: { latitude: simulator.simPos.lat, longitude: simulator.simPos.lng }, 
             mooringRadius: emetteur.mooringRadius,
-            accuracy: 5,
+            accuracy: simulator.simAccuracy || 5,
             speed: simulator.simSpeed,
             heading: simulator.simBearing,
             isSim: true
@@ -414,7 +406,7 @@ export default function VesselTrackerPage() {
     const v = followedVessels.find(v => v.isSharing && v.anchorLocation);
     if (v) return { ...v, speed: v.speed, heading: v.heading, isSim: false };
     return null;
-  }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, emetteur.accuracy, emetteur.currentSpeed, emetteur.currentHeading, mapCore.isCirclesHidden, simulator.isActive, simulator.simPos, simulator.simSpeed, simulator.simBearing]);
+  }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, emetteur.accuracy, emetteur.currentSpeed, emetteur.currentHeading, mapCore.isCirclesHidden, simulator.isActive, simulator.simPos, simulator.simSpeed, simulator.simBearing, simulator.simAccuracy]);
 
   const currentDriftDist = emetteur.smoothedDistance;
 
@@ -459,7 +451,7 @@ export default function VesselTrackerPage() {
             }
         }
     }
-    toast({ title: "Diagnostic Terminé", description: "Si aucun son n'est sorti, vérifiez les réglages de votre smartphone." });
+    toast({ title: "Diagnostic Terminé", description: "Vérifiez vos réglages si aucun son n'est sorti." });
   };
 
   const handleSaveVessel = async () => {
@@ -517,6 +509,24 @@ export default function VesselTrackerPage() {
             
             {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                 <React.Fragment>
+                    {/* CERCLE DE PRÉCISION (EXTERNE) v95.0 : Uniquement si > 20m */}
+                    {activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 20 && (
+                        <Circle 
+                            onLoad={c => activeCirclesRef.current.push(c)}
+                            center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
+                            radius={activeAnchorVessel.accuracy} 
+                            options={{ 
+                                strokeColor: '#ffffff', 
+                                strokeOpacity: 0.3, 
+                                strokeWeight: 1, 
+                                fillColor: '#ffffff', 
+                                fillOpacity: 0.05, 
+                                clickable: false, 
+                                zIndex: 0 
+                            }} 
+                        />
+                    )}
+
                     {tensionVectorStyle && activeAnchorVessel.location && (
                         <Polyline 
                             onLoad={p => activeCirclesRef.current.push(p)}
@@ -534,6 +544,7 @@ export default function VesselTrackerPage() {
                         />
                     )}
                     
+                    {/* ÉTIQUETTE TACTIQUE v95.0 : Fusion visuelle de la précision */}
                     <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -320%)', zIndex: 9999 }} className="flex flex-col items-center pointer-events-none mb-3">
                             <div className={cn(
@@ -541,16 +552,16 @@ export default function VesselTrackerPage() {
                                 (activeAnchorVessel.isSim) ? "bg-orange-600/90 border-orange-300 text-white" :
                                 (activeAnchorVessel.id === emetteur.sharingId && isDangerDriftTowardsReef) ? "bg-violet-600/90 border-violet-400 text-white animate-pulse-violet" :
                                 activeAnchorVessel.status === 'drifting' ? "bg-red-600/90 border-red-400 text-white animate-pulse" : 
-                                (activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15) ? "bg-orange-50/90 border-orange-300 text-white" : "bg-slate-900/80 border-white/20 text-white"
+                                (activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 20) ? "bg-orange-50/90 border-orange-300 text-white" : "bg-slate-900/80 border-white/20 text-white"
                             )}>
                                 {activeAnchorVessel.isSim ? (
-                                    `SIMU : ${activeAnchorVessel.mooringRadius}m | Distance : ${currentDriftDist !== null ? `${currentDriftDist}m` : '...'}`
+                                    `SIMU : ${activeAnchorVessel.mooringRadius}M | DISTANCE : ${currentDriftDist !== null ? `${currentDriftDist}M` : '0M'} ${activeAnchorVessel.accuracy > 20 ? `(PREC +/-${activeAnchorVessel.accuracy}M)` : ''}`
                                 ) : (activeAnchorVessel.id === emetteur.sharingId && isDangerDriftTowardsReef) ? (
                                     "⚠️ DANGER DÉRIVE VERS RÉCIF"
                                 ) : (
                                     <>
-                                        Rayon : {activeAnchorVessel.mooringRadius}m | Distance : {currentDriftDist !== null ? `${currentDriftDist}m` : '...'}
-                                        {activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15 && " (Prec +/-" + activeAnchorVessel.accuracy + "m)"}
+                                        RAYON : {activeAnchorVessel.mooringRadius}M | DISTANCE : {currentDriftDist !== null ? `${currentDriftDist}M` : '0M'} 
+                                        {activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 20 && ` (PREC +/-${activeAnchorVessel.accuracy}M)`}
                                     </>
                                 )}
                             </div>
@@ -591,7 +602,7 @@ export default function VesselTrackerPage() {
                                                     "px-[10px] py-[4px] rounded-lg backdrop-blur-md border border-white text-[11px] font-black uppercase shadow-2xl whitespace-nowrap bg-orange-600/90 text-white",
                                                     isImpactProbable && "bg-red-600 animate-pulse"
                                                 )}>
-                                                    {isImpactProbable ? `⚠️ IMPACT POSSIBLE DANS ${distToProj}m` : `Estimation position dans ${recepteur.vesselPrefs.driftProjectionMinutes || 5} min`}
+                                                    {isImpactProbable ? `⚠️ IMPACT POSSIBLE DANS ${distToProj}M` : `ESTIMATION POSITION DANS ${recepteur.vesselPrefs.driftProjectionMinutes || 5} MIN`}
                                                 </div>
                                                 <div className="w-0.5 h-3 bg-white/40 shadow-sm" />
                                             </div>
@@ -630,7 +641,6 @@ export default function VesselTrackerPage() {
 
             {emetteur.isSharing && emetteur.currentPos && (
                 <React.Fragment>
-                    {/* RADAR SENTINEL v90.0 : Overlay des Dangers IA */}
                     {emetteur.currentSpeed <= 10 && radar.dangers.map((danger) => (
                         <OverlayView key={danger.id} position={{ lat: danger.lat, lng: danger.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                             <div style={{ transform: 'translate(-50%, -50%)' }} className="size-4 bg-red-600/40 rounded-full blur-[2px] animate-pulse" />
@@ -650,13 +660,12 @@ export default function VesselTrackerPage() {
                                 lastActive: new Date() 
                             } as any} />
 
-                            {/* ÉTIQUETTE RADAR SENTINEL v92.0 : Ajout bouton ignorer */}
                             {radar.closestDanger && emetteur.currentSpeed <= 10 && (
                                 <div style={{ transform: 'translate(-50%, -380%)' }} className="absolute z-[10001] flex flex-col items-center">
                                     <div className="flex items-center gap-1">
                                         <div className="px-3 py-1 bg-red-600/90 backdrop-blur-md border border-white rounded-l-lg shadow-2xl whitespace-nowrap animate-pulse">
                                             <p className="text-[10px] font-black uppercase text-white flex items-center gap-2">
-                                                <AlertTriangle className="size-3" /> DANGER {radar.closestDanger.type === 'reef' ? 'RÉCIF' : 'CÔTE'} : {radar.closestDanger.distance}m
+                                                <AlertTriangle className="size-3" /> DANGER {radar.closestDanger.type === 'reef' ? 'RÉCIF' : 'CÔTE'} : {radar.closestDanger.distance}M
                                             </p>
                                         </div>
                                         <button 
@@ -709,7 +718,7 @@ export default function VesselTrackerPage() {
                                       <div className="flex items-center gap-2 mt-1">
                                           <p className="text-[9px] font-bold text-muted-foreground uppercase">Capitaine : {emetteur.vesselNickname}</p>
                                           <Badge variant="outline" className={cn("h-4 text-[7px] font-black uppercase px-1 border-dashed", emetteur.accuracy > 15 ? "text-orange-600 border-orange-300 bg-orange-50" : "text-green-600 border-green-300 bg-green-50")}>
-                                              Prec: +/-{emetteur.accuracy}m
+                                              Prec: +/-{emetteur.accuracy}M
                                           </Badge>
                                       </div>
                                   </div>
@@ -732,7 +741,7 @@ export default function VesselTrackerPage() {
                                       </Button>
                                       <div className="text-right">
                                           <p className="text-[10px] font-black uppercase text-orange-800">Rayon Dérive</p>
-                                          <p className="text-lg font-black text-orange-950 leading-none">{emetteur.mooringRadius}m</p>
+                                          <p className="text-lg font-black text-orange-950 leading-none">{emetteur.mooringRadius}M</p>
                                       </div>
                                   </div>
                                   <div className="space-y-3">
@@ -756,9 +765,9 @@ export default function VesselTrackerPage() {
                               <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-primary"><Navigation className="size-4" /> Identité & Partage</CardTitle>
                           </CardHeader>
                           <CardContent className="p-5 space-y-5">
-                              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">Mon Surnom</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg" /></div>
+                              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Mon Surnom</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg" /></div>
                               <div className="grid grid-cols-2 gap-3">
-                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
+                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 text-indigo-600">ID Flotte</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase" /></div>
                               </div>
                               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 text-emerald-600">Commentaire Flotte</Label><Input value={emetteur.fleetComment} onChange={e => emetteur.setFleetComment(e.target.value)} placeholder="EX: AMIS PÊCHE" className="h-12 border-2 border-emerald-100 font-black text-center uppercase" /></div>
@@ -770,7 +779,7 @@ export default function VesselTrackerPage() {
                                     <div className="grid gap-2">
                                         {emetteur.savedFleets.map(fleet => (
                                             <div key={fleet.id} className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm hover:border-primary/30 transition-all group">
-                                                <div className="flex flex-col min-w-0 flex-1 cursor-pointer" onClick={() => { emetteur.setCustomFleetId(fleet.id); emetteur.setFleetComment(fleet.comment); toast({ title: "Flotte sélectionnée" }); }}>
+                                                <div className="flex flex-col min-0 flex-1 cursor-pointer" onClick={() => { emetteur.setCustomFleetId(fleet.id); emetteur.setFleetComment(fleet.comment); toast({ title: "Flotte sélectionnée" }); }}>
                                                     <span className="font-black text-xs text-primary uppercase tracking-wider">{fleet.id}</span>
                                                     <span className="text-[9px] font-bold text-muted-foreground uppercase truncate">{fleet.comment}</span>
                                                 </div>
@@ -860,7 +869,7 @@ export default function VesselTrackerPage() {
 
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4 space-y-4">
                                   <div className="flex justify-between items-center px-1">
-                                      <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v86.0 prêt</div>
+                                      <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système prêt</div>
                                       <Button 
                                           variant="ghost" 
                                           size="sm" 
@@ -904,7 +913,7 @@ export default function VesselTrackerPage() {
                                                   </div>
                                                   <div className="flex items-center justify-between border-t border-dashed pt-1.5">
                                                       <span className="text-[8px] font-bold text-muted-foreground uppercase truncate flex-1">{log.details}</span>
-                                                      {log.accuracy !== undefined && <Badge variant="outline" className={cn("text-[7px] h-3.5 font-black uppercase bg-white", log.accuracy > 15 ? "text-orange-600 border-orange-200" : "")}>Prec: +/-{log.accuracy}m</Badge>}
+                                                      {log.accuracy !== undefined && <Badge variant="outline" className={cn("text-[7px] h-3.5 font-black uppercase bg-white", log.accuracy > 15 ? "text-orange-600 border-orange-200" : "")}>Prec: +/-{log.accuracy}M</Badge>}
                                                   </div>
                                               </div>
                                           ))}
@@ -933,7 +942,7 @@ export default function VesselTrackerPage() {
                                       <div className="space-y-4">
                                           <div className="flex justify-between items-center px-1">
                                               <Label className="text-[10px] font-black uppercase opacity-60">Temps de projection dérive</Label>
-                                              <Badge variant="outline" className="font-black bg-white">{recepteur.vesselPrefs.driftProjectionMinutes || 5} min</Badge>
+                                              <Badge variant="outline" className="font-black bg-white">{recepteur.vesselPrefs.driftProjectionMinutes || 5} MIN</Badge>
                                           </div>
                                           <Slider 
                                               value={[recepteur.vesselPrefs.driftProjectionMinutes || 5]} 
@@ -1039,7 +1048,7 @@ export default function VesselTrackerPage() {
                                 <TabsContent value="labo" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
                                     <div className="space-y-4 p-4 border-2 border-dashed border-red-200 rounded-3xl bg-red-50/30">
                                         <div className="flex items-center justify-between border-b pb-2">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v86.0</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique</p>
                                             <Switch checked={simulator.isActive} onCheckedChange={(v) => { 
                                                 recepteur.initAudio(); 
                                                 recepteur.stopAllAlarms(); 
@@ -1090,10 +1099,9 @@ export default function VesselTrackerPage() {
                                             <div className="space-y-2 border-t pt-2">
                                                 <div className="flex justify-between text-[9px] font-black uppercase">
                                                     <span className="flex items-center gap-1"><Signal className="size-3" /> Bruit GPS (Instabilité)</span>
-                                                    <span className="text-red-600">{simulator.simGpsNoise} m</span>
+                                                    <span className="text-red-600">{simulator.simGpsNoise} M</span>
                                                 </div>
                                                 <Slider value={[simulator.simGpsNoise]} min={0} max={50} step={1} onValueChange={v => { simulator.setSimGpsNoise(v[0]); }} />
-                                                <p className="text-[7px] font-bold text-muted-foreground uppercase">Simule un signal qui saute pour tester le lissage</p>
                                             </div>
 
                                             <div className="space-y-2">
