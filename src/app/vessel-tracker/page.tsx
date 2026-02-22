@@ -278,6 +278,7 @@ export default function VesselTrackerPage() {
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
     recepteur.initAudio(); 
     if (simulator.isTeleportMode && e.latLng) {
+        recepteur.stopAllAlarms();
         simulator.teleport(e.latLng.lat(), e.latLng.lng());
         toast({ title: "Position Sandbox injectée" });
     }
@@ -641,8 +642,8 @@ export default function VesselTrackerPage() {
                                 <TabsContent value="labo" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
                                     <div className="space-y-4 p-4 border-2 border-dashed border-red-200 rounded-3xl bg-red-50/30">
                                         <div className="flex items-center justify-between border-b pb-2">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v82.1</p>
-                                            <Switch checked={simulator.isActive} onCheckedChange={(v) => { recepteur.initAudio(); simulator.setIsActive(v); }} />
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v82.2</p>
+                                            <Switch checked={simulator.isActive} onCheckedChange={(v) => { recepteur.initAudio(); recepteur.stopAllAlarms(); simulator.setIsActive(v); }} />
                                         </div>
                                         
                                         <div className={cn("space-y-4", !simulator.isActive && "opacity-40 pointer-events-none")}>
@@ -655,6 +656,7 @@ export default function VesselTrackerPage() {
                                                     className="h-12 text-[10px] font-black uppercase gap-2 border-2" 
                                                     onClick={() => {
                                                         recepteur.initAudio();
+                                                        recepteur.stopAllAlarms();
                                                         if (!simulator.isMoving && !simulator.simPos) {
                                                             simulator.setSimPos(emetteur.currentPos || { lat: -22.27, lng: 166.45 });
                                                         }
@@ -709,7 +711,7 @@ export default function VesselTrackerPage() {
                                             <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2 bg-white" onClick={() => { recepteur.initAudio(); simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius); }}>
                                                 <Move className="size-4" /> Forcer Dérive
                                             </Button>
-                                            <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2 bg-white" onClick={() => { recepteur.initAudio(); simulator.stopSim(); emetteur.resetTrajectory(); clearPreviousCircle(); emetteur.addTechLog('LABO', 'NETTOYAGE CERCLE : OK'); }}>
+                                            <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2 bg-white" onClick={() => { recepteur.initAudio(); recepteur.stopAllAlarms(); simulator.stopSim(); emetteur.resetTrajectory(); clearPreviousCircle(); emetteur.addTechLog('LABO', 'NETTOYAGE CERCLE : OK'); }}>
                                                 <Undo2 className="size-4" /> Rétablir Réel
                                             </Button>
                                         </div>

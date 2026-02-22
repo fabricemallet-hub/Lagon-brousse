@@ -11,7 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v82.1 : "Raccordement au protocole de nettoyage impératif"
+ * LOGIQUE ÉMETTEUR (A) v82.2 : Stabilisation de l'ancrage simu et verrous de sécurité.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -59,6 +59,10 @@ export function useEmetteur(
   const isTrajectoryHiddenRef = useRef(isTrajectoryHidden);
   const lastFirestoreSyncRef = useRef<number>(0);
 
+  // Verrous de simulation v82.2
+  const driftCheckLockedUntilRef = useRef<number>(0);
+  const prevSimPosRef = useRef<{ lat: number; lng: number } | null>(null);
+
   useEffect(() => { vesselStatusRef.current = vesselStatus; }, [vesselStatus]);
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
   useEffect(() => { anchorPosRef.current = anchorPos; }, [anchorPos]);
@@ -81,7 +85,6 @@ export function useEmetteur(
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  // ÉCOUTEUR BATTERIE
   useEffect(() => {
     if (simulator?.isActive) {
         setBattery({ level: simulator.simBattery / 100, charging: false });
@@ -246,6 +249,26 @@ export function useEmetteur(
   const handlePositionLogic = useCallback((lat: number, lng: number, speed: number, heading: number, acc: number) => {
     const knotSpeed = speed;
     let nextStatus = vesselStatusRef.current;
+    
+    const isSimActive = !!simulator?.isActive;
+    const nowTs = Date.now();
+    const isLocked = nowTs < driftCheckLockedUntilRef.current;
+
+    // LOGIQUE v82.2 : Stabilisation ancrage Sandbox
+    if (isSimActive && knotSpeed < 2) {
+        const isNewPoint = !prevSimPosRef.current;
+        const isJump = prevSimPosRef.current && getDistance(lat, lng, prevSimPosRef.current.lat, prevSimPosRef.current.lng) > 10;
+        
+        if (isNewPoint || isJump || !anchorPosRef.current) {
+            nextStatus = 'stationary';
+            const newAnchor = { lat, lng };
+            setAnchorPos(newAnchor);
+            anchorPosRef.current = newAnchor;
+            // Marge de sécurité 1.5s pour éviter le trigger dérive immédiat
+            driftCheckLockedUntilRef.current = nowTs + 1500;
+            addTechLog('LABO', 'ANCRAGE SIMU FIXÉ (STABLE)');
+        }
+    }
 
     if (knotSpeed >= 4) {
         if (nextStatus !== 'moving') {
@@ -256,30 +279,35 @@ export function useEmetteur(
         }
     } 
     else if (knotSpeed < 2 && (nextStatus === 'moving' || nextStatus === 'drifting')) {
-        nextStatus = 'stationary';
-        setAnchorPos({ lat, lng });
-        anchorPosRef.current = { lat, lng };
-        addTechLog('CHGT STATUT', 'Mouillage stabilisé (ARRÊT)');
+        if (!isLocked) {
+            nextStatus = 'stationary';
+            setAnchorPos({ lat, lng });
+            anchorPosRef.current = { lat, lng };
+            addTechLog('CHGT STATUT', 'Mouillage stabilisé (ARRÊT)');
+        }
     }
 
     if ((nextStatus === 'stationary' || nextStatus === 'drifting') && anchorPosRef.current) {
-        const dist = getDistance(lat, lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
-        if (dist > mooringRadiusRef.current) {
-            if (acc <= 25 || simulator?.isActive) {
-                if (nextStatus !== 'drifting' && nextStatus !== 'emergency') {
-                    nextStatus = 'drifting';
-                    addTechLog('DÉRIVE', 'HORS ZONE DE SÉCURITÉ');
+        if (!isLocked) {
+            const dist = getDistance(lat, lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
+            if (dist > mooringRadiusRef.current) {
+                if (acc <= 25 || isSimActive) {
+                    if (nextStatus !== 'drifting' && nextStatus !== 'emergency') {
+                        nextStatus = 'drifting';
+                        addTechLog('DÉRIVE', 'HORS ZONE DE SÉCURITÉ');
+                    }
                 }
+            } else if (nextStatus === 'drifting') {
+                nextStatus = 'stationary';
+                addTechLog('CHGT STATUT', 'Retour en zone de sécurité');
             }
-        } else if (nextStatus === 'drifting') {
-            nextStatus = 'stationary';
-            addTechLog('CHGT STATUT', 'Retour en zone de sécurité');
         }
     }
 
     vesselStatusRef.current = nextStatus;
     setVesselStatus(nextStatus);
     setCurrentPos({ lat, lng });
+    prevSimPosRef.current = { lat, lng };
     setCurrentHeading(heading);
     setCurrentSpeed(Math.round(knotSpeed));
     setAccuracy(Math.round(acc));
