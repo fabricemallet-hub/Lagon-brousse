@@ -95,7 +95,8 @@ import {
   Check,
   Wind,
   Thermometer,
-  CloudRain
+  CloudRain,
+  Map as MapIcon
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -445,8 +446,24 @@ export default function VesselTrackerPage() {
         <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2 pointer-events-auto">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>{mapCore.isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
             
-            {/* WINDY SELECTOR v118 */}
+            {/* WINDY SELECTOR v119 */}
             <div className="mt-4 flex flex-col gap-2">
+                <Button 
+                    size="icon" 
+                    className={cn(
+                        "h-10 w-10 border-2 shadow-xl rounded-xl transition-all",
+                        mapCore.windyLayer === 'none' ? "bg-primary text-white border-primary scale-110" : "bg-white/90 backdrop-blur-md text-slate-600 hover:bg-white"
+                    )}
+                    onClick={() => {
+                        mapCore.setWindyLayer('none');
+                        toast({ title: `Vue Google Map Standard` });
+                        emetteur.addTechLog('TECHNIQUE', `RETOUR VUE GOOGLE MAP`);
+                    }}
+                    title="Vue Standard"
+                >
+                    <MapIcon className="size-5" />
+                </Button>
+
                 {[
                     { id: 'wind', icon: Wind, title: 'Vent' },
                     { id: 'waves', icon: Waves, title: 'Mer' },
@@ -744,12 +761,15 @@ export default function VesselTrackerPage() {
                         </div>
                         <ScrollArea className="h-48">
                             <div className="space-y-2">
-                                {emetteur.techLogs.map((log, i) => (
-                                    <div key={i} className="p-2 border rounded-lg bg-slate-50 text-[10px] flex justify-between">
-                                        <span className="font-black uppercase">{log.label} - {log.status}</span>
-                                        <span className="font-bold opacity-40">{format(log.time, 'HH:mm:ss')}</span>
-                                    </div>
-                                ))}
+                                {emetteur.techLogs.map((log, i) => {
+                                    const isTactical = ['CHGT STATUT', 'DÉRIVE', 'URGENCE', 'CHGT MANUEL', 'MOUILLAGE', 'POSITION', 'ANNULATION'].includes(log.label);
+                                    return (
+                                        <div key={i} className={cn("p-2 border rounded-lg bg-slate-50 text-[10px] flex justify-between", isTactical && "border-primary/20 bg-primary/5")}>
+                                            <span className={cn("font-black uppercase", isTactical ? "text-primary" : "text-slate-700")}>{log.label} - {log.status}</span>
+                                            <span className="font-bold opacity-40">{format(log.time, 'HH:mm:ss')}</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </ScrollArea>
                       </TabsContent>
@@ -891,7 +911,7 @@ export default function VesselTrackerPage() {
                                                 <Textarea 
                                                     placeholder="Ex: Problème moteur, besoin aide immédiate." 
                                                     value={emetteur.vesselSmsMessage} 
-                                                    onChange={e => emetteur.setVesselSmsMessage(e.target.value)} 
+                                                    onChange={e => setVesselSmsMessage(e.target.value)} 
                                                     className="border-2 font-medium min-h-[100px] bg-slate-100 text-sm"
                                                 />
                                             </div>
@@ -902,7 +922,7 @@ export default function VesselTrackerPage() {
                                                 </p>
                                                 <div className="p-4 bg-muted/30 border-2 border-dashed border-slate-200 rounded-2xl">
                                                     <p className="text-[9px] font-medium leading-relaxed italic text-slate-600 font-mono">
-                                                        {`[${(emetteur.vesselNickname || 'MON NAVIRE').toUpperCase()}] ${emetteur.vesselSmsMessage || 'Besoin assistance.'} à ${format(new Date(), 'HH:mm')}. +/- ${emetteur.accuracy || '...'}m : https://www.google.com/maps?q=${emetteur.currentPos?.lat || 0},${emetteur.currentPos?.lng || 0}`}
+                                                        {`[${(emetteur.vesselNickname || 'MON NAVIRE').toUpperCase()}] ${emetteur.vesselSmsMessage || 'Besoin assistance.'} à ${format(new Date(), 'HH:mm')} +/- ${emetteur.accuracy}m : https://www.google.com/maps?q=${emetteur.currentPos?.lat || 0},${emetteur.currentPos?.lng || 0}`}
                                                     </p>
                                                 </div>
                                             </div>
@@ -981,10 +1001,8 @@ export default function VesselTrackerPage() {
                                         </div>
 
                                         <div className="space-y-3">
-                                            <div className="flex justify-between items-center px-1">
-                                                <Label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
-                                                    <Battery className="size-3" /> Batterie
-                                                </Label>
+                                            <div className="flex justify-between text-[10px] font-black uppercase px-1">
+                                                <span className="flex items-center gap-1"><Battery className="size-3" /> Batterie</span>
                                                 <span className="text-red-600">{simulator.simBattery}%</span>
                                             </div>
                                             <Slider value={[simulator.simBattery]} max={100} step={1} onValueChange={v => simulator.setSimBattery(v[0])} />

@@ -7,7 +7,7 @@ import { useFirestore } from '@/firebase';
 import { collection, query, orderBy, onSnapshot, where, type DocumentData } from 'firebase/firestore';
 
 export type ViewMode = 'alpha' | 'beta' | 'gamma';
-export type WindyLayer = 'wind' | 'temp' | 'waves' | 'gust' | 'rain' | 'thunder' | 'uv';
+export type WindyLayer = 'none' | 'wind' | 'temp' | 'waves' | 'rain';
 
 export interface TacticalMarker {
     id: string;
@@ -24,14 +24,13 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v76.3 : Gestion de la carte et du tracé intelligent.
- * Correction v118.0 : Inclusion de windyLayer dans les dépendances de mémoïsation.
+ * HOOK PARTAGÉ v119.0 : Gestion de la carte et du moteur de tuiles Windy.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
   const firestore = useFirestore();
   const [viewMode, setViewMode] = useState<ViewMode>('alpha');
-  const [windyLayer, setWindyLayer] = useState<WindyLayer>('wind');
+  const [windyLayer, setWindyLayer] = useState<WindyLayer>('none');
   const [googleMap, setGoogleMap] = useState<google.maps.Map | null>(null);
   const [isFollowMode, setIsFollowMode] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -46,6 +45,33 @@ export function useMapCore() {
   
   const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
   const [tacticalMarkers, setTacticalMarkers] = useState<TacticalMarker[]>([]);
+
+  // MOTEUR D'OVERLAY WINDY v119.0
+  useEffect(() => {
+    if (!googleMap || !isGoogleLoaded) return;
+
+    // 1. Nettoyage des calques existants
+    googleMap.overlayMapTypes.clear();
+
+    if (windyLayer === 'none') return;
+
+    // 2. Création du calque de tuiles Windy
+    // Note: Utilisation de la clé API Point Forecast pour les tuiles si autorisée, sinon fallback
+    const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
+    
+    const windyTileLayer = new google.maps.ImageMapType({
+      getTileUrl: (coord, zoom) => {
+        return `https://tiles.windy.com/tiles/v1.0/gfs/layers/${windyLayer}/${zoom}/${coord.x}/${coord.y}.png?key=${API_KEY}`;
+      },
+      tileSize: new google.maps.Size(256, 256),
+      name: `Windy-${windyLayer}`,
+      opacity: 0.6
+    });
+
+    // 3. Injection dans Google Maps
+    googleMap.overlayMapTypes.push(windyTileLayer);
+
+  }, [googleMap, windyLayer, isGoogleLoaded]);
 
   // Moteur de clignotement global
   useEffect(() => {
@@ -121,7 +147,6 @@ export function useMapCore() {
   }, [firestore]);
 
   const updateBreadcrumbs = useCallback((lat: number, lng: number, status: string) => {
-    // RÈGLE v69.0 : Arrêter le tracé bleu si stationnaire ou dérive
     if (status !== 'moving' && status !== 'returning') return;
 
     const now = Date.now();
@@ -139,7 +164,6 @@ export function useMapCore() {
   const clearBreadcrumbs = useCallback(() => {
     setBreadcrumbs([]);
     setTacticalMarkers([]); 
-    // v76.3 : On ne touche plus à isCirclesHidden ici pour garder l'ancre et le cercle lors d'un reset de trajectoire
     lastTracePosRef.current = null;
   }, []);
 
