@@ -73,7 +73,12 @@ import {
   Copy,
   ChevronDown,
   ClipboardList,
-  Save
+  Save,
+  Target,
+  Fish,
+  Waves,
+  Bird,
+  Camera
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -171,7 +176,6 @@ export default function VesselTrackerPage() {
   const recepteur = useRecepteur(emetteur.sharingId);
   const flotte = useFlotte(emetteur.sharingId, emetteur.vesselNickname);
   
-  // v100.0 : RADAR IA avec Pause UX lors des réglages de rayon
   const radar = useRadarIA(emetteur.currentPos, emetteur.currentSpeed, emetteur.vesselStatus, isAdjustingRadius);
   
   const isAdmin = useMemo(() => {
@@ -202,6 +206,16 @@ export default function VesselTrackerPage() {
   useEffect(() => { 
     if (followedVessels) recepteur.processVesselAlerts(followedVessels, isImpactProbable); 
   }, [followedVessels, recepteur, isImpactProbable]);
+
+  // Sync Tactical Markers for the whole followed group
+  useEffect(() => {
+    if (firestore && (followedVessels || emetteur.isSharing)) {
+        const ids = followedVessels?.map(v => v.id) || [];
+        if (emetteur.sharingId) ids.push(emetteur.sharingId);
+        const unsub = mapCore.syncTacticalMarkers(Array.from(new Set(ids)));
+        return () => unsub();
+    }
+  }, [followedVessels, emetteur.isSharing, emetteur.sharingId, firestore, mapCore]);
 
   const activeCirclesRef = useRef<(google.maps.Circle | google.maps.Polyline)[]>([]);
   const prevStatusRef = useRef<string>('');
@@ -261,6 +275,15 @@ export default function VesselTrackerPage() {
     if (pos) mapCore.handleRecenter(pos);
   };
 
+  const handleTactical = useCallback((type: string) => {
+    const pos = emetteur.currentPos || simulator.simPos;
+    if (pos) {
+        flotte.addTacticalLog(type, pos.lat, pos.lng);
+    } else {
+        toast({ variant: "destructive", title: "GPS Inactif", description: "Position requise pour signaler." });
+    }
+  }, [emetteur.currentPos, simulator.simPos, flotte, toast]);
+
   const activeAnchorVessel = useMemo(() => {
     if (mapCore.isCirclesHidden) return null;
     if (simulator.isActive && simulator.simPos) {
@@ -281,7 +304,6 @@ export default function VesselTrackerPage() {
     return null;
   }, [simulator, emetteur, mapCore.isCirclesHidden]);
 
-  // v100.0 : Mémoïsation des options de cercles pour éviter le Forced Reflow
   const mooringCircleOptions = useMemo(() => {
     if (!activeAnchorVessel) return null;
     const isDrifting = activeAnchorVessel.status === 'drifting';
@@ -330,7 +352,6 @@ export default function VesselTrackerPage() {
             
             {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                 <React.Fragment>
-                    {/* CERCLE DE PRÉCISION (EXTERNE) v95.0 : Uniquement si > 20m */}
                     {activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 20 && (
                         <Circle 
                             center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
@@ -368,6 +389,24 @@ export default function VesselTrackerPage() {
                     <VesselMarker vessel={{ id: emetteur.sharingId, displayName: emetteur.vesselNickname || 'Moi', status: emetteur.vesselStatus, speed: emetteur.currentSpeed, batteryLevel: Math.round(emetteur.battery.level * 100), isCharging: emetteur.battery.charging, isSharing: true, isGhostMode: emetteur.isGhostMode, lastActive: new Date() } as any} />
                 </OverlayView>
             )}
+
+            {/* Render Tactical Markers */}
+            {mapCore.tacticalMarkers.map(marker => (
+                <OverlayView key={marker.id} position={marker.pos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                    <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center group cursor-pointer z-[100]">
+                        <div className="px-1.5 py-0.5 bg-slate-900/90 text-white rounded text-[8px] font-black shadow-lg border border-white/20 mb-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                            {marker.type} - {marker.vesselName}
+                        </div>
+                        <div className="p-1.5 rounded-full bg-white border-2 border-primary shadow-xl ring-2 ring-primary/20">
+                            {marker.type === 'OISEAUX' ? <Bird className="size-3 text-primary" /> : 
+                             marker.type === 'SARDINES' ? <Waves className="size-3 text-primary" /> :
+                             marker.type === 'MARLIN' ? <Target className="size-3 text-primary" /> :
+                             marker.type === 'PRISE' ? <Camera className="size-3 text-primary" /> :
+                             <Fish className="size-3 text-primary" />}
+                        </div>
+                    </div>
+                </OverlayView>
+            ))}
         </GoogleMap>
         
         <div className="absolute top-4 left-4 z-[9999] flex flex-col gap-2">
@@ -455,16 +494,58 @@ export default function VesselTrackerPage() {
               <Accordion type="single" collapsible className="bg-white/95 backdrop-blur-md rounded-t-[2.5rem] shadow-2xl border-x-2 border-t-2 overflow-hidden">
                   <AccordionItem value="logs" className="border-none">
                       <AccordionTrigger className="h-12 px-6 hover:no-underline">
-                          <div className="flex items-center gap-3"><ClipboardList className="size-5 text-primary" /><span className="text-sm font-black uppercase tracking-tighter">Cockpit Technique</span></div>
+                          <div className="flex items-center gap-3">
+                              <ClipboardList className="size-5 text-primary" />
+                              <span className="text-sm font-black uppercase tracking-tighter">COCKPIT : JOURNAL & RÉGLAGES</span>
+                              <Badge variant="outline" className="ml-2 text-[8px] font-black uppercase bg-primary/10 text-primary border-primary/20 animate-pulse">LIVE</Badge>
+                          </div>
                       </AccordionTrigger>
                       <AccordionContent className="p-0">
-                          <Tabs defaultValue="technical" className="w-full">
-                              <TabsList className={cn("grid h-12 bg-muted/20 border-y rounded-none", isAdmin ? "grid-cols-3" : "grid-cols-2")}>
-                                  <TabsTrigger value="technical" className="text-[10px] font-black uppercase">Journal</TabsTrigger>
-                                  <TabsTrigger value="settings" className="text-[10px] font-black uppercase">Réglages</TabsTrigger>
+                          <Tabs defaultValue="tactical" className="w-full">
+                              <TabsList className={cn("grid h-12 bg-muted/20 border-y rounded-none", isAdmin ? "grid-cols-4" : "grid-cols-3")}>
+                                  <TabsTrigger value="tactical" className="text-[10px] font-black uppercase">Tactique</TabsTrigger>
+                                  <TabsTrigger value="technical" className="text-[10px] font-black uppercase">Technique</TabsTrigger>
+                                  <TabsTrigger value="settings" className="text-[10px] font-black uppercase">Réglages Sons</TabsTrigger>
                                   {isAdmin && <TabsTrigger value="labo" className="text-[10px] font-black uppercase text-primary">Labo</TabsTrigger>}
                               </TabsList>
                               
+                              <TabsContent value="tactical" className="m-0 p-4 bg-white">
+                                  <div className="grid grid-cols-4 gap-2">
+                                      <Button variant="outline" className="flex flex-col items-center justify-center h-20 rounded-xl border-2 gap-1 touch-manipulation transition-all active:scale-95" onClick={() => handleTactical('MARLIN')}>
+                                          <Target className="size-5 text-primary" />
+                                          <span className="text-[9px] font-black uppercase">Marlin</span>
+                                      </Button>
+                                      <Button variant="outline" className="flex flex-col items-center justify-center h-20 rounded-xl border-2 gap-1 touch-manipulation transition-all active:scale-95" onClick={() => handleTactical('THON')}>
+                                          <Fish className="size-5 text-primary" />
+                                          <span className="text-[9px] font-black uppercase">Thon</span>
+                                      </Button>
+                                      <Button variant="outline" className="flex flex-col items-center justify-center h-20 rounded-xl border-2 gap-1 touch-manipulation transition-all active:scale-95" onClick={() => handleTactical('TAZARD')}>
+                                          <Fish className="size-5 text-primary" />
+                                          <span className="text-[9px] font-black uppercase">Tazard</span>
+                                      </Button>
+                                      <Button variant="outline" className="flex flex-col items-center justify-center h-20 rounded-xl border-2 gap-1 touch-manipulation transition-all active:scale-95" onClick={() => handleTactical('WAHOO')}>
+                                          <Fish className="size-5 text-primary" />
+                                          <span className="text-[9px] font-black uppercase">Wahoo</span>
+                                      </Button>
+                                      <Button variant="outline" className="flex flex-col items-center justify-center h-20 rounded-xl border-2 gap-1 touch-manipulation transition-all active:scale-95" onClick={() => handleTactical('BONITE')}>
+                                          <Fish className="size-5 text-primary" />
+                                          <span className="text-[9px] font-black uppercase">Bonite</span>
+                                      </Button>
+                                      <Button variant="outline" className="flex flex-col items-center justify-center h-20 rounded-xl border-2 gap-1 touch-manipulation transition-all active:scale-95" onClick={() => handleTactical('SARDINES')}>
+                                          <Waves className="size-5 text-primary" />
+                                          <span className="text-[9px] font-black uppercase">Sardines</span>
+                                      </Button>
+                                      <Button variant="outline" className="flex flex-col items-center justify-center h-20 rounded-xl border-2 gap-1 touch-manipulation transition-all active:scale-95" onClick={() => handleTactical('OISEAUX')}>
+                                          <Bird className="size-5 text-primary" />
+                                          <span className="text-[9px] font-black uppercase">Oiseaux</span>
+                                      </Button>
+                                      <Button variant="outline" className="flex flex-col items-center justify-center h-20 rounded-xl border-2 gap-1 touch-manipulation transition-all active:scale-95 bg-slate-50" onClick={() => handleTactical('PRISE')}>
+                                          <Camera className="size-5 text-primary" />
+                                          <span className="text-[9px] font-black uppercase">Prise</span>
+                                      </Button>
+                                  </div>
+                              </TabsContent>
+
                               <TabsContent value="technical" className="m-0 p-4 bg-white">
                                 <div className="flex justify-between items-center mb-2 px-1">
                                     <p className="text-[9px] font-black uppercase text-muted-foreground">Historique session</p>
