@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -549,11 +550,31 @@ export default function VesselTrackerPage() {
                           </CardHeader>
                           <CardContent className="p-5 space-y-5">
                               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">Mon Surnom</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg" /></div>
-                              <div className="grid grid-cols-2 gap-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 text-indigo-600">ID Flotte</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase" /></div>
+                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 text-emerald-600">Commentaire</Label><Input value={emetteur.fleetComment} onChange={e => emetteur.setFleetComment(e.target.value)} placeholder="EX: AMIS PÊCHE" className="h-12 border-2 border-emerald-100 font-black text-center uppercase" /></div>
                               </div>
                               <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl gap-3" onClick={() => { recepteur.initAudio(); emetteur.startSharing(); }}><Zap className="size-5 fill-white" /> Lancer le Partage GPS</Button>
+                              
+                              {emetteur.savedFleets && emetteur.savedFleets.length > 0 && (
+                                <div className="space-y-3 pt-4 border-t border-dashed">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Mes Flottes Enregistrées</Label>
+                                    <div className="grid gap-2">
+                                        {emetteur.savedFleets.map(fleet => (
+                                            <div key={fleet.id} className="p-3 bg-white border-2 rounded-xl flex items-center justify-between shadow-sm hover:border-primary/30 transition-all group">
+                                                <div className="flex flex-col min-w-0 flex-1 cursor-pointer" onClick={() => { emetteur.setCustomFleetId(fleet.id); emetteur.setFleetComment(fleet.comment); toast({ title: "Flotte sélectionnée" }); }}>
+                                                    <span className="font-black text-xs text-primary uppercase tracking-wider">{fleet.id}</span>
+                                                    <span className="text-[9px] font-bold text-muted-foreground uppercase truncate">{fleet.comment}</span>
+                                                </div>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-20 group-hover:opacity-100 transition-opacity" onClick={() => emetteur.removeFleet(fleet.id)}>
+                                                    <Trash2 className="size-4" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                              )}
                           </CardContent>
                       </Card>
                   )}

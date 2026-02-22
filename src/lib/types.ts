@@ -77,6 +77,11 @@ export interface VesselPrefs {
   };
 }
 
+export interface FleetEntry {
+  id: string;
+  comment: string;
+}
+
 export interface UserAccount {
   id: string;
   email: string;
@@ -105,6 +110,7 @@ export interface UserAccount {
   savedVesselIds?: string[];
   vesselIdHistory?: string[];
   fleetIdHistory?: string[];
+  savedFleets?: FleetEntry[];
   lastVesselId?: string;
   lastFleetId?: string;
   isEmergencyEnabled?: boolean;
