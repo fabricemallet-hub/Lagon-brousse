@@ -4,8 +4,9 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
 /**
- * HOOK SIMULATEUR v80.2 : "Moteur de Mouvement Fluide & Boucle RAF"
+ * HOOK SIMULATEUR v80.3 : "Moteur de Mouvement Fluide & Boucle RAF"
  * Gère l'état et les commandes de simulation GPS avec rendu haute fréquence.
+ * Correction v80.3 : Initialisation automatique de la position si null.
  */
 export function useSimulator() {
   const [isActive, setIsActive] = useState(false);
@@ -25,9 +26,17 @@ export function useSimulator() {
   const rafRef = useRef<number | null>(null);
   const lastUpdateRef = useRef<number>(0);
 
+  // Auto-initialisation de la position si la Sandbox est active
+  useEffect(() => {
+    if (isActive && !simPos) {
+      // Point par défaut (Nouméa) si aucune position n'est injectée
+      setSimPos({ lat: -22.27, lng: 166.45 });
+    }
+  }, [isActive, simPos]);
+
   const startSim = useCallback((currentPos: {lat: number, lng: number} | null) => {
     setIsActive(true);
-    if (!simPos && currentPos) setSimPos(currentPos);
+    if (currentPos) setSimPos(currentPos);
     else if (!simPos) setSimPos({ lat: -22.27, lng: 166.45 }); 
   }, [simPos]);
 
@@ -62,7 +71,7 @@ export function useSimulator() {
     setIsMoving(true);
   }, [isActive]);
 
-  // MOTEUR DE NAVIGATION FICTIVE (v80.2) - BOUCLE FLUIDE
+  // MOTEUR DE NAVIGATION FICTIVE (v80.3) - BOUCLE FLUIDE
   useEffect(() => {
     if (isActive && isMoving && simSpeed > 0 && !isGpsCut) {
         lastUpdateRef.current = performance.now();
@@ -71,25 +80,29 @@ export function useSimulator() {
             const dt = (time - lastUpdateRef.current) / 1000; // Delta en secondes
             lastUpdateRef.current = time;
 
-            setSimPos(prev => {
-                if (!prev) return prev;
-                
-                // 1 nds = 0.514444 m/s
-                const metersPerSec = simSpeed * 0.514444;
-                const distanceMoved = metersPerSec * dt;
-                
-                const degPerMeter = 1 / 111320;
-                const lngCorrection = 1 / Math.cos(prev.lat * Math.PI / 180);
-                const rad = (simBearing * Math.PI) / 180;
-                
-                const dLat = Math.cos(rad) * (distanceMoved * degPerMeter);
-                const dLng = Math.sin(rad) * (distanceMoved * degPerMeter * lngCorrection);
-                
-                return { 
-                    lat: prev.lat + dLat, 
-                    lng: prev.lng + dLng 
-                };
-            });
+            // On ne calcule le déplacement que si le temps a avancé
+            if (dt > 0) {
+                setSimPos(prev => {
+                    // Si prev est null, on utilise le point par défaut pour démarrer le mouvement
+                    const current = prev || { lat: -22.27, lng: 166.45 };
+                    
+                    // 1 nds = 0.514444 m/s
+                    const metersPerSec = simSpeed * 0.514444;
+                    const distanceMoved = metersPerSec * dt;
+                    
+                    const degPerMeter = 1 / 111320;
+                    const lngCorrection = 1 / Math.cos(current.lat * Math.PI / 180);
+                    const rad = (simBearing * Math.PI) / 180;
+                    
+                    const dLat = Math.cos(rad) * (distanceMoved * degPerMeter);
+                    const dLng = Math.sin(rad) * (distanceMoved * degPerMeter * lngCorrection);
+                    
+                    return { 
+                        lat: current.lat + dLat, 
+                        lng: current.lng + dLng 
+                    };
+                });
+            }
 
             rafRef.current = requestAnimationFrame(animate);
         };

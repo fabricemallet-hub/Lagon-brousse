@@ -11,7 +11,8 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v80.2 : "Priorité Rendu Sandbox & Throttling Firestore"
+ * LOGIQUE ÉMETTEUR (A) v80.3 : "Priorité Rendu Sandbox & Throttling Firestore"
+ * Correction v80.3 : Amélioration de la réactivité des seuils de mouvement simulés.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -174,7 +175,7 @@ export function useEmetteur(
     if (!isSharingRef.current && !force) return;
     if (simulator?.isComCut && !force) return; 
     
-    // Throttling en mode simulation pour préserver les quotas
+    // Throttling en mode simulation pour préserver les quotas (5s)
     const now = Date.now();
     if (simulator?.isActive && !force && now - lastFirestoreSyncRef.current < 5000) {
         return;
@@ -249,23 +250,24 @@ export function useEmetteur(
     const knotSpeed = speed;
     let nextStatus = vesselStatusRef.current;
 
-    // RÈGLE v80.2 : Détection auto
-    if (knotSpeed > 5) {
+    // RÈGLE v80.3 : Détection auto plus sensible pour la simulation
+    if (knotSpeed >= 4) {
         if (nextStatus !== 'moving') {
             nextStatus = 'moving';
             setAnchorPos(null);
-            addTechLog('CHGT STATUT', 'Navigation détectée (>5 nds)');
+            addTechLog('CHGT STATUT', 'Navigation détectée (MOUVEMENT)');
         }
     } 
     else if (knotSpeed < 2 && (nextStatus === 'moving' || nextStatus === 'drifting')) {
         nextStatus = 'stationary';
         setAnchorPos({ lat, lng });
-        addTechLog('CHGT STATUT', 'Mouillage stabilisé (<2 nds)');
+        addTechLog('CHGT STATUT', 'Mouillage stabilisé (ARRÊT)');
     }
 
     if ((nextStatus === 'stationary' || nextStatus === 'drifting') && anchorPosRef.current) {
         const dist = getDistance(lat, lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
         if (dist > mooringRadiusRef.current) {
+            // En simulation on ignore la précision GPS pour forcer la détection de dérive
             if (acc <= 25 || simulator?.isActive) {
                 if (nextStatus !== 'drifting' && nextStatus !== 'emergency') {
                     nextStatus = 'drifting';
@@ -319,6 +321,7 @@ export function useEmetteur(
             const lastPos = lastHeartbeatPosRef.current;
             const currentStatus = vesselStatusRef.current;
             
+            // On ne déclenche le mouillage auto que si on n'est pas en mode simulation
             if (nowPos && lastPos && currentStatus === 'moving' && !simulator?.isActive) {
                 const dist = getDistance(nowPos.lat, nowPos.lng, lastPos.lat, lastPos.lng);
                 if (dist < mooringRadiusRef.current) {
@@ -347,17 +350,14 @@ export function useEmetteur(
     isSharingRef.current = true;
     addTechLog('LANCEMENT', 'Initialisation en cours...');
 
+    // Si la Sandbox est déjà active, on injecte immédiatement la position simulée
     if (simulator?.isActive && simulator?.simPos) {
         handlePositionLogic(simulator.simPos.lat, simulator.simPos.lng, simulator.simSpeed, simulator.simBearing, simulator.simAccuracy);
-    } else {
-        navigator.geolocation.getCurrentPosition((pos) => {
-            if (simulator?.isActive) return;
-            handlePositionLogic(pos.coords.latitude, pos.coords.longitude, (pos.coords.speed || 0) * 1.94384, pos.coords.heading || 0, pos.coords.accuracy);
-        });
     }
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
+        // RÈGLE v80.3 : Ignorer le GPS réel si la Sandbox est active
         if (simulator?.isActive) return;
         handlePositionLogic(pos.coords.latitude, pos.coords.longitude, (pos.coords.speed || 0) * 1.94384, pos.coords.heading || 0, pos.coords.accuracy);
       },

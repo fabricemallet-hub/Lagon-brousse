@@ -244,7 +244,8 @@ export default function VesselTrackerPage() {
   }, [emetteur.lastSyncTime]);
 
   const handleRecenter = () => {
-    if (emetteur.currentPos) mapCore.handleRecenter(emetteur.currentPos);
+    const pos = emetteur.currentPos || simulator.simPos;
+    if (pos) mapCore.handleRecenter(pos);
     else toast({ description: "En attente de signal GPS..." });
   };
 
@@ -584,7 +585,7 @@ export default function VesselTrackerPage() {
                                 <TabsContent value="labo" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
                                     <div className="space-y-4 p-4 border-2 border-dashed border-red-200 rounded-3xl bg-red-50/30">
                                         <div className="flex items-center justify-between border-b pb-2">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v80.0</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v80.3</p>
                                             <Switch checked={simulator.isActive} onCheckedChange={simulator.setIsActive} />
                                         </div>
                                         
@@ -596,7 +597,12 @@ export default function VesselTrackerPage() {
                                                 <Button 
                                                     variant={simulator.isMoving ? "destructive" : "default"} 
                                                     className="h-12 text-[10px] font-black uppercase gap-2 border-2" 
-                                                    onClick={() => simulator.setIsMoving(!simulator.isMoving)}
+                                                    onClick={() => {
+                                                        if (!simulator.isMoving && !simulator.simPos) {
+                                                            simulator.setSimPos(emetteur.currentPos || { lat: -22.27, lng: 166.45 });
+                                                        }
+                                                        simulator.setIsMoving(!simulator.isMoving);
+                                                    }}
                                                 >
                                                     {simulator.isMoving ? <StopCircle className="size-4" /> : <PlayCircle className="size-4" />}
                                                     {simulator.isMoving ? 'ARRÊTER' : 'LANCER SIMU'}
