@@ -252,6 +252,7 @@ export default function VesselTrackerPage() {
   }, [emetteur.mooringRadius]);
 
   const handleRadiusChange = (val: number) => {
+    // v122 : On ne met à jour que l'UI locale pendant le glissement
     setTempRadius(val);
     setIsConfirmingRadius(true);
     
@@ -378,8 +379,11 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
-        {/* GHOST HUD LIFO v117 */}
-        <div className="absolute top-[35%] right-[10px] z-[999] pointer-events-none flex flex-col items-end gap-2 max-w-[200px]">
+        {/* GHOST HUD v122 - OPTIMISÉ GPU */}
+        <div 
+            className="absolute top-[35%] right-[10px] z-[999] pointer-events-none flex flex-col items-end gap-2 max-w-[200px]"
+            style={{ willChange: 'transform', transform: 'translateZ(0)' }}
+        >
             <div className="flex bg-black/40 backdrop-blur-md rounded-lg p-1 border border-white/10 pointer-events-auto shadow-xl group transition-opacity hover:opacity-100 opacity-40">
                 {['AUTO', 'TACTICAL', 'TECHNICAL'].map(m => (
                     <button 
@@ -415,7 +419,7 @@ export default function VesselTrackerPage() {
             </div>
         </div>
 
-        {/* RADIUS CONTROLLER v117 */}
+        {/* RADIUS CONTROLLER v122 - OPTIMISÉ FIREBASE */}
         <div className="absolute bottom-[80px] left-4 z-[1001] pointer-events-auto">
             <Card className="bg-black/40 backdrop-blur-md border-white/10 p-3 rounded-xl shadow-2xl flex flex-col items-center gap-3 w-40 animate-in fade-in slide-in-from-left-2">
                 <div className="flex justify-between items-center w-full px-1">
@@ -429,7 +433,8 @@ export default function VesselTrackerPage() {
                     min={10} 
                     max={500} 
                     step={10} 
-                    onValueChange={v => handleRadiusChange(v[0])} 
+                    onValueChange={v => setTempRadius(v[0])} // v122 : Uniquement UI locale pendant le glissement
+                    onValueCommit={v => handleRadiusChange(v[0])} // v122 : Déclenche la validation logicielle au relâchement
                     className="w-full"
                 />
                 {isConfirmingRadius && (

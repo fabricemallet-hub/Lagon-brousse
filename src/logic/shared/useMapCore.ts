@@ -24,8 +24,8 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v121.0 : Gestion de la carte et du moteur de tuiles Windy.
- * Correction de l'instanciation ImageMapType via window.google.
+ * HOOK PARTAGÉ v122.0 : Gestion de la carte et du moteur de tuiles Windy.
+ * OPTIMISATION : Debouncing des snapshots et priorisation du rendu.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
@@ -46,6 +46,8 @@ export function useMapCore() {
   
   const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
   const [tacticalMarkers, setTacticalMarkers] = useState<TacticalMarker[]>([]);
+  const pendingMarkersRef = useRef<Record<string, TacticalMarker[]>>({});
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // MOTEUR D'OVERLAY WINDY v121.0
   useEffect(() => {
@@ -115,6 +117,10 @@ export function useMapCore() {
     }
   }, [googleMap]);
 
+  /**
+   * Synchronisation des marqueurs tactiques avec DEBOUNCING v122
+   * Évite de surcharger React si 50 marqueurs arrivent en même temps.
+   */
   const syncTacticalMarkers = useCallback((vesselIds: string[]) => {
     if (!firestore || vesselIds.length === 0) return () => {};
 
@@ -125,29 +131,45 @@ export function useMapCore() {
         );
 
         return onSnapshot(q, (snapshot) => {
-            setTacticalMarkers(prev => {
-                const newMarkers: TacticalMarker[] = [];
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (data.pos) {
-                        newMarkers.push({
-                            id: `${vid}_${doc.id}`,
-                            type: data.type,
-                            pos: { lat: data.pos.latitude, lng: data.pos.longitude },
-                            time: data.time?.toDate() || new Date(),
-                            vesselName: data.vesselName || vid,
-                            photoUrl: data.photoUrl,
-                            weather: data.weather
-                        });
-                    }
-                });
-                const merged = [...prev.filter(m => !m.id.startsWith(vid)), ...newMarkers];
-                return merged.slice(0, 100);
+            const newMarkers: TacticalMarker[] = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                if (data.pos) {
+                    newMarkers.push({
+                        id: `${vid}_${doc.id}`,
+                        type: data.type,
+                        pos: { lat: data.pos.latitude, lng: data.pos.longitude },
+                        time: data.time?.toDate() || new Date(),
+                        vesselName: data.vesselName || vid,
+                        photoUrl: data.photoUrl,
+                        weather: data.weather
+                    });
+                }
             });
+
+            // Stockage temporaire pour batching
+            pendingMarkersRef.current[vid] = newMarkers;
+
+            if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = setTimeout(() => {
+                // v122 : Utilisation de requestAnimationFrame pour le refresh UI final
+                requestAnimationFrame(() => {
+                    setTacticalMarkers(prev => {
+                        let merged = [...prev];
+                        Object.entries(pendingMarkersRef.current).forEach(([id, markers]) => {
+                            merged = [...merged.filter(m => !m.id.startsWith(id)), ...markers];
+                        });
+                        return merged.slice(0, 100);
+                    });
+                });
+            }, 300);
         });
     });
 
-    return () => unsubscribers.forEach(unsub => unsub());
+    return () => {
+        unsubscribers.forEach(unsub => unsub());
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
   }, [firestore]);
 
   const updateBreadcrumbs = useCallback((lat: number, lng: number, status: string) => {
