@@ -33,7 +33,10 @@ import {
   doc, 
   orderBy, 
   addDoc, 
-  serverTimestamp 
+  serverTimestamp,
+  updateDoc,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 import { 
   Select, 
@@ -200,6 +203,8 @@ export default function VesselTrackerPage() {
   }, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
+  const savedVesselIds = userProfile?.savedVesselIds || [];
+  
   const emetteur = useEmetteur(handlePositionUpdate, handleStopCleanup, simulator, userProfile);
   const recepteur = useRecepteur(emetteur.sharingId);
   const flotte = useFlotte(emetteur.sharingId, emetteur.vesselNickname);
@@ -212,7 +217,6 @@ export default function VesselTrackerPage() {
 
   const [testMinutes, setTestMinutes] = useState('60');
 
-  const savedVesselIds = userProfile?.savedVesselIds || [];
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     const ids = [...savedVesselIds];
@@ -309,6 +313,17 @@ export default function VesselTrackerPage() {
     return followedVessels.find(v => v.isSharing && v.anchorLocation);
   }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, mapCore.isCirclesHidden]);
 
+  // v84.1 : Calcul de la distance réelle de dérive pour l'indicateur tactique
+  const currentDriftDist = useMemo(() => {
+    if (!activeAnchorVessel?.anchorLocation || !activeAnchorVessel?.location) return null;
+    return Math.round(getDistance(
+        activeAnchorVessel.anchorLocation.latitude, 
+        activeAnchorVessel.anchorLocation.longitude,
+        activeAnchorVessel.location.latitude,
+        activeAnchorVessel.location.longitude
+    ));
+  }, [activeAnchorVessel]);
+
   const handleUpdateAlertConfig = (key: keyof VesselPrefs['alerts'], field: 'enabled' | 'sound' | 'loop', value: any) => {
     const currentAlerts = { ...recepteur.vesselPrefs.alerts };
     currentAlerts[key] = { ...currentAlerts[key], [field]: value };
@@ -394,6 +409,20 @@ export default function VesselTrackerPage() {
             {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                 <React.Fragment>
                     {activeAnchorVessel.location && <Polyline path={[{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }, { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }]} options={{ strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6', strokeOpacity: 0.8, strokeWeight: 2, zIndex: 2 }} />}
+                    
+                    {/* v84.1 : Indicateur numérique de distance au-dessus du cercle */}
+                    <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                        <div style={{ transform: 'translate(-50%, -160%)' }} className="flex flex-col items-center pointer-events-none">
+                            <div className={cn(
+                                "px-2 py-1 rounded-lg backdrop-blur-md border-2 text-[9px] font-black uppercase shadow-2xl whitespace-nowrap transition-all",
+                                activeAnchorVessel.status === 'drifting' ? "bg-red-600/90 border-red-400 text-white animate-pulse" : "bg-slate-900/80 border-white/20 text-white"
+                            )}>
+                                Rayon : {activeAnchorVessel.mooringRadius}m | Distance : {currentDriftDist !== null ? `${currentDriftDist}m` : '...'}
+                            </div>
+                            <div className="w-0.5 h-2 bg-white/40 shadow-sm" />
+                        </div>
+                    </OverlayView>
+
                     <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]"><Anchor className="size-3.5 text-white" /></div>
                     </OverlayView>
@@ -702,7 +731,7 @@ export default function VesselTrackerPage() {
                                 <TabsContent value="labo" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
                                     <div className="space-y-4 p-4 border-2 border-dashed border-red-200 rounded-3xl bg-red-50/30">
                                         <div className="flex items-center justify-between border-b pb-2">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v83.1</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v84.1</p>
                                             <Switch checked={simulator.isActive} onCheckedChange={(v) => { recepteur.initAudio(); recepteur.stopAllAlarms(); simulator.setIsActive(v); }} />
                                         </div>
                                         

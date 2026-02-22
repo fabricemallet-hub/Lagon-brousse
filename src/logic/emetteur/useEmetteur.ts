@@ -11,7 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v84.0 : Persistance du rayon de dérive.
+ * LOGIQUE ÉMETTEUR (A) v84.1 : Bridage strict à 100m et persistance.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -27,7 +27,7 @@ export function useEmetteur(
   const [currentPos, setCurrentPos] = useState<{ lat: number, lng: number } | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [anchorPos, setAnchorPos] = useState<{ lat: number, lng: number } | null>(null);
-  const [mooringRadius, setMooringRadius] = useState(100);
+  const [mooringRadius, _setMooringRadius] = useState(100);
   const [accuracy, setAccuracy] = useState<number>(0);
   const [currentHeading, setCurrentHeading] = useState<number>(0);
   const [currentSpeed, setCurrentSpeed] = useState<number>(0);
@@ -72,14 +72,20 @@ export function useEmetteur(
   useEffect(() => { isGhostModeRef.current = isGhostMode; }, [isGhostMode]);
   useEffect(() => { isTrajectoryHiddenRef.current = isTrajectoryHidden; }, [isTrajectoryHidden]);
 
+  // BRIDAGE v84.1 : Setter sécurisé à 100m
+  const setMooringRadius = useCallback((val: number) => {
+    const capped = Math.min(val, 100);
+    _setMooringRadius(capped);
+    mooringRadiusRef.current = capped;
+  }, []);
+
   // Chargement des préférences de rayon
   useEffect(() => {
     if (userProfile?.vesselPrefs?.mooringRadius) {
       const radius = Math.min(userProfile.vesselPrefs.mooringRadius, 100);
       setMooringRadius(radius);
-      mooringRadiusRef.current = radius;
     }
-  }, [userProfile]);
+  }, [userProfile, setMooringRadius]);
 
   const watchIdRef = useRef<number | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -505,7 +511,7 @@ export function useEmetteur(
     forceTimeOffset, addTechLog
   }), [
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
-    triggerEmergency, changeManualStatus, anchorPos, mooringRadius, saveMooringRadius, accuracy, battery,
+    triggerEmergency, changeManualStatus, anchorPos, mooringRadius, setMooringRadius, saveMooringRadius, accuracy, battery,
     vesselNickname, customSharingId, customFleetId, sharingId,
     lastSyncTime, techLogs, tacticalLogs, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
     isCustomMessageEnabled, toast, user, firestore, clearLogs,
