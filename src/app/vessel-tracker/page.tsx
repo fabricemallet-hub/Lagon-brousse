@@ -620,13 +620,22 @@ export default function VesselTrackerPage() {
                                 lastActive: new Date() 
                             } as any} />
 
-                            {/* ÉTIQUETTE RADAR SENTINEL */}
+                            {/* ÉTIQUETTE RADAR SENTINEL v92.0 : Ajout bouton ignorer */}
                             {radar.closestDanger && emetteur.currentSpeed <= 10 && (
                                 <div style={{ transform: 'translate(-50%, -380%)' }} className="absolute z-[10001] flex flex-col items-center">
-                                    <div className="px-3 py-1 bg-red-600/90 backdrop-blur-md border border-white rounded-lg shadow-2xl whitespace-nowrap animate-pulse">
-                                        <p className="text-[10px] font-black uppercase text-white flex items-center gap-2">
-                                            <AlertTriangle className="size-3" /> DANGER {radar.closestDanger.type === 'reef' ? 'RÉCIF' : 'CÔTE'} : {radar.closestDanger.distance}m
-                                        </p>
+                                    <div className="flex items-center gap-1">
+                                        <div className="px-3 py-1 bg-red-600/90 backdrop-blur-md border border-white rounded-l-lg shadow-2xl whitespace-nowrap animate-pulse">
+                                            <p className="text-[10px] font-black uppercase text-white flex items-center gap-2">
+                                                <AlertTriangle className="size-3" /> DANGER {radar.closestDanger.type === 'reef' ? 'RÉCIF' : 'CÔTE'} : {radar.closestDanger.distance}m
+                                            </p>
+                                        </div>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); radar.ignoreDanger(radar.closestDanger!.id); }}
+                                            className="px-2 py-1 bg-slate-900/90 text-white rounded-r-lg border-y border-r border-white border-l-white/20 hover:bg-black transition-colors shadow-2xl"
+                                            title="Ignorer ce danger"
+                                        >
+                                            <EyeOff className="size-3" />
+                                        </button>
                                     </div>
                                     <div className="w-0.5 h-4 bg-red-600/60 shadow-sm" />
                                 </div>
