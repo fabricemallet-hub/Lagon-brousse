@@ -222,7 +222,7 @@ export default function VesselTrackerPage() {
 
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // ÉCOUTEUR RÉCEPTEUR CENTRAL (v81.0)
+  // ÉCOUTEUR RÉCEPTEUR CENTRAL
   useEffect(() => { 
     if (followedVessels) recepteur.processVesselAlerts(followedVessels); 
   }, [followedVessels, recepteur.processVesselAlerts]);
@@ -232,7 +232,7 @@ export default function VesselTrackerPage() {
   const prevStatusRef = useRef<string>('');
   const hasCenteredInitially = useRef(false);
 
-  // NETTOYAGE IMPÉRATIF DU CERCLE (v82.0)
+  // NETTOYAGE IMPÉRATIF DU CERCLE
   const clearPreviousCircle = useCallback(() => {
     if (anchorCircleRef.current) {
         anchorCircleRef.current.setMap(null);
@@ -242,13 +242,15 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     if (prevStatusRef.current !== emetteur.vesselStatus) {
-        // Si on quitte le mouillage, on force le nettoyage impératif
+        // PROTOCOLE v82.1 : Nettoyage impératif lors de la sortie du mouillage ou dérive
         if (emetteur.vesselStatus === 'moving' || emetteur.vesselStatus === 'returning' || emetteur.vesselStatus === 'landed' || emetteur.vesselStatus === 'offline') {
             clearPreviousCircle();
+            recepteur.stopAllAlarms();
+            emetteur.addTechLog('LABO', 'NETTOYAGE CERCLE : OK');
         }
         prevStatusRef.current = emetteur.vesselStatus;
     }
-  }, [emetteur.vesselStatus, clearPreviousCircle]);
+  }, [emetteur.vesselStatus, clearPreviousCircle, recepteur.stopAllAlarms, emetteur.addTechLog]);
 
   useEffect(() => {
     if (emetteur.currentPos && !hasCenteredInitially.current && mapCore.googleMap) {
@@ -284,7 +286,7 @@ export default function VesselTrackerPage() {
   const activeAnchorVessel = useMemo(() => {
     if (mapCore.isCirclesHidden) return null;
     
-    // RÈGLE v82.0 : Si on émet, on utilise UNIQUEMENT l'état local pour éviter les superpositions avec le cloud (sync lag)
+    // RÈGLE v82.1 : Priorité absolue aux données locales pour l'émetteur
     if (emetteur.isSharing) {
         if ((emetteur.vesselStatus === 'stationary' || emetteur.vesselStatus === 'drifting') && emetteur.anchorPos) {
             return { 
@@ -295,12 +297,10 @@ export default function VesselTrackerPage() {
                 mooringRadius: emetteur.mooringRadius 
             };
         }
-        // Si on partage mais qu'on ne mouille pas, on ignore aussi les données cloud pour soi-même
         const otherVessels = followedVessels?.filter(v => v.id !== emetteur.sharingId && v.isSharing && v.anchorLocation) || [];
         return otherVessels[0] || null;
     }
     
-    // Si on n'émet pas (Mode Récepteur Pur), on cherche le premier navire avec une ancre
     if (!followedVessels) return null;
     return followedVessels.find(v => v.isSharing && v.anchorLocation);
   }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, mapCore.isCirclesHidden]);
@@ -309,6 +309,13 @@ export default function VesselTrackerPage() {
     const currentAlerts = { ...recepteur.vesselPrefs.alerts };
     currentAlerts[key] = { ...currentAlerts[key], [field]: value };
     recepteur.updateLocalPrefs({ alerts: currentAlerts });
+  };
+
+  const handleClearEverything = () => {
+    recepteur.initAudio();
+    clearPreviousCircle();
+    emetteur.clearLogs();
+    emetteur.addTechLog('LABO', 'NETTOYAGE CERCLE : OK');
   };
 
   if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
@@ -497,7 +504,7 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v82.0 prêt</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v82.1 prêt</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm border-slate-100", (log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') || log.label === 'DÉRIVE' || log.label === 'SANDBOX' || log.label === 'LABO') && 'border-red-200 bg-red-50')}>
                                                   <div className="flex justify-between items-start">
@@ -541,7 +548,7 @@ export default function VesselTrackerPage() {
                                           <div className="space-y-0.5"><Label className="text-xs font-black uppercase">Masquer Tracé</Label><p className="text-[8px] font-bold text-slate-400 uppercase">Cache la ligne bleue</p></div>
                                           <Switch checked={emetteur.isTrajectoryHidden} onCheckedChange={(v) => { recepteur.initAudio(); emetteur.toggleTrajectoryHidden(); }} />
                                       </div>
-                                      <Button variant="outline" className="w-full h-12 font-black uppercase text-[10px] border-2 bg-white text-slate-900 mt-2 gap-2" onClick={() => { recepteur.initAudio(); emetteur.resetTrajectory(); clearPreviousCircle(); }}>
+                                      <Button variant="outline" className="w-full h-12 font-black uppercase text-[10px] border-2 bg-white text-slate-900 mt-2 gap-2" onClick={() => { recepteur.initAudio(); emetteur.resetTrajectory(); clearPreviousCircle(); emetteur.addTechLog('LABO', 'NETTOYAGE CERCLE : OK'); }}>
                                           <HistoryIcon className="size-4" /> RESET TRAJECTOIRE
                                       </Button>
                                   </div>
@@ -634,7 +641,7 @@ export default function VesselTrackerPage() {
                                 <TabsContent value="labo" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
                                     <div className="space-y-4 p-4 border-2 border-dashed border-red-200 rounded-3xl bg-red-50/30">
                                         <div className="flex items-center justify-between border-b pb-2">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v82.0</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v82.1</p>
                                             <Switch checked={simulator.isActive} onCheckedChange={(v) => { recepteur.initAudio(); simulator.setIsActive(v); }} />
                                         </div>
                                         
@@ -702,7 +709,7 @@ export default function VesselTrackerPage() {
                                             <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2 bg-white" onClick={() => { recepteur.initAudio(); simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius); }}>
                                                 <Move className="size-4" /> Forcer Dérive
                                             </Button>
-                                            <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2 bg-white" onClick={() => { recepteur.initAudio(); simulator.stopSim(); emetteur.resetTrajectory(); clearPreviousCircle(); }}>
+                                            <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2 bg-white" onClick={() => { recepteur.initAudio(); simulator.stopSim(); emetteur.resetTrajectory(); clearPreviousCircle(); emetteur.addTechLog('LABO', 'NETTOYAGE CERCLE : OK'); }}>
                                                 <Undo2 className="size-4" /> Rétablir Réel
                                             </Button>
                                         </div>

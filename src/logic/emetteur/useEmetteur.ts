@@ -11,7 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v82.0 : "Gestion stricte des ancres et reset"
+ * LOGIQUE ÉMETTEUR (A) v82.1 : "Raccordement au protocole de nettoyage impératif"
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -81,13 +81,12 @@ export function useEmetteur(
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  // ÉCOUTEUR BATTERIE (Réel vs Simulé)
+  // ÉCOUTEUR BATTERIE
   useEffect(() => {
     if (simulator?.isActive) {
         setBattery({ level: simulator.simBattery / 100, charging: false });
         return;
     }
-
     if (typeof window === 'undefined' || !('getBattery' in navigator)) return;
     let batteryObj: any = null;
     const updateBatteryState = () => { if (batteryObj) setBattery({ level: batteryObj.level, charging: batteryObj.charging }); };
@@ -139,7 +138,7 @@ export function useEmetteur(
 
     setTechLogs(prev => {
         const lastLog = prev[0];
-        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE' || label === 'MOUILLAGE AUTO' || label === 'RESET' || label === 'LABO' || label === 'SANDBOX';
+        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE' || label === 'MOUILLAGE AUTO' || label === 'RESET' || label === 'LABO' || label === 'SANDBOX' || label === 'CHGT STATUT' || label === 'CHGT MANUEL';
 
         if (!statusChanged && label === 'AUTO') {
             const duration = differenceInMinutes(now, lastLog.time);
@@ -403,7 +402,7 @@ export function useEmetteur(
     setTechLogs([]);
     setTacticalLogs([]);
     if (firestore && sharingId) {
-        await updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp(), tacticalClearedAt: serverTimestamp() });
+        await updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp(), tacticalClearedAt: serverTimestamp(), anchorLocation: null });
         const batch = writeBatch(firestore);
         const tactSnap = await getDocs(collection(firestore, 'vessels', sharingId, 'tactical_logs'));
         tactSnap.forEach(d => batch.delete(d.ref));
@@ -491,7 +490,7 @@ export function useEmetteur(
         toast({ title: "Réglages SMS sauvegardés" });
     }, clearLogs,
     isGhostMode, toggleGhostMode, isTrajectoryHidden, toggleTrajectoryHidden, resetTrajectory,
-    forceTimeOffset
+    forceTimeOffset, addTechLog
   }), [
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     triggerEmergency, changeManualStatus, anchorPos, mooringRadius, accuracy, battery,
@@ -499,6 +498,6 @@ export function useEmetteur(
     lastSyncTime, techLogs, tacticalLogs, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
     isCustomMessageEnabled, toast, user, firestore, clearLogs,
     isGhostMode, toggleGhostMode, isTrajectoryHidden, toggleTrajectoryHidden, resetTrajectory,
-    forceTimeOffset
+    forceTimeOffset, addTechLog
   ]);
 }
