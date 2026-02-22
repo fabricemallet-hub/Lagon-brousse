@@ -4,9 +4,8 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
 /**
- * HOOK SIMULATEUR v85.0 : "Moteur de Mouvement & Simulateur de Bruit"
- * Gère l'état et les commandes de simulation GPS.
- * Ajout v85.0 : simGpsNoise pour simuler l'instabilité du signal.
+ * HOOK SIMULATEUR v98.0 : "Moteur de Mouvement & Sandbox Haute Précision"
+ * Ajout v98.0 : simSpeed step 0.1 pour les tests de dérive fine.
  */
 export function useSimulator() {
   const [isActive, setIsActive] = useState(false);
@@ -18,7 +17,7 @@ export function useSimulator() {
   // États simulés
   const [simSpeed, setSimSpeed] = useState(0);
   const [simAccuracy, setSimAccuracy] = useState(5);
-  const [simGpsNoise, setSimGpsNoise] = useState(0); // Nouveau: Bruit GPS en mètres
+  const [simGpsNoise, setSimGpsNoise] = useState(0);
   const [simBattery, setSimBattery] = useState(100);
   const [simPos, setSimPos] = useState<{lat: number, lng: number} | null>(null);
   const [timeOffset, setTimeOffset] = useState(0);
@@ -27,18 +26,11 @@ export function useSimulator() {
   const rafRef = useRef<number | null>(null);
   const lastUpdateRef = useRef<number>(0);
 
-  // Auto-initialisation de la position si la Sandbox est active
   useEffect(() => {
     if (isActive && !simPos) {
       setSimPos({ lat: -22.27, lng: 166.45 });
     }
   }, [isActive, simPos]);
-
-  const startSim = useCallback((currentPos: {lat: number, lng: number} | null) => {
-    setIsActive(true);
-    if (currentPos) setSimPos(currentPos);
-    else if (!simPos) setSimPos({ lat: -22.27, lng: 166.45 }); 
-  }, [simPos]);
 
   const stopSim = useCallback(() => {
     setIsActive(false);
@@ -67,87 +59,49 @@ export function useSimulator() {
     const offsetLat = Math.cos(angle) * (driftDist * degPerMeter);
     const offsetLng = Math.sin(angle) * (driftDist * degPerMeter);
     setSimPos({ lat: anchorPos.lat + offsetLat, lng: anchorPos.lng + offsetLng });
-    setSimSpeed(1); 
+    setSimSpeed(0.5); // v98.0 : Vitesse de dérive type
     setIsActive(true);
     setIsMoving(true);
   }, [isActive]);
 
-  // MOTEUR DE NAVIGATION FICTIVE (v85.0)
   useEffect(() => {
     if (isActive && isMoving && simSpeed > 0 && !isGpsCut) {
         lastUpdateRef.current = performance.now();
-
         const animate = (time: number) => {
             const dt = (time - lastUpdateRef.current) / 1000;
             lastUpdateRef.current = time;
-
             if (dt > 0) {
                 setSimPos(prev => {
                     const current = prev || { lat: -22.27, lng: 166.45 };
                     const metersPerSec = simSpeed * 0.514444;
                     const distanceMoved = metersPerSec * dt;
-                    
                     const degPerMeter = 1 / 111320;
                     const lngCorrection = 1 / Math.cos(current.lat * Math.PI / 180);
                     const rad = (simBearing * Math.PI) / 180;
-                    
                     const dLat = Math.cos(rad) * (distanceMoved * degPerMeter);
                     const dLng = Math.sin(rad) * (distanceMoved * degPerMeter * lngCorrection);
-                    
-                    // Application du bruit GPS (Jitter)
-                    let jitterLat = 0;
-                    let jitterLng = 0;
+                    let jitterLat = 0, jitterLng = 0;
                     if (simGpsNoise > 0) {
                         jitterLat = (Math.random() - 0.5) * (simGpsNoise * degPerMeter);
                         jitterLng = (Math.random() - 0.5) * (simGpsNoise * degPerMeter * lngCorrection);
                     }
-
-                    return { 
-                        lat: current.lat + dLat + jitterLat, 
-                        lng: current.lng + dLng + jitterLng
-                    };
+                    return { lat: current.lat + dLat + jitterLat, lng: current.lng + dLng + jitterLng };
                 });
             }
             rafRef.current = requestAnimationFrame(animate);
         };
         rafRef.current = requestAnimationFrame(animate);
-    } else {
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    } else if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
     }
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [isActive, isMoving, simSpeed, isGpsCut, simBearing, simGpsNoise]);
 
   return useMemo(() => ({
-    isActive,
-    setIsActive,
-    startSim,
-    stopSim,
-    isGpsCut,
-    setIsGpsCut,
-    isComCut,
-    setIsComCut,
-    isTeleportMode,
-    setIsTeleportMode,
-    isMoving,
-    setIsMoving,
-    simSpeed,
-    setSimSpeed,
-    simAccuracy,
-    setSimAccuracy,
-    simGpsNoise,
-    setSimGpsNoise,
-    simBattery,
-    setSimBattery,
-    simPos,
-    setSimPos,
-    teleport,
-    forceDrift,
-    timeOffset,
-    setTimeOffset,
-    simBearing,
-    setSimBearing
-  }), [
-    isActive, simPos, simSpeed, simAccuracy, simGpsNoise, simBattery, isGpsCut, isComCut, isTeleportMode, isMoving, timeOffset, simBearing,
-    startSim, stopSim, teleport, forceDrift, setTimeOffset
-  ]);
+    isActive, setIsActive, stopSim, isGpsCut, setIsGpsCut, isComCut, setIsComCut,
+    isTeleportMode, setIsTeleportMode, isMoving, setIsMoving,
+    simSpeed, setSimSpeed, simAccuracy, setSimAccuracy, simGpsNoise, setSimGpsNoise,
+    simBattery, setSimBattery, simPos, setSimPos, teleport, forceDrift,
+    timeOffset, setTimeOffset, simBearing, setSimBearing
+  }), [isActive, simPos, simSpeed, simAccuracy, simGpsNoise, simBattery, isGpsCut, isComCut, isTeleportMode, isMoving, timeOffset, simBearing, stopSim, teleport, forceDrift]);
 }
