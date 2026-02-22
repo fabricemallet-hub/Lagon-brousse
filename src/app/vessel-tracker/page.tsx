@@ -374,6 +374,23 @@ export default function VesselTrackerPage() {
 
   const activeAnchorVessel = useMemo(() => {
     if (mapCore.isCirclesHidden) return null;
+
+    // v94.0 : Priorité absolue au simulateur pour le retour visuel immédiat en mode LABO
+    if (simulator.isActive && simulator.simPos) {
+        const aPos = emetteur.anchorPos || simulator.simPos;
+        return { 
+            id: 'SANDBOX', 
+            status: emetteur.vesselStatus, 
+            anchorLocation: { latitude: aPos.lat, longitude: aPos.lng }, 
+            location: { latitude: simulator.simPos.lat, longitude: simulator.simPos.lng }, 
+            mooringRadius: emetteur.mooringRadius,
+            accuracy: 5,
+            speed: simulator.simSpeed,
+            heading: simulator.simBearing,
+            isSim: true
+        };
+    }
+
     if (emetteur.isSharing) {
         if ((emetteur.vesselStatus === 'stationary' || emetteur.vesselStatus === 'drifting') && emetteur.anchorPos) {
             return { 
@@ -384,19 +401,20 @@ export default function VesselTrackerPage() {
                 mooringRadius: emetteur.mooringRadius,
                 accuracy: emetteur.accuracy,
                 speed: emetteur.currentSpeed,
-                heading: emetteur.currentHeading
+                heading: emetteur.currentHeading,
+                isSim: false
             };
         }
         const otherVessels = followedVessels?.filter(v => v.id !== emetteur.sharingId && v.isSharing && v.anchorLocation) || [];
         const v = otherVessels[0] || null;
-        if (v) return { ...v, speed: v.speed, heading: v.heading };
+        if (v) return { ...v, speed: v.speed, heading: v.heading, isSim: false };
         return null;
     }
     if (!followedVessels) return null;
     const v = followedVessels.find(v => v.isSharing && v.anchorLocation);
-    if (v) return { ...v, speed: v.speed, heading: v.heading };
+    if (v) return { ...v, speed: v.speed, heading: v.heading, isSim: false };
     return null;
-  }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, emetteur.accuracy, emetteur.currentSpeed, emetteur.currentHeading, mapCore.isCirclesHidden]);
+  }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, emetteur.accuracy, emetteur.currentSpeed, emetteur.currentHeading, mapCore.isCirclesHidden, simulator.isActive, simulator.simPos, simulator.simSpeed, simulator.simBearing]);
 
   const currentDriftDist = emetteur.smoothedDistance;
 
@@ -520,11 +538,14 @@ export default function VesselTrackerPage() {
                         <div style={{ transform: 'translate(-50%, -320%)', zIndex: 9999 }} className="flex flex-col items-center pointer-events-none mb-3">
                             <div className={cn(
                                 "px-[10px] py-[4px] rounded-lg backdrop-blur-md border text-[11px] font-black uppercase shadow-2xl whitespace-nowrap transition-all border-white",
+                                (activeAnchorVessel.isSim) ? "bg-orange-600/90 border-orange-300 text-white" :
                                 (activeAnchorVessel.id === emetteur.sharingId && isDangerDriftTowardsReef) ? "bg-violet-600/90 border-violet-400 text-white animate-pulse-violet" :
                                 activeAnchorVessel.status === 'drifting' ? "bg-red-600/90 border-red-400 text-white animate-pulse" : 
                                 (activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15) ? "bg-orange-50/90 border-orange-300 text-white" : "bg-slate-900/80 border-white/20 text-white"
                             )}>
-                                {(activeAnchorVessel.id === emetteur.sharingId && isDangerDriftTowardsReef) ? (
+                                {activeAnchorVessel.isSim ? (
+                                    `SIMU : ${activeAnchorVessel.mooringRadius}m | Distance : ${currentDriftDist !== null ? `${currentDriftDist}m` : '...'}`
+                                ) : (activeAnchorVessel.id === emetteur.sharingId && isDangerDriftTowardsReef) ? (
                                     "⚠️ DANGER DÉRIVE VERS RÉCIF"
                                 ) : (
                                     <>
@@ -582,13 +603,21 @@ export default function VesselTrackerPage() {
                     )}
 
                     <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                        <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]"><Anchor className="size-3.5 text-white" /></div>
+                        <div style={{ transform: 'translate(-50%, -50%)' }} className={cn("size-6 rounded-full border-2 border-white flex items-center justify-center shadow-lg z-[800]", activeAnchorVessel.isSim ? "bg-orange-600" : "bg-orange-500")}><Anchor className="size-3.5 text-white" /></div>
                     </OverlayView>
                     <Circle 
                         onLoad={c => activeCirclesRef.current.push(c)}
                         center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
                         radius={activeAnchorVessel.mooringRadius || 100} 
-                        options={{ strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6', strokeOpacity: 0.8, strokeWeight: 3, fillColor: '#3b82f6', fillOpacity: 0.15, clickable: false, zIndex: 1 }} 
+                        options={{ 
+                            strokeColor: activeAnchorVessel.isSim ? '#f97316' : (activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6'), 
+                            strokeOpacity: activeAnchorVessel.isSim ? 0.4 : 0.8, 
+                            strokeWeight: activeAnchorVessel.isSim ? 2 : 3, 
+                            fillColor: activeAnchorVessel.isSim ? '#f97316' : '#3b82f6', 
+                            fillOpacity: 0.15, 
+                            clickable: false, 
+                            zIndex: 1 
+                        }} 
                     />
                 </React.Fragment>
             )}
