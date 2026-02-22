@@ -14,7 +14,8 @@ const THRESHOLD_DRIFT = 0.2; // ND
 const THRESHOLD_MOVEMENT = 2.0; // ND
 
 /**
- * LOGIQUE ÉMETTEUR (A) v106.0 : Identité, Partage et Gestion des Flottes.
+ * LOGIQUE ÉMETTEUR (A) v106.1 : Identité, Partage et Gestion des Flottes.
+ * Correction ReferenceError: startSharing et renforcement de la stabilité.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -77,10 +78,13 @@ export function useEmetteur(
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  // Synchronisation des refs
+  // Synchronisation critique des refs pour les callbacks asynchrones (GPS / Timer)
   useEffect(() => { mooringRadiusRef.current = mooringRadius; }, [mooringRadius]);
   useEffect(() => { isGhostModeRef.current = isGhostMode; }, [isGhostMode]);
   useEffect(() => { isTrajectoryHiddenRef.current = isTrajectoryHidden; }, [isTrajectoryHidden]);
+  useEffect(() => { isSharingRef.current = isSharing; }, [isSharing]);
+  useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
+  useEffect(() => { batteryRef.current = battery; }, [battery]);
 
   const addTechLog = useCallback(async (label: string, details?: string, statusOverride?: string) => {
     if (!firestore || !sharingId) return;
@@ -225,7 +229,7 @@ export function useEmetteur(
     });
   }, [addTechLog, updateVesselInFirestore, simulator?.isActive]);
 
-  const startTracking = useCallback(() => {
+  const startSharing = useCallback(() => {
     if (!navigator.geolocation || !user || !firestore) return;
     setIsSharing(true);
     isSharingRef.current = true;
@@ -324,7 +328,7 @@ export function useEmetteur(
     }
   }), [
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
-    anchorPos, mooringRadius, setMooringRadius, accuracy, battery, smoothedDistance,
+    anchorPos, mooringRadius, accuracy, battery, smoothedDistance,
     vesselNickname, customSharingId, customFleetId, fleetComment, sharingId,
     lastSyncTime, techLogs, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
     isCustomMessageEnabled, toast, user, firestore, isGhostMode, isTrajectoryHidden, updateVesselInFirestore,
