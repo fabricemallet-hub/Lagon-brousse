@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -445,7 +444,7 @@ export default function VesselTrackerPage() {
                             <div className={cn(
                                 "px-[10px] py-[4px] rounded-lg backdrop-blur-md border text-[11px] font-black uppercase shadow-2xl whitespace-nowrap transition-all border-white",
                                 activeAnchorVessel.status === 'drifting' ? "bg-red-600/90 border-red-400 text-white animate-pulse" : 
-                                (activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15) ? "bg-orange-500/90 border-orange-300 text-white" : "bg-slate-900/80 border-white/20 text-white"
+                                (activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15) ? "bg-orange-50/90 border-orange-300 text-white" : "bg-slate-900/80 border-white/20 text-white"
                             )}>
                                 Rayon : {activeAnchorVessel.mooringRadius}m | Distance : {currentDriftDist !== null ? `${currentDriftDist}m` : '...'}
                                 {activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15 && " (Prec +/-" + activeAnchorVessel.accuracy + "m)"}
@@ -551,7 +550,7 @@ export default function VesselTrackerPage() {
                           <CardContent className="p-5 space-y-5">
                               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">Mon Surnom</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg" /></div>
                               <div className="grid grid-cols-2 gap-3">
-                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
+                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 text-indigo-600">ID Flotte</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase" /></div>
                               </div>
                               <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl gap-3" onClick={() => { recepteur.initAudio(); emetteur.startSharing(); }}><Zap className="size-5 fill-white" /> Lancer le Partage GPS</Button>
