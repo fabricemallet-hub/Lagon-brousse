@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -222,7 +221,10 @@ export default function VesselTrackerPage() {
 
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  useEffect(() => { if (followedVessels) recepteur.processVesselAlerts(followedVessels); }, [followedVessels, recepteur.processVesselAlerts]);
+  // ÉCOUTEUR RÉCEPTEUR CENTRAL (v81.0)
+  useEffect(() => { 
+    if (followedVessels) recepteur.processVesselAlerts(followedVessels); 
+  }, [followedVessels, recepteur.processVesselAlerts]);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const hasCenteredInitially = useRef(false);
@@ -244,12 +246,14 @@ export default function VesselTrackerPage() {
   }, [emetteur.lastSyncTime]);
 
   const handleRecenter = () => {
+    recepteur.initAudio(); // Déblocage AudioContext sur interaction
     const pos = emetteur.currentPos || simulator.simPos;
     if (pos) mapCore.handleRecenter(pos);
     else toast({ description: "En attente de signal GPS..." });
   };
 
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
+    recepteur.initAudio(); // Déblocage AudioContext sur interaction
     if (simulator.isTeleportMode && e.latLng) {
         simulator.teleport(e.latLng.lat(), e.latLng.lng());
         toast({ title: "Position Sandbox injectée" });
@@ -276,6 +280,7 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
+      {/* BOUTON D'ARRÊT D'URGENCE SONORE (LOOP) */}
       {recepteur.isAlarmActive && (
         <Button className="fixed top-2 left-1/2 -translate-x-1/2 z-[10008] h-14 bg-red-600 hover:bg-red-700 text-white font-black uppercase shadow-2xl animate-bounce gap-3 px-8 rounded-full border-4 border-white transition-all active:scale-95" onClick={recepteur.stopAllAlarms}>
             <Volume2 className="size-6 animate-pulse" /> ARRÊTER LE SON
@@ -351,12 +356,12 @@ export default function VesselTrackerPage() {
                           </CardHeader>
                           <CardContent className="p-4 space-y-4">
                               <div className="grid grid-cols-2 gap-2">
-                                  <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", emetteur.vesselStatus === 'returning' ? "bg-indigo-600 text-white border-indigo-700" : "bg-indigo-50 border-indigo-100 text-indigo-700")} onClick={() => emetteur.changeManualStatus('returning')}>Retour Maison</Button>
-                                  <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", emetteur.vesselStatus === 'landed' ? "bg-green-600 text-white border-green-700" : "bg-green-50 border-indigo-100 text-green-700")} onClick={() => emetteur.changeManualStatus('landed')}>À terre</Button>
+                                  <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", emetteur.vesselStatus === 'returning' ? "bg-indigo-600 text-white border-indigo-700" : "bg-indigo-50 border-indigo-100 text-indigo-700")} onClick={() => { recepteur.initAudio(); emetteur.changeManualStatus('returning'); }}>Retour Maison</Button>
+                                  <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", emetteur.vesselStatus === 'landed' ? "bg-green-600 text-white border-green-700" : "bg-green-50 border-indigo-100 text-green-700")} onClick={() => { recepteur.initAudio(); emetteur.changeManualStatus('landed'); }}>À terre</Button>
                               </div>
                               <div className="p-4 bg-orange-50/30 border-2 border-orange-100 rounded-2xl space-y-4">
                                   <div className="flex items-center justify-between">
-                                      <Button className={cn("h-12 px-6 font-black uppercase text-[10px] gap-2 shadow-lg", emetteur.anchorPos ? "bg-orange-600" : "bg-slate-200 text-slate-600")} onClick={() => emetteur.anchorPos ? emetteur.changeManualStatus('moving') : emetteur.changeManualStatus('stationary')}>
+                                      <Button className={cn("h-12 px-6 font-black uppercase text-[10px] gap-2 shadow-lg", emetteur.anchorPos ? "bg-orange-600" : "bg-slate-200 text-slate-600")} onClick={() => { recepteur.initAudio(); emetteur.anchorPos ? emetteur.changeManualStatus('moving') : emetteur.changeManualStatus('stationary'); }}>
                                           <Anchor className="size-4" /> {emetteur.anchorPos ? "MOUILLAGE ACTIF" : "ACTIVER MOUILLAGE"}
                                       </Button>
                                       <div className="text-right">
@@ -375,12 +380,12 @@ export default function VesselTrackerPage() {
                               <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-primary"><Navigation className="size-4" /> Identité & Partage</CardTitle>
                           </CardHeader>
                           <CardContent className="p-5 space-y-5">
-                              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">Mon Surnom</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg" /></div>
+                              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">Mon Surnom</Label><Input value={emetteur.vesselNickname} onChange={e => setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg" /></div>
                               <div className="grid grid-cols-2 gap-3">
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 text-indigo-600">ID Flotte</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase" /></div>
                               </div>
-                              <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl gap-3" onClick={emetteur.startSharing}><Zap className="size-5 fill-white" /> Lancer le Partage GPS</Button>
+                              <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl gap-3" onClick={() => { recepteur.initAudio(); emetteur.startSharing(); }}><Zap className="size-5 fill-white" /> Lancer le Partage GPS</Button>
                           </CardContent>
                       </Card>
                   )}
@@ -406,9 +411,9 @@ export default function VesselTrackerPage() {
           <div className="max-w-2xl mx-auto pointer-events-auto">
               {emetteur.isSharing && (
                   <div className="flex gap-2 mb-2 p-2 bg-slate-900/10 backdrop-blur-md rounded-2xl border-2 border-white/20">
-                      <Button variant="destructive" className="flex-1 h-16 font-black uppercase text-xs border-2 shadow-2xl bg-red-700" onClick={() => emetteur.triggerEmergency('MAYDAY')}><ShieldAlert className="size-6 mr-2" /> MAYDAY</Button>
-                      <Button variant="secondary" className="flex-1 h-16 font-black uppercase text-xs border-2 shadow-xl bg-orange-600 text-white" onClick={() => emetteur.triggerEmergency('PAN PAN')}><AlertTriangle className="size-5 mr-2" /> PAN PAN</Button>
-                      <Button variant="outline" className="flex-1 h-16 font-black uppercase text-[10px] border-2 bg-white text-red-600 border-red-600 leading-tight" onClick={() => emetteur.triggerEmergency('ASSISTANCE')}>DEMANDE<br/>ASSISTANCE</Button>
+                      <Button variant="destructive" className="flex-1 h-16 font-black uppercase text-xs border-2 shadow-2xl bg-red-700" onClick={() => { recepteur.initAudio(); emetteur.triggerEmergency('MAYDAY'); }}><ShieldAlert className="size-6 mr-2" /> MAYDAY</Button>
+                      <Button variant="secondary" className="flex-1 h-16 font-black uppercase text-xs border-2 shadow-xl bg-orange-600 text-white" onClick={() => { recepteur.initAudio(); emetteur.triggerEmergency('PAN PAN'); }}><AlertTriangle className="size-5 mr-2" /> PAN PAN</Button>
+                      <Button variant="outline" className="flex-1 h-16 font-black uppercase text-[10px] border-2 bg-white text-red-600 border-red-600 leading-tight" onClick={() => { recepteur.initAudio(); emetteur.triggerEmergency('ASSISTANCE'); }}>DEMANDE<br/>ASSISTANCE</Button>
                   </div>
               )}
 
@@ -429,12 +434,12 @@ export default function VesselTrackerPage() {
                               <TabsContent value="tactical" className="m-0 bg-white p-4 space-y-4">
                                   <div className="grid grid-cols-4 gap-2">
                                       {TACTICAL_SPECIES.map(spec => (
-                                          <Button key={spec.label} variant="outline" className="flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 hover:bg-primary/5 active:scale-95" onClick={() => emetteur.addTacticalLog(spec.label)}>
+                                          <Button key={spec.label} variant="outline" className="flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 hover:bg-primary/5 active:scale-95" onClick={() => { recepteur.initAudio(); emetteur.addTacticalLog(spec.label); }}>
                                               <spec.icon className="size-5 text-primary" />
                                               <span className="text-[8px] font-black">{spec.label}</span>
                                           </Button>
                                       ))}
-                                      <Button variant="secondary" className="flex flex-col items-center justify-center h-16 rounded-xl border-2 border-primary/20" onClick={() => photoInputRef.current?.click()}><Camera className="size-5 text-primary" /><span className="text-[8px] font-black">PRISE</span></Button>
+                                      <Button variant="secondary" className="flex flex-col items-center justify-center h-16 rounded-xl border-2 border-primary/20" onClick={() => { recepteur.initAudio(); photoInputRef.current?.click(); }}><Camera className="size-5 text-primary" /><span className="text-[8px] font-black">PRISE</span></Button>
                                   </div>
                                   <ScrollArea className="h-48 border-t pt-2">
                                       <div className="space-y-1">
@@ -451,7 +456,7 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v80.0 prêt</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v81.0 prêt</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm border-slate-100", (log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') || log.label === 'DÉRIVE' || log.label === 'SANDBOX' || log.label === 'LABO') && 'border-red-200 bg-red-50')}>
                                                   <div className="flex justify-between items-start">
@@ -489,37 +494,37 @@ export default function VesselTrackerPage() {
                                       <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 flex items-center gap-2"><Ghost className="size-3" /> Confidentialité Tactique</p>
                                       <div className="flex items-center justify-between py-2 border-b border-white/10">
                                           <div className="space-y-0.5"><Label className="text-xs font-black uppercase">Mode Fantôme</Label><p className="text-[8px] font-bold text-slate-400 uppercase">Invisible pour la Flotte C</p></div>
-                                          <Switch checked={emetteur.isGhostMode} onCheckedChange={emetteur.toggleGhostMode} />
+                                          <Switch checked={emetteur.isGhostMode} onCheckedChange={(v) => { recepteur.initAudio(); emetteur.toggleGhostMode(); }} />
                                       </div>
                                       <div className="flex items-center justify-between py-2 border-b border-white/10">
                                           <div className="space-y-0.5"><Label className="text-xs font-black uppercase">Masquer Tracé</Label><p className="text-[8px] font-bold text-slate-400 uppercase">Cache la ligne bleue</p></div>
-                                          <Switch checked={emetteur.isTrajectoryHidden} onCheckedChange={emetteur.toggleTrajectoryHidden} />
+                                          <Switch checked={emetteur.isTrajectoryHidden} onCheckedChange={(v) => { recepteur.initAudio(); emetteur.toggleTrajectoryHidden(); }} />
                                       </div>
-                                      <Button variant="outline" className="w-full h-12 font-black uppercase text-[10px] border-2 bg-white text-slate-900 mt-2 gap-2" onClick={emetteur.resetTrajectory}><HistoryIcon className="size-4" /> RESET TRAJECTOIRE</Button>
+                                      <Button variant="outline" className="w-full h-12 font-black uppercase text-[10px] border-2 bg-white text-slate-900 mt-2 gap-2" onClick={() => { recepteur.initAudio(); emetteur.resetTrajectory(); }}><HistoryIcon className="size-4" /> RESET TRAJECTOIRE</Button>
                                   </div>
 
                                   <div className="space-y-4 p-4 border-2 rounded-2xl bg-muted/10">
                                       <p className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2 mb-2"><Volume2 className="size-3" /> Pilotage Global & Sons</p>
                                       <div className="flex items-center justify-between">
                                           <Label className="text-xs font-black uppercase">Alertes Sonores</Label>
-                                          <Switch checked={recepteur.vesselPrefs.isNotifyEnabled} onCheckedChange={v => recepteur.updateLocalPrefs({ isNotifyEnabled: v })} />
+                                          <Switch checked={recepteur.vesselPrefs.isNotifyEnabled} onCheckedChange={v => { recepteur.initAudio(); recepteur.updateLocalPrefs({ isNotifyEnabled: v }); }} />
                                       </div>
                                       <div className="space-y-3">
                                           <Label className="text-[10px] font-black uppercase opacity-60">Volume global ({Math.round(recepteur.vesselPrefs.volume * 100)}%)</Label>
-                                          <Slider value={[recepteur.vesselPrefs.volume * 100]} max={100} onValueChange={v => recepteur.updateLocalPrefs({ volume: v[0] / 100 })} />
+                                          <Slider value={[recepteur.vesselPrefs.volume * 100]} max={100} onValueChange={v => { recepteur.initAudio(); recepteur.updateLocalPrefs({ volume: v[0] / 100 }); }} />
                                       </div>
                                   </div>
 
                                   <div className="space-y-4 p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100">
-                                      <div className="flex items-center justify-between"><Label className="text-[10px] font-black uppercase text-orange-800 flex items-center gap-2"><Timer className="size-3" /> Veille Stratégique</Label><Switch checked={recepteur.vesselPrefs.isWatchEnabled} onCheckedChange={v => recepteur.updateLocalPrefs({ isWatchEnabled: v })} /></div>
+                                      <div className="flex items-center justify-between"><Label className="text-[10px] font-black uppercase text-orange-800 flex items-center gap-2"><Timer className="size-3" /> Veille Stratégique</Label><Switch checked={recepteur.vesselPrefs.isWatchEnabled} onCheckedChange={v => { recepteur.initAudio(); recepteur.updateLocalPrefs({ isWatchEnabled: v }); }} /></div>
                                       <div className={cn("space-y-4", !recepteur.vesselPrefs.isWatchEnabled && "opacity-40")}>
                                           <div className="space-y-2">
                                               <div className="flex justify-between text-[9px] font-black uppercase"><span>Alerte après :</span><span>{recepteur.vesselPrefs.watchDuration >= 60 ? `${Math.floor(recepteur.vesselPrefs.watchDuration / 60)}h` : `${recepteur.vesselPrefs.watchDuration} min`}</span></div>
-                                              <Slider value={[recepteur.vesselPrefs.watchDuration]} min={10} max={1440} step={10} onValueChange={v => recepteur.updateLocalPrefs({ watchDuration: v[0] })} />
+                                              <Slider value={[recepteur.vesselPrefs.watchDuration]} min={10} max={1440} step={10} onValueChange={v => { recepteur.initAudio(); recepteur.updateLocalPrefs({ watchDuration: v[0] }); }} />
                                           </div>
                                           <div className="flex items-center justify-between gap-2">
                                               <span className="text-[9px] font-black uppercase opacity-60">Son :</span>
-                                              <Select value={recepteur.vesselPrefs.watchSound} onValueChange={v => recepteur.updateLocalPrefs({ watchSound: v })}>
+                                              <Select value={recepteur.vesselPrefs.watchSound} onValueChange={v => { recepteur.initAudio(); recepteur.updateLocalPrefs({ watchSound: v }); }}>
                                                   <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-white"><SelectValue /></SelectTrigger>
                                                   <SelectContent>{recepteur.availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}</SelectContent>
                                               </Select>
@@ -532,7 +537,7 @@ export default function VesselTrackerPage() {
                                       <p className="text-[10px] font-black uppercase text-red-800 flex items-center gap-2"><Battery className="size-3" /> Seuil Batterie Faible</p>
                                       <div className="space-y-2">
                                           <div className="flex justify-between text-[9px] font-black uppercase"><span>Alerte à :</span><span>{recepteur.vesselPrefs.batteryThreshold}%</span></div>
-                                          <Slider value={[recepteur.vesselPrefs.batteryThreshold]} min={5} max={50} step={5} onValueChange={v => recepteur.updateLocalPrefs({ batteryThreshold: v[0] })} />
+                                          <Slider value={[recepteur.vesselPrefs.batteryThreshold]} min={5} max={50} step={5} onValueChange={v => { recepteur.initAudio(); recepteur.updateLocalPrefs({ batteryThreshold: v[0] }); }} />
                                       </div>
                                   </div>
 
@@ -553,18 +558,19 @@ export default function VesselTrackerPage() {
                                                   <div key={alert.id} className="space-y-2 border-b pb-3 last:border-0 last:pb-0">
                                                       <div className="flex items-center justify-between">
                                                           <span className="text-[10px] font-black uppercase">{alert.label}</span>
-                                                          <Switch checked={config.enabled} onCheckedChange={v => handleUpdateAlertConfig(alert.id as any, 'enabled', v)} />
+                                                          <Switch checked={config.enabled} onCheckedChange={v => { recepteur.initAudio(); handleUpdateAlertConfig(alert.id as any, 'enabled', v); }} />
                                                       </div>
                                                       <div className={cn("flex items-center gap-2", !config.enabled && "opacity-40 pointer-events-none")}>
-                                                          <Select value={config.sound} onValueChange={v => handleUpdateAlertConfig(alert.id as any, 'sound', v)}>
+                                                          <Select value={config.sound} onValueChange={v => { recepteur.initAudio(); handleUpdateAlertConfig(alert.id as any, 'sound', v); }}>
                                                               <SelectTrigger className="h-8 text-[9px] font-black uppercase flex-1 bg-white"><SelectValue /></SelectTrigger>
                                                               <SelectContent>{recepteur.availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}</SelectContent>
                                                           </Select>
                                                           <div className="flex items-center gap-1 bg-white border rounded px-1.5 h-8">
                                                               <span className="text-[8px] font-bold">LOOP</span>
-                                                              <Switch checked={config.loop} onCheckedChange={v => handleUpdateAlertConfig(alert.id as any, 'loop', v)} className="scale-75" />
+                                                              <Switch checked={config.loop} onCheckedChange={v => { recepteur.initAudio(); handleUpdateAlertConfig(alert.id as any, 'loop', v); }} className="scale-75" />
                                                           </div>
                                                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                                              recepteur.initAudio();
                                                               const sound = recepteur.availableSounds.find(s => s.id === config.sound || s.label === config.sound);
                                                               if (sound) new Audio(sound.url).play();
                                                           }}><Play className="size-3" /></Button>
@@ -575,7 +581,7 @@ export default function VesselTrackerPage() {
                                       </div>
                                   </div>
 
-                                  <Button className="w-full h-14 font-black uppercase tracking-widest shadow-xl rounded-2xl bg-primary text-white gap-2" onClick={recepteur.savePrefsToFirestore}>
+                                  <Button className="w-full h-14 font-black uppercase tracking-widest shadow-xl rounded-2xl bg-primary text-white gap-2" onClick={() => { recepteur.initAudio(); recepteur.savePrefsToFirestore(); }}>
                                       {recepteur.isSaving ? <RefreshCw className="size-5 animate-spin" /> : <Save className="size-5" />} 
                                       ENREGISTRER ET VALIDER
                                   </Button>
@@ -585,19 +591,20 @@ export default function VesselTrackerPage() {
                                 <TabsContent value="labo" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
                                     <div className="space-y-4 p-4 border-2 border-dashed border-red-200 rounded-3xl bg-red-50/30">
                                         <div className="flex items-center justify-between border-b pb-2">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v80.3</p>
-                                            <Switch checked={simulator.isActive} onCheckedChange={simulator.setIsActive} />
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v81.0</p>
+                                            <Switch checked={simulator.isActive} onCheckedChange={(v) => { recepteur.initAudio(); simulator.setIsActive(v); }} />
                                         </div>
                                         
                                         <div className={cn("space-y-4", !simulator.isActive && "opacity-40 pointer-events-none")}>
                                             <div className="grid grid-cols-2 gap-2">
-                                                <Button variant={simulator.isTeleportMode ? "default" : "outline"} className="h-12 text-[10px] font-black uppercase gap-2 border-2" onClick={() => simulator.setIsTeleportMode(!simulator.isTeleportMode)}>
+                                                <Button variant={simulator.isTeleportMode ? "default" : "outline"} className="h-12 text-[10px] font-black uppercase gap-2 border-2" onClick={() => { recepteur.initAudio(); simulator.setIsTeleportMode(!simulator.isTeleportMode); }}>
                                                     <MousePointer2 className="size-4" /> Injection Clic
                                                 </Button>
                                                 <Button 
                                                     variant={simulator.isMoving ? "destructive" : "default"} 
                                                     className="h-12 text-[10px] font-black uppercase gap-2 border-2" 
                                                     onClick={() => {
+                                                        recepteur.initAudio();
                                                         if (!simulator.isMoving && !simulator.simPos) {
                                                             simulator.setSimPos(emetteur.currentPos || { lat: -22.27, lng: 166.45 });
                                                         }
@@ -614,7 +621,7 @@ export default function VesselTrackerPage() {
                                                     <span>Vitesse Simulée</span>
                                                     <span className="text-red-600">{simulator.simSpeed} ND</span>
                                                 </div>
-                                                <Slider value={[simulator.simSpeed]} max={30} step={1} onValueChange={v => simulator.setSimSpeed(v[0])} />
+                                                <Slider value={[simulator.simSpeed]} max={30} step={1} onValueChange={v => { recepteur.initAudio(); simulator.setSimSpeed(v[0]); }} />
                                             </div>
 
                                             <div className="space-y-2">
@@ -622,7 +629,7 @@ export default function VesselTrackerPage() {
                                                     <span>Cap (Bearing)</span>
                                                     <span className="text-red-600">{simulator.simBearing}°</span>
                                                 </div>
-                                                <Slider value={[simulator.simBearing]} min={0} max={360} step={5} onValueChange={v => simulator.setSimBearing(v[0])} />
+                                                <Slider value={[simulator.simBearing]} min={0} max={360} step={5} onValueChange={v => { recepteur.initAudio(); simulator.setSimBearing(v[0]); }} />
                                             </div>
 
                                             <div className="space-y-2">
@@ -630,29 +637,29 @@ export default function VesselTrackerPage() {
                                                     <span>Batterie Simulée</span>
                                                     <span className="text-red-600">{simulator.simBattery}%</span>
                                                 </div>
-                                                <Slider value={[simulator.simBattery]} min={1} max={100} step={1} onValueChange={v => simulator.setSimBattery(v[0])} />
+                                                <Slider value={[simulator.simBattery]} min={1} max={100} step={1} onValueChange={v => { recepteur.initAudio(); simulator.setSimBattery(v[0]); }} />
                                             </div>
 
                                             <div className="flex items-center justify-between p-2 bg-white rounded-xl border">
                                                 <div className="space-y-0.5"><Label className="text-[10px] font-black uppercase">Coupure Firestore</Label><p className="text-[8px] font-bold text-muted-foreground uppercase">Simuler "Signal Perdu"</p></div>
-                                                <Switch checked={simulator.isComCut} onCheckedChange={simulator.setIsComCut} />
+                                                <Switch checked={simulator.isComCut} onCheckedChange={(v) => { recepteur.initAudio(); simulator.setIsComCut(v); }} />
                                             </div>
 
                                             <div className="space-y-2 border-t pt-3">
                                                 <Label className="text-[9px] font-black uppercase opacity-60">Décalage temporel (min)</Label>
                                                 <div className="flex gap-2">
                                                     <Input type="number" value={testMinutes} onChange={e => setTestMinutes(e.target.value)} className="h-10 border-2 font-black text-center" />
-                                                    <Button className="h-10 font-black uppercase text-[10px] gap-2 flex-1" onClick={() => emetteur.forceTimeOffset(parseInt(testMinutes))}>Injecter Temps</Button>
+                                                    <Button className="h-10 font-black uppercase text-[10px] gap-2 flex-1" onClick={() => { recepteur.initAudio(); emetteur.forceTimeOffset(parseInt(testMinutes)); }}>Injecter Temps</Button>
                                                 </div>
                                                 <p className="text-[8px] font-bold text-red-600 italic leading-tight mt-1">L'injection met à jour statusChangedAt pour tester la Veille Stratégique.</p>
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-2">
-                                            <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2 bg-white" onClick={() => simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius)}>
+                                            <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2 bg-white" onClick={() => { recepteur.initAudio(); simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius); }}>
                                                 <Move className="size-4" /> Forcer Dérive
                                             </Button>
-                                            <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2 bg-white" onClick={() => { simulator.stopSim(); emetteur.resetTrajectory(); }}>
+                                            <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2 bg-white" onClick={() => { recepteur.initAudio(); simulator.stopSim(); emetteur.resetTrajectory(); }}>
                                                 <Undo2 className="size-4" /> Rétablir Réel
                                             </Button>
                                         </div>

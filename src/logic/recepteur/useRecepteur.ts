@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
@@ -7,12 +6,10 @@ import { collection, query, orderBy, doc, updateDoc, serverTimestamp } from 'fir
 import { useToast } from '@/hooks/use-toast';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import type { UserAccount, SoundLibraryEntry, VesselStatus, VesselPrefs } from '@/lib/types';
-import { differenceInMinutes } from 'date-fns';
 
 /**
- * LOGIQUE RÉCEPTEUR (B) v79.0
- * Surveillance temporelle complète : Gère la perte de signal, l'immobilité prolongée et la batterie.
- * Intégration de la granularité des sons par statut.
+ * LOGIQUE RÉCEPTEUR (B) v81.0 - CONTRÔLEUR DE TRIGGERS AUDIO
+ * Surveille les changements d'états Firestore et déclenche les alertes sonores.
  */
 export function useRecepteur(vesselId?: string) {
   const { user } = useUser();
@@ -21,7 +18,9 @@ export function useRecepteur(vesselId?: string) {
   const audioEngine = useAudioEngine();
 
   const [isSaving, setIsSaving] = useState(false);
-  const lastAlarmTriggerRef = useRef<Record<string, { status: string, time: number }>>({});
+  
+  // Mémoire des derniers déclenchements pour détecter les transitions
+  const lastAlarmTriggerRef = useRef<Record<string, string>>({});
   const [acknowledgedAlerts, setAcknowledgedAlerts] = useState<Record<string, string>>({});
 
   const defaultPrefs: VesselPrefs = {
@@ -61,18 +60,29 @@ export function useRecepteur(vesselId?: string) {
     }
   }, [profile?.vesselPrefs]);
 
+  /**
+   * Déclencheur Audio Centralisé
+   */
   const triggerAlert = useCallback((type: keyof VesselPrefs['alerts'], vesselName: string, forceMaxVolume: boolean = false, vId: string) => {
+    // Si l'utilisateur a manuellement coupé cette alarme spécifique, on ignore
     if (acknowledgedAlerts[vId] === type) return;
+    
     if (!vesselPrefs.isNotifyEnabled || !dbSounds || !audioEngine.isUnlocked) return;
 
     const config = vesselPrefs.alerts[type];
     if (!config || !config.enabled) return;
 
+    // Recherche du son par label ou ID
     const sound = dbSounds.find(s => s.label.toLowerCase() === config.sound.toLowerCase() || s.id === config.sound);
-    if (!sound) return;
+    if (!sound) {
+        console.warn(`Recepteur: Sound ${config.sound} not found in library`);
+        return;
+    }
 
+    // ACTION : Jouer le son via le moteur audio
     audioEngine.play(type, sound.url, forceMaxVolume ? 1 : vesselPrefs.volume, config.loop);
 
+    // UI : Notification Toaster
     let message = `Notification de ${vesselName}`;
     let title = "ALERTE SYSTÈME";
     let variant: "default" | "destructive" = "default";
@@ -80,92 +90,105 @@ export function useRecepteur(vesselId?: string) {
     switch(type) {
         case 'assistance':
             title = "🆘 DÉTRESSE";
-            message = `Alerte [MAYDAY/PANPAN] activée sur ${vesselName} !`;
+            message = `Signal d'assistance [MAYDAY/PANPAN] sur ${vesselName} !`;
             variant = "destructive";
             break;
         case 'drifting':
             title = "🚨 DÉRIVE DÉTECTÉE";
-            message = `Le navire ${vesselName} est sorti de sa zone de sécurité !`;
+            message = `Le navire ${vesselName} est hors de sa zone de sécurité !`;
             variant = "destructive";
             break;
         case 'stationary':
             title = "⚓ VEILLE IMMOBILITÉ";
-            message = `${vesselName} est stationnaire depuis ${vesselPrefs.watchDuration} min.`;
+            message = `${vesselName} est immobile depuis trop longtemps.`;
             variant = "default";
             break;
         case 'offline':
             title = "📡 SIGNAL PERDU";
-            message = `Perte de heartbeat pour ${vesselName} (> 2 min) !`;
+            message = `Le navire ${vesselName} ne transmet plus depuis 2 min.`;
             variant = "destructive";
             break;
         case 'battery':
             title = "🪫 BATTERIE FAIBLE";
-            message = `${vesselName} est passé sous le seuil critique (${vesselPrefs.batteryThreshold}%).`;
+            message = `${vesselName} : Batterie critique (${vesselPrefs.batteryThreshold}%).`;
             variant = "destructive";
             break;
     }
 
-    toast({ title, description: message, variant, duration: config.loop ? 30000 : 4000 });
+    toast({ title, description: message, variant, duration: config.loop ? 100000 : 5000 });
   }, [vesselPrefs, dbSounds, audioEngine, toast, acknowledgedAlerts]);
 
+  /**
+   * Analyseur de Statuts & Transitions
+   */
   const processVesselAlerts = useCallback((followedVessels: VesselStatus[]) => {
     if (!vesselPrefs.isNotifyEnabled || !audioEngine.isUnlocked) return;
 
     followedVessels.forEach(vessel => {
         const vId = vessel.id;
-        const lastTrigger = lastAlarmTriggerRef.current[vId];
+        const lastKnownTrigger = lastAlarmTriggerRef.current[vId];
         
         const lastActiveTime = vessel.lastActive?.toMillis() || 0;
         const lastStatusTime = vessel.statusChangedAt?.toMillis() || lastActiveTime;
         const now = Date.now();
 
-        // 1. DÉTECTION PERTE DE RÉSEAU (2 minutes sans heartbeat)
+        // 1. Détection Perte Signal
         const isOffline = vessel.isSharing && (now - lastActiveTime > 120000);
         
-        // 2. DÉTECTION IMMOBILITÉ PROLONGÉE (Seuil paramétrable)
+        // 2. Détection Immobilité
         const isImmobileTooLong = vesselPrefs.isWatchEnabled && 
                                  vessel.status === 'stationary' && 
                                  (now - lastStatusTime > vesselPrefs.watchDuration * 60000);
 
-        // 3. DÉTECTION BATTERIE
+        // 3. Détection Batterie
         const isBatteryCritical = (vessel.batteryLevel ?? 100) <= vesselPrefs.batteryThreshold;
 
-        let typeToTrigger: keyof VesselPrefs['alerts'] | null = null;
+        // DÉTERMINATION DU TYPE D'ALERTE PRIORITAIRE
+        let activeType: keyof VesselPrefs['alerts'] | null = null;
 
-        if (vessel.status === 'emergency') {
-            typeToTrigger = 'assistance';
-        } else if (isOffline) {
-            typeToTrigger = 'offline';
-        } else if (vessel.status === 'drifting') {
-            typeToTrigger = 'drifting';
-        } else if (isImmobileTooLong) {
-            typeToTrigger = 'stationary';
-        } else if (isBatteryCritical && !vessel.isCharging) {
-            typeToTrigger = 'battery';
-        }
+        if (vessel.status === 'emergency') activeType = 'assistance';
+        else if (isOffline) activeType = 'offline';
+        else if (vessel.status === 'drifting') activeType = 'drifting';
+        else if (isImmobileTooLong) activeType = 'stationary';
+        else if (isBatteryCritical && !vessel.isCharging) activeType = 'battery';
 
-        if (typeToTrigger && lastTrigger?.status !== typeToTrigger) {
-            triggerAlert(typeToTrigger, vessel.displayName || vId, typeToTrigger === 'assistance', vId);
-            lastAlarmTriggerRef.current[vId] = { status: typeToTrigger, time: now };
-        }
-
-        // Réinitialisation si tout redevient normal
-        if (!typeToTrigger && lastTrigger) {
-            audioEngine.stop(lastTrigger.status);
+        // GESTION DU DÉCLENCHEMENT (TRIGGER)
+        if (activeType && lastKnownTrigger !== activeType) {
+            // Changement d'état détecté -> On déclenche le son
+            triggerAlert(activeType, vessel.displayName || vId, activeType === 'assistance', vId);
+            lastAlarmTriggerRef.current[vId] = activeType;
+        } 
+        
+        // GESTION DE LA RÉINITIALISATION
+        if (!activeType && lastKnownTrigger) {
+            // Retour à la normale -> On coupe le son spécifique
+            audioEngine.stop(lastKnownTrigger);
             delete lastAlarmTriggerRef.current[vId];
-            setAcknowledgedAlerts(prev => { const n = {...prev}; delete n[vId]; return n; });
+            
+            // Nettoyage de l'acquittement manuel si l'alerte a disparu d'elle-même
+            setAcknowledgedAlerts(prev => {
+                const n = {...prev};
+                delete n[vId];
+                return n;
+            });
         }
     });
   }, [vesselPrefs, audioEngine, triggerAlert]);
 
+  /**
+   * Arrêt d'Urgence (Bouton Rouge)
+   */
   const stopAllAlarms = useCallback(() => {
     audioEngine.stopAll();
+    
+    // On mémorise que ces alertes ont été "acquittées" par l'utilisateur
     const newAcks: Record<string, string> = { ...acknowledgedAlerts };
-    Object.entries(lastAlarmTriggerRef.current).forEach(([vId, data]) => {
-        newAcks[vId] = data.status;
+    Object.entries(lastAlarmTriggerRef.current).forEach(([vId, status]) => {
+        newAcks[vId] = status;
     });
     setAcknowledgedAlerts(newAcks);
-    toast({ title: "SONS COUPÉS", description: "Vigilance visuelle maintenue." });
+    
+    toast({ title: "ALERTES COUPÉES", description: "Le système est passé en mode surveillance visuelle." });
   }, [audioEngine, acknowledgedAlerts, toast]);
 
   return useMemo(() => ({
@@ -174,8 +197,14 @@ export function useRecepteur(vesselId?: string) {
     savePrefsToFirestore: async () => {
         if (!user || !firestore) return false;
         setIsSaving(true);
-        try { await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs }); setIsSaving(false); return true; }
-        catch (e) { setIsSaving(false); return false; }
+        try { 
+            await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs }); 
+            setIsSaving(false); 
+            return true; 
+        } catch (e) { 
+            setIsSaving(false); 
+            return false; 
+        }
     },
     isSaving,
     availableSounds: dbSounds || [],
