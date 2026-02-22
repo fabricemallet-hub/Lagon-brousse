@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useMapCore } from '@/logic/shared/useMapCore';
 import { useSimulator } from '@/logic/shared/useSimulator';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
@@ -621,10 +621,10 @@ export default function VesselTrackerPage() {
                         center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
                         radius={activeAnchorVessel.mooringRadius || 100} 
                         options={{ 
-                            strokeColor: activeAnchorVessel.isSim ? '#f97316' : (activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6'), 
-                            strokeOpacity: activeAnchorVessel.isSim ? 0.4 : 0.8, 
+                            strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
+                            strokeOpacity: (activeAnchorVessel.status === 'drifting' && mapCore.isFlashOn) ? 1.0 : (activeAnchorVessel.isSim ? 0.4 : 0.8), 
                             strokeWeight: activeAnchorVessel.isSim ? 2 : 3, 
-                            fillColor: activeAnchorVessel.isSim ? '#f97316' : '#3b82f6', 
+                            fillColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
                             fillOpacity: 0.15, 
                             clickable: false, 
                             zIndex: 1 

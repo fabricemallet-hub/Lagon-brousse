@@ -11,7 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v93.0 : Localisation FR et gestion des Purges.
+ * LOGIQUE ÉMETTEUR (A) v96.0 : Anchor Lock Strict & Rupture Labo.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -121,7 +121,7 @@ export function useEmetteur(
 
     setTechLogs(prev => {
         const lastLog = prev[0];
-        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE' || label === 'MOUILLAGE AUTO' || label === 'RESET' || label === 'LABO' || label === 'PURGE' || label === 'SANDBOX' || label === 'CHGT STATUT' || label === 'CHGT MANUEL' || label === 'SIGNAL';
+        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE' || label === 'MOUILLAGE AUTO' || label === 'RESET' || label === 'LABO' || label === 'PURGE' || label === 'SANDBOX' || label === 'CHGT STATUT' || label === 'CHGT MANUEL' || label === 'SIGNAL' || label === 'RUPTURE';
 
         if (!statusChanged && label === 'AUTO') {
             const duration = differenceInMinutes(now, lastLog.time);
@@ -205,40 +205,36 @@ export function useEmetteur(
     const nowTs = Date.now();
     const isLocked = nowTs < driftCheckLockedUntilRef.current;
 
-    if (isSimActive && knotSpeed < 2) {
-        const isNewPoint = !prevSimPosRef.current;
-        const isJump = prevSimPosRef.current && getDistance(lat, lng, prevSimPosRef.current.lat, prevSimPosRef.current.lng) > 10;
-        
-        if (isNewPoint || isJump || !anchorPosRef.current) {
-            nextStatus = 'stationary';
+    // v96.0 : ANCHOR LOCK STRICT POUR SIMU
+    if (isSimActive) {
+        if (!anchorPosRef.current) {
             const newAnchor = { lat, lng };
             setAnchorPos(newAnchor);
             anchorPosRef.current = newAnchor;
-            driftCheckLockedUntilRef.current = nowTs + 1500;
-            distanceHistoryRef.current = [];
-            addTechLog('LABO', 'ANCRAGE SIMU FIXÉ');
+            addTechLog('LABO', 'ANCHOR LOCK ACTIVE');
+        }
+    } else {
+        if (knotSpeed >= 4) {
+            if (nextStatus !== 'moving') {
+                nextStatus = 'moving';
+                setAnchorPos(null);
+                anchorPosRef.current = null;
+                distanceHistoryRef.current = [];
+                addTechLog('CHGT STATUT', 'Navigation (MOUVEMENT)');
+            }
+        } 
+        else if (knotSpeed < 2 && (nextStatus === 'moving' || nextStatus === 'drifting')) {
+            if (!isLocked) {
+                nextStatus = 'stationary';
+                setAnchorPos({ lat, lng });
+                anchorPosRef.current = { lat, lng };
+                distanceHistoryRef.current = [];
+                addTechLog('CHGT STATUT', 'Mouillage (ARRÊT)');
+            }
         }
     }
 
-    if (knotSpeed >= 4) {
-        if (nextStatus !== 'moving') {
-            nextStatus = 'moving';
-            setAnchorPos(null);
-            anchorPosRef.current = null;
-            distanceHistoryRef.current = [];
-            addTechLog('CHGT STATUT', 'Navigation (MOUVEMENT)');
-        }
-    } 
-    else if (knotSpeed < 2 && (nextStatus === 'moving' || nextStatus === 'drifting')) {
-        if (!isLocked) {
-            nextStatus = 'stationary';
-            setAnchorPos({ lat, lng });
-            anchorPosRef.current = { lat, lng };
-            distanceHistoryRef.current = [];
-            addTechLog('CHGT STATUT', 'Mouillage (ARRÊT)');
-        }
-    }
-
+    // GESTION DÉRIVE (UNIFIÉE)
     if ((nextStatus === 'stationary' || nextStatus === 'drifting') && anchorPosRef.current) {
         const rawDist = getDistance(lat, lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
         distanceHistoryRef.current = [...distanceHistoryRef.current, rawDist].slice(-3);
@@ -250,7 +246,7 @@ export function useEmetteur(
                 if (acc <= 25 || isSimActive) {
                     if (nextStatus !== 'drifting' && nextStatus !== 'emergency') {
                         nextStatus = 'drifting';
-                        addTechLog('DÉRIVE', 'HORS ZONE DE SÉCURITÉ');
+                        addTechLog(isSimActive ? 'RUPTURE' : 'DÉRIVE', 'HORS ZONE DE SÉCURITÉ');
                     }
                 }
             } else if (nextStatus === 'drifting') {
@@ -351,7 +347,7 @@ export function useEmetteur(
     setAnchorPos(null);
     setSmoothedDistance(null);
     distanceHistoryRef.current = [];
-    setTechLogs([]); // Purge automatique à l'arrêt (RAM uniquement)
+    setTechLogs([]); 
     toast({ title: "PARTAGE ARRÊTÉ" });
   }, [firestore, sharingId, toast, addTechLog, updateVesselInFirestore]);
 
