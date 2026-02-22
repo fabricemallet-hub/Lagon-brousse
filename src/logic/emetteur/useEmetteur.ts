@@ -30,7 +30,7 @@ export function useEmetteur(
   const [currentPos, setCurrentPos] = useState<{ lat: number, lng: number } | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [anchorPos, setAnchorPos] = useState<{ lat: number, lng: number } | null>(null);
-  const [mooringRadius, _setMooringRadius] = useState(100);
+  const [mooringRadius, setMooringRadius] = useState(100);
   const [accuracy, setAccuracy] = useState<number>(0);
   const [currentHeading, setCurrentHeading] = useState<number>(0);
   const [currentSpeed, setCurrentSpeed] = useState<number>(0);
@@ -79,6 +79,11 @@ export function useEmetteur(
   useEffect(() => { handlePositionUpdateRef.current = handlePositionUpdate; }, [handlePositionUpdate]);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
+
+  // Synchronisation de la ref pour éviter les closures périmées dans watchPosition
+  useEffect(() => {
+    mooringRadiusRef.current = mooringRadius;
+  }, [mooringRadius]);
 
   const addTechLog = useCallback(async (label: string, details?: string, statusOverride?: string) => {
     if (!firestore || !sharingId) return;
