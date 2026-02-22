@@ -147,7 +147,7 @@ const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
                             statusLabel === 'MOUVEMENT' ? "text-green-400" : 
                             statusLabel === 'MOUILLAGE' ? "text-blue-400" : "text-red-400"
                         )}>
-                            {statusLabel} {vessel.speed !== undefined && `| ${vessel.speed.toFixed(1)}ND`}
+                            {statusLabel} | {vessel.speed !== undefined && `${vessel.speed.toFixed(1)}ND`}
                         </span>
                     </div>
                 </div>
@@ -389,7 +389,6 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
-        {/* GHOST HUD v111.0 - POSITION BASSE (35%) ET LIFO (TOP FOCUS) */}
         <div className="absolute top-[35%] right-[10px] z-[999] pointer-events-none flex flex-col items-end gap-2 max-w-[200px]">
             <div className="flex bg-black/40 backdrop-blur-md rounded-lg p-1 border border-white/10 pointer-events-auto shadow-xl group transition-opacity hover:opacity-100 opacity-40">
                 {['AUTO', 'TACTICAL', 'TECHNICAL'].map(m => (
@@ -473,7 +472,6 @@ export default function VesselTrackerPage() {
         </GoogleMap>
       </div>
 
-      {/* BOUTONS DE NAVIGATION ET ASSISTANCE v112.0 - VISIBLES EN MODE SHARING OU SIMU */}
       {(emetteur.isSharing || simulator.isActive) && (
         <div className="grid grid-cols-1 gap-2 mb-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="grid grid-cols-2 gap-2">
@@ -504,7 +502,6 @@ export default function VesselTrackerPage() {
         </div>
       )}
 
-      {/* BOUTONS D'URGENCE CRITIQUE */}
       <div className="grid grid-cols-2 gap-2 mb-4">
           <Button variant="destructive" className="h-14 font-black uppercase rounded-2xl shadow-xl gap-3 text-xs border-2 border-white/20 animate-pulse" onClick={() => emetteur.triggerEmergency('MAYDAY')}>
               <ShieldAlert className="size-5" /> MAYDAY (SOS)
@@ -513,6 +510,117 @@ export default function VesselTrackerPage() {
               <AlertTriangle className="size-5 text-primary" /> PAN PAN
           </Button>
       </div>
+
+      <Tabs value={appMode} className="w-full">
+        <TabsContent value="sender">
+            {emetteur.isSharing ? (
+                <div className="space-y-4">
+                    <Card className={cn("p-6 rounded-2xl shadow-xl relative overflow-hidden border-2", 
+                        emetteur.vesselStatus === 'landed' ? "bg-green-600 border-green-400/20" : "bg-primary border-primary-foreground/20")}>
+                        <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
+                        <div className="space-y-1 relative z-10 text-white">
+                            <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                <Zap className="size-3 fill-yellow-300 text-yellow-300" /> Partage en cours
+                            </p>
+                            <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{emetteur.sharingId}</h3>
+                            <p className="text-xs font-bold opacity-80 mt-1 italic">{emetteur.vesselNickname || 'Capitaine'}</p>
+                        </div>
+                        <div className="mt-8 flex items-center justify-between relative z-10">
+                            <div className="flex items-center gap-3">
+                                <Badge variant="outline" className="bg-green-500/30 border-green-200 text-white font-black text-[10px] px-3 h-6 animate-pulse">EN LIGNE</Badge>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-white/80 flex items-center gap-2">
+                                    {emetteur.vesselStatus === 'moving' ? <Move className="size-3" /> : emetteur.vesselStatus === 'returning' ? <Navigation className="size-3" /> : emetteur.vesselStatus === 'landed' ? <Home className="size-3" /> : <Anchor className="size-3" />}
+                                    {emetteur.vesselStatus === 'moving' ? 'En mouvement' : emetteur.vesselStatus === 'returning' ? 'Retour Maison' : emetteur.vesselStatus === 'landed' ? 'À terre' : 'Au mouillage'}
+                                </span>
+                            </div>
+                            <Button variant="destructive" size="sm" className="h-8 font-black uppercase text-[9px] border-2 border-white/20" onClick={emetteur.stopSharing}>Quitter</Button>
+                        </div>
+                    </Card>
+                </div>
+            ) : (
+                <Card className="border-2 shadow-xl overflow-hidden rounded-[2.5rem] bg-white animate-in fade-in slide-in-from-top-2">
+                    <CardHeader className="bg-white border-b p-6">
+                        <CardTitle className="text-sm font-black uppercase tracking-tight text-primary flex items-center gap-3">
+                            <Navigation className="size-5 text-primary rotate-45" /> IDENTITÉ &amp; PARTAGE
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-6">
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Mon Surnom</Label>
+                                <Input 
+                                    value={emetteur.vesselNickname} 
+                                    onChange={e => emetteur.setVesselNickname(e.target.value)} 
+                                    placeholder="KOolapik" 
+                                    className="h-14 border-2 font-black text-lg bg-slate-100" 
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">ID Navire</Label>
+                                    <Input 
+                                        value={emetteur.customSharingId} 
+                                        onChange={e => emetteur.setCustomSharingId(e.target.value)} 
+                                        placeholder="XXX" 
+                                        className="h-14 border-2 font-black text-center text-sm uppercase bg-slate-100" 
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-[10px] font-black uppercase text-[#8b5cf6] tracking-widest ml-1">ID Flotte</Label>
+                                    <Input 
+                                        value={emetteur.customFleetId} 
+                                        onChange={e => emetteur.setCustomFleetId(e.target.value)} 
+                                        placeholder="ABC" 
+                                        className="h-14 border-2 font-black text-center text-sm uppercase bg-[#f5f3ff]" 
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-[10px] font-black uppercase text-[#10b981] tracking-widest ml-1">Commentaire Flotte</Label>
+                                <Input 
+                                    value={emetteur.fleetComment} 
+                                    onChange={e => emetteur.setFleetComment(e.target.value)} 
+                                    placeholder="TEST ADMIN" 
+                                    className="h-14 border-2 font-black text-center text-xs uppercase bg-[#ebf7f3] border-[#d1e9e0]" 
+                                />
+                            </div>
+
+                            <Button 
+                                onClick={emetteur.startSharing} 
+                                className="w-full h-16 font-black uppercase tracking-widest text-sm shadow-xl gap-3 rounded-2xl bg-primary hover:bg-primary/90"
+                            >
+                                <Zap className="size-6 fill-white" /> LANCER LE PARTAGE GPS
+                            </Button>
+                        </div>
+
+                        <div className="pt-6 border-t border-dashed">
+                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">Mes Flottes Enregistrées</p>
+                            <div className="grid gap-3">
+                                {emetteur.savedFleets.map((fleet, idx) => (
+                                    <div key={idx} className="p-4 bg-white border-2 rounded-2xl shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all cursor-pointer hover:border-primary/30" onClick={() => { emetteur.setCustomFleetId(fleet.id); if (fleet.comment) emetteur.setFleetComment(fleet.comment); }}>
+                                        <div className="flex flex-col">
+                                            <span className="font-black text-sm text-primary uppercase">{fleet.id}</span>
+                                            {fleet.comment && <span className="text-[10px] font-bold text-muted-foreground uppercase">{fleet.comment}</span>}
+                                        </div>
+                                        <Button variant="ghost" size="icon" className="size-10 text-destructive/20 hover:text-destructive hover:bg-red-50" onClick={(e) => { e.stopPropagation(); emetteur.removeFleet(fleet); }}>
+                                            <Trash2 className="size-5" />
+                                        </Button>
+                                    </div>
+                                ))}
+                                {emetteur.savedFleets.length === 0 && (
+                                    <div className="p-10 text-center border-4 border-dashed rounded-[2.5rem] opacity-20">
+                                        <p className="text-[10px] font-black uppercase tracking-widest italic">Aucun groupe favori enregistré</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+        </TabsContent>
+      </Tabs>
 
       <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="cockpit" className="border-none">
@@ -543,7 +651,6 @@ export default function VesselTrackerPage() {
                               ))}
                           </div>
 
-                          {/* SECTION CONFIDENTIALITÉ TACTIQUE v105.0 */}
                           <div className="p-5 bg-slate-900 text-white rounded-3xl space-y-6 shadow-2xl border border-white/10">
                               <div className="flex items-center gap-2 mb-2">
                                   <Ghost className="size-4 text-primary" />
@@ -671,91 +778,6 @@ export default function VesselTrackerPage() {
                                     })}
                                 </div>
 
-                                {/* SECTION IDENTITÉ & PARTAGE v106.0 */}
-                                <Card className="border-2 border-dashed border-primary/20 bg-muted/5 rounded-3xl p-5 space-y-5">
-                                    <div className="flex items-center justify-between border-b border-primary/10 pb-3">
-                                        <div className="flex items-center gap-2">
-                                            <Navigation className="size-4 text-primary" />
-                                            <span className="text-xs font-black uppercase tracking-widest text-slate-800">Identité & Partage</span>
-                                        </div>
-                                        {emetteur.isSharing && <Badge className="bg-green-600 animate-pulse text-[8px] h-5 px-2">PARTAGE ACTIF</Badge>}
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">Mon Surnom</Label>
-                                            <Input 
-                                                value={emetteur.vesselNickname} 
-                                                onChange={e => emetteur.setVesselNickname(e.target.value)} 
-                                                placeholder="Ex: Capitaine Nemo" 
-                                                className="h-12 border-2 font-black text-center text-base" 
-                                            />
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1.5">
-                                                <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">ID Navire (Sharing)</Label>
-                                                <Input 
-                                                    value={emetteur.customSharingId} 
-                                                    onChange={e => emetteur.setCustomSharingId(e.target.value)} 
-                                                    placeholder="BATEAU-1" 
-                                                    className="h-12 border-2 font-black text-center text-xs uppercase" 
-                                                />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">ID Flotte (Group)</Label>
-                                                <Input 
-                                                    value={emetteur.customFleetId} 
-                                                    onChange={e => emetteur.setCustomFleetId(e.target.value)} 
-                                                    placeholder="FLOTTE-A" 
-                                                    className="h-12 border-2 font-black text-center text-xs uppercase" 
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-1.5 p-3 bg-[#ebf7f3] rounded-2xl border-2 border-[#d1e9e0]">
-                                            <Label className="text-[10px] font-black uppercase text-[#2d6a4f] ml-1">Commentaire Flotte (Tactique)</Label>
-                                            <Input 
-                                                value={emetteur.fleetComment} 
-                                                onChange={e => emetteur.setFleetComment(e.target.value)} 
-                                                placeholder="Ex: Pêche au vif, Test admin..." 
-                                                className="h-10 border-none bg-transparent font-bold text-xs text-[#1b4332] focus-visible:ring-0 p-0" 
-                                            />
-                                        </div>
-
-                                        <Button 
-                                            onClick={emetteur.isSharing ? emetteur.stopSharing : emetteur.startSharing} 
-                                            className={cn("w-full h-16 font-black uppercase tracking-widest text-sm shadow-xl gap-3 rounded-2xl", emetteur.isSharing ? "bg-red-600 hover:bg-red-700" : "bg-primary hover:bg-primary/90")}
-                                        >
-                                            {emetteur.isSharing ? <X className="size-6" /> : <Zap className="size-6 fill-white" />}
-                                            {emetteur.isSharing ? "Arrêter le partage" : "Lancer le partage GPS"}
-                                        </Button>
-                                    </div>
-
-                                    {emetteur.savedFleets.length > 0 && (
-                                        <div className="space-y-3 pt-4 border-t border-dashed">
-                                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Mes Flottes Enregistrées</p>
-                                            <div className="grid gap-2">
-                                                {emetteur.savedFleets.map((fleet, idx) => (
-                                                    <div key={idx} className="p-3 bg-white border-2 rounded-xl shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all" onClick={() => { emetteur.setCustomFleetId(fleet.id); if (fleet.comment) emetteur.setFleetComment(fleet.comment); }}>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="p-2 bg-primary/10 rounded-lg"><Users className="size-4 text-primary" /></div>
-                                                            <div className="flex flex-col">
-                                                                <span className="font-black text-xs uppercase">{fleet.id}</span>
-                                                                {fleet.comment && <span className="text-[9px] font-bold text-muted-foreground uppercase">{fleet.comment}</span>}
-                                                            </div>
-                                                        </div>
-                                                        <Button variant="ghost" size="icon" className="size-8 text-destructive/40 hover:text-destructive opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); emetteur.removeFleet(fleet); }}>
-                                                            <Trash2 className="size-4" />
-                                                        </Button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </Card>
-
-                                {/* SECTION RÉGLAGES D'URGENCE SMS v107.0 */}
                                 <Card className="border-2 border-dashed border-orange-200 bg-orange-50/20 rounded-3xl p-5 space-y-5">
                                     <div className="flex items-center justify-between border-b border-orange-100 pb-3">
                                         <div className="flex items-center gap-2">
@@ -783,19 +805,19 @@ export default function VesselTrackerPage() {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between mb-1">
                                                 <Label className="text-[9px] font-black uppercase text-slate-500 tracking-widest ml-1">Message personnalisé</Label>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[8px] font-bold uppercase opacity-40">Personnalisé</span>
-                                                    <Switch checked={emetteur.isCustomMessageEnabled} onCheckedChange={emetteur.setIsCustomMessageEnabled} className="scale-75" />
+                                                    <span className="text-[8px] font-bold uppercase opacity-40">{emetteur.isCustomMessageEnabled ? 'Activé' : 'Désactivé'}</span>
+                                                    <Switch checked={emetteur.isCustomMessageEnabled} onCheckedChange={emetteur.setIsCustomMessageEnabled} className="scale-75 touch-manipulation" disabled={!emetteur.isEmergencyEnabled} />
                                                 </div>
                                             </div>
                                             <Textarea 
                                                 placeholder="Ex: Problème moteur, besoin aide immédiate." 
                                                 value={emetteur.vesselSmsMessage} 
                                                 onChange={e => emetteur.setVesselSmsMessage(e.target.value)} 
-                                                className="border-2 font-medium min-h-[80px] bg-slate-100 text-sm"
-                                                disabled={!emetteur.isCustomMessageEnabled}
+                                                className={cn("border-2 font-medium min-h-[80px] bg-slate-100 text-sm", !emetteur.isCustomMessageEnabled && "opacity-50")}
+                                                disabled={!emetteur.isEmergencyEnabled || !emetteur.isCustomMessageEnabled}
                                             />
                                         </div>
 
