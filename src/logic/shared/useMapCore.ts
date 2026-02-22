@@ -24,7 +24,8 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v120.0 : Gestion de la carte et du moteur de tuiles Windy avec nouvelle clé API.
+ * HOOK PARTAGÉ v121.0 : Gestion de la carte et du moteur de tuiles Windy.
+ * Correction de l'instanciation ImageMapType via window.google.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
@@ -46,29 +47,33 @@ export function useMapCore() {
   const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
   const [tacticalMarkers, setTacticalMarkers] = useState<TacticalMarker[]>([]);
 
-  // MOTEUR D'OVERLAY WINDY v120.0
+  // MOTEUR D'OVERLAY WINDY v121.0
   useEffect(() => {
-    if (!googleMap || !isGoogleLoaded) return;
+    if (!googleMap || !isGoogleLoaded || typeof window === 'undefined' || !window.google) return;
 
-    // 1. Nettoyage des calques existants
+    // 1. Nettoyage radical des calques existants
     googleMap.overlayMapTypes.clear();
 
     if (windyLayer === 'none') return;
 
-    // 2. Création du calque de tuiles Windy avec la NOUVELLE CLÉ API
+    // 2. Création du calque de tuiles Windy avec la CLÉ UTILISATEUR
     const API_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
     
-    const windyTileLayer = new google.maps.ImageMapType({
-      getTileUrl: (coord, zoom) => {
-        return `https://tiles.windy.com/tiles/v1.0/gfs/layers/${windyLayer}/${zoom}/${coord.x}/${coord.y}.png?key=${API_KEY}`;
-      },
-      tileSize: new google.maps.Size(256, 256),
-      name: `Windy-${windyLayer}`,
-      opacity: 0.6
-    });
+    try {
+        const windyTileLayer = new window.google.maps.ImageMapType({
+          getTileUrl: (coord, zoom) => {
+            return `https://tiles.windy.com/tiles/v1.0/gfs/layers/${windyLayer}/${zoom}/${coord.x}/${coord.y}.png?key=${API_KEY}`;
+          },
+          tileSize: new window.google.maps.Size(256, 256),
+          name: `Windy-${windyLayer}`,
+          opacity: 0.6
+        });
 
-    // 3. Injection dans Google Maps
-    googleMap.overlayMapTypes.push(windyTileLayer);
+        // 3. Injection dans Google Maps
+        googleMap.overlayMapTypes.push(windyTileLayer);
+    } catch (e) {
+        console.error("Erreur instanciation calque Windy:", e);
+    }
 
   }, [googleMap, windyLayer, isGoogleLoaded]);
 
@@ -128,7 +133,7 @@ export function useMapCore() {
                         newMarkers.push({
                             id: `${vid}_${doc.id}`,
                             type: data.type,
-                            pos: data.pos,
+                            pos: { lat: data.pos.latitude, lng: data.pos.longitude },
                             time: data.time?.toDate() || new Date(),
                             vesselName: data.vesselName || vid,
                             photoUrl: data.photoUrl,
