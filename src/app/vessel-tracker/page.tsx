@@ -34,7 +34,9 @@ import {
   orderBy, 
   updateDoc,
   arrayUnion,
-  arrayRemove
+  arrayRemove,
+  setDoc,
+  serverTimestamp
 } from 'firebase/firestore';
 import { 
   Select, 
@@ -1046,7 +1048,7 @@ export default function VesselTrackerPage() {
                                                 <div className="space-y-2">
                                                     <div className="flex justify-between text-[10px] font-black uppercase">
                                                         <span className="flex items-center gap-1"><Battery className="size-3" /> Batterie</span>
-                                                        <span className="text-red-600">{simulator.setSimBattery(v[0])}%</span>
+                                                        <span className="text-red-600">{simulator.simBattery}%</span>
                                                     </div>
                                                     <Slider value={[simulator.simBattery]} max={100} step={1} onValueChange={v => simulator.setSimBattery(v[0])} />
                                                 </div>
