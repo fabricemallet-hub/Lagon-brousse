@@ -26,38 +26,38 @@ export function useEmetteur(
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const [isSharing, setIsSharing = useState(false);
-  const [currentPos, setCurrentPos = useState<{ lat: number, lng: number } | null>(null);
-  const [vesselStatus, setVesselStatus = useState<VesselStatus['status']>('moving');
-  const [anchorPos, setAnchorPos = useState<{ lat: number, lng: number } | null>(null);
-  const [mooringRadius, setMooringRadius = useState<number>(100);
-  const [accuracy, setAccuracy = useState<number>(0);
-  const [currentHeading, setCurrentHeading = useState<number>(0);
-  const [currentSpeed, setCurrentSpeed = useState<number>(0);
+  const [isSharing, setIsSharing] = useState(false);
+  const [currentPos, setCurrentPos] = useState<{ lat: number, lng: number } | null>(null);
+  const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
+  const [anchorPos, setAnchorPos] = useState<{ lat: number, lng: number } | null>(null);
+  const [mooringRadius, setMooringRadius] = useState<number>(100);
+  const [accuracy, setAccuracy] = useState<number>(0);
+  const [currentHeading, setCurrentHeading] = useState<number>(0);
+  const [currentSpeed, setCurrentSpeed] = useState<number>(0);
   
-  const [smoothedDistance, setSmoothedDistance = useState<number | null>(null);
+  const [smoothedDistance, setSmoothedDistance] = useState<number | null>(null);
   const distanceHistoryRef = useRef<number[]>([]);
   const speedConsecutiveHitsRef = useRef<number>(0);
   
   const lastStatusChangeTimeRef = useRef<number>(0);
   
-  const [vesselNickname, setVesselNickname = useState('');
-  const [customSharingId, setCustomSharingId = useState('');
-  const [customFleetId, setCustomFleetId = useState('');
-  const [fleetComment, setFleetComment = useState('');
-  const [lastSyncTime, setLastSyncTime = useState<number>(0);
+  const [vesselNickname, setVesselNickname] = useState('');
+  const [customSharingId, setCustomSharingId] = useState('');
+  const [customFleetId, setCustomFleetId] = useState('');
+  const [fleetComment, setFleetComment] = useState('');
+  const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
-  const [isGhostMode, setIsGhostMode = useState(false);
-  const [isTrajectoryHidden, setIsTrajectoryHidden = useState(false);
+  const [isGhostMode, setIsGhostMode] = useState(false);
+  const [isTrajectoryHidden, setIsTrajectoryHidden] = useState(false);
 
-  const [battery, setBattery = useState<{ level: number, charging: boolean }>({ level: 1, charging: false });
+  const [battery, setBattery] = useState<{ level: number, charging: boolean }>({ level: 1, charging: false });
 
-  const [emergencyContact, setEmergencyContact = useState('');
-  const [vesselSmsMessage, setVesselSmsMessage = useState('');
-  const [isEmergencyEnabled, setIsEmergencyEnabled = useState(true);
-  const [isCustomMessageEnabled, setIsCustomMessageEnabled = useState(true);
+  const [emergencyContact, setEmergencyContact] = useState('');
+  const [vesselSmsMessage, setVesselSmsMessage] = useState('');
+  const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
+  const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
 
-  const [techLogs, setTechLogs = useState<TechLogEntry[]>([]);
+  const [techLogs, setTechLogs] = useState<TechLogEntry[]>([]);
   
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
   const currentPosRef = useRef(currentPos);
@@ -225,7 +225,7 @@ export function useEmetteur(
     });
   }, [addTechLog, updateVesselInFirestore, simulator?.isActive]);
 
-  const startSharing = useCallback(() => {
+  const startTracking = useCallback(() => {
     if (!navigator.geolocation || !user || !firestore) return;
     setIsSharing(true);
     isSharingRef.current = true;
