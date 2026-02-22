@@ -24,7 +24,7 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v119.0 : Gestion de la carte et du moteur de tuiles Windy.
+ * HOOK PARTAGÉ v120.0 : Gestion de la carte et du moteur de tuiles Windy avec nouvelle clé API.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
@@ -46,7 +46,7 @@ export function useMapCore() {
   const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
   const [tacticalMarkers, setTacticalMarkers] = useState<TacticalMarker[]>([]);
 
-  // MOTEUR D'OVERLAY WINDY v119.0
+  // MOTEUR D'OVERLAY WINDY v120.0
   useEffect(() => {
     if (!googleMap || !isGoogleLoaded) return;
 
@@ -55,9 +55,8 @@ export function useMapCore() {
 
     if (windyLayer === 'none') return;
 
-    // 2. Création du calque de tuiles Windy
-    // Note: Utilisation de la clé API Point Forecast pour les tuiles si autorisée, sinon fallback
-    const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
+    // 2. Création du calque de tuiles Windy avec la NOUVELLE CLÉ API
+    const API_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
     
     const windyTileLayer = new google.maps.ImageMapType({
       getTileUrl: (coord, zoom) => {
