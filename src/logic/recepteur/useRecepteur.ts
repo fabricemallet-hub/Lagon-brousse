@@ -9,8 +9,8 @@ import { useAudioEngine } from '@/hooks/useAudioEngine';
 import type { UserAccount, SoundLibraryEntry, VesselStatus, VesselPrefs } from '@/lib/types';
 
 /**
- * LOGIQUE RÉCEPTEUR (B) v83.1 - CONTRÔLEUR DE TRIGGERS AUDIO
- * Synchronisation avec le protocole Hard Clear et fiabilisation des alertes critiques.
+ * LOGIQUE RÉCEPTEUR (B) v89.0 - CONTRÔLEUR DE TRIGGERS AUDIO
+ * Intégration de l'alarme haute priorité pour collision probable.
  */
 export function useRecepteur(vesselId?: string) {
   const { user } = useUser();
@@ -61,11 +61,12 @@ export function useRecepteur(vesselId?: string) {
     }
   }, [profile?.vesselPrefs]);
 
-  const triggerAlert = useCallback((type: keyof VesselPrefs['alerts'], vesselName: string, forceMaxVolume: boolean = false, vId: string) => {
+  const triggerAlert = useCallback((type: keyof VesselPrefs['alerts'] | 'collision', vesselName: string, forceMaxVolume: boolean = false, vId: string) => {
     if (acknowledgedAlerts[vId] === type) return;
     if (!vesselPrefs.isNotifyEnabled || !dbSounds || !audioEngine.isUnlocked) return;
 
-    const config = vesselPrefs.alerts[type];
+    // v89.0: On mappe collision sur alerte urgence par défaut si pas de son dédié
+    const config = type === 'collision' ? { enabled: true, sound: 'alerte urgence', loop: true } : vesselPrefs.alerts[type as keyof VesselPrefs['alerts']];
     if (!config || !config.enabled) return;
 
     const sound = dbSounds.find(s => s.label.toLowerCase() === config.sound.toLowerCase() || s.id === config.sound);
@@ -78,6 +79,11 @@ export function useRecepteur(vesselId?: string) {
     let variant: "default" | "destructive" = "default";
 
     switch(type) {
+        case 'collision':
+            title = "⚠️ DANGER COLLISION";
+            message = `IMPACT CÔTIER PROBABLE POUR ${vesselName} !`;
+            variant = "destructive";
+            break;
         case 'assistance':
             title = "🆘 DÉTRESSE";
             message = `Signal d'assistance [MAYDAY/PANPAN] sur ${vesselName} !`;
@@ -107,7 +113,7 @@ export function useRecepteur(vesselId?: string) {
     toast({ title, description: message, variant, duration: config.loop ? 100000 : 5000 });
   }, [vesselPrefs, dbSounds, audioEngine, toast, acknowledgedAlerts]);
 
-  const processVesselAlerts = useCallback((followedVessels: VesselStatus[]) => {
+  const processVesselAlerts = useCallback((followedVessels: VesselStatus[], isImpactDetected: boolean = false) => {
     if (!vesselPrefs.isNotifyEnabled || !audioEngine.isUnlocked) return;
 
     followedVessels.forEach(vessel => {
@@ -124,16 +130,18 @@ export function useRecepteur(vesselId?: string) {
                                  (now - lastStatusTime > vesselPrefs.watchDuration * 60000);
         const isBatteryCritical = (vessel.batteryLevel ?? 100) <= vesselPrefs.batteryThreshold;
 
-        let activeType: keyof VesselPrefs['alerts'] | null = null;
+        let activeType: keyof VesselPrefs['alerts'] | 'collision' | null = null;
 
-        if (vessel.status === 'emergency') activeType = 'assistance';
+        // PRIORITÉ : Collision > Mayday > Dérive
+        if (isImpactDetected && vessel.status === 'drifting') activeType = 'collision';
+        else if (vessel.status === 'emergency') activeType = 'assistance';
         else if (isOffline) activeType = 'offline';
         else if (vessel.status === 'drifting') activeType = 'drifting';
         else if (isImmobileTooLong) activeType = 'stationary';
         else if (isBatteryCritical && !vessel.isCharging) activeType = 'battery';
 
         if (activeType && lastKnownTrigger !== activeType) {
-            triggerAlert(activeType, vessel.displayName || vId, activeType === 'assistance', vId);
+            triggerAlert(activeType, vessel.displayName || vId, activeType === 'assistance' || activeType === 'collision', vId);
             lastAlarmTriggerRef.current[vId] = activeType;
         } 
         

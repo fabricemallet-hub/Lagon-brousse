@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -103,7 +104,8 @@ import {
   Activity,
   Signal,
   ArrowUp,
-  Compass
+  Compass,
+  Ruler
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -220,6 +222,7 @@ export default function VesselTrackerPage() {
 
   const [testMinutes, setTestMinutes] = useState('60');
   const [isTensionVectorEnabled, setIsTensionVectorEnabled] = useState(true);
+  const [isImpactProbable, setIsImpactProbable] = useState(false);
 
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -232,8 +235,8 @@ export default function VesselTrackerPage() {
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
   useEffect(() => { 
-    if (followedVessels) recepteur.processVesselAlerts(followedVessels); 
-  }, [followedVessels, recepteur.processVesselAlerts]);
+    if (followedVessels) recepteur.processVesselAlerts(followedVessels, isImpactProbable); 
+  }, [followedVessels, recepteur.processVesselAlerts, isImpactProbable]);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const activeCirclesRef = useRef<(google.maps.Circle | google.maps.Polyline)[]>([]);
@@ -271,6 +274,43 @@ export default function VesselTrackerPage() {
         hasCenteredInitially.current = true;
     }
   }, [emetteur.currentPos, mapCore.googleMap, mapCore.handleRecenter]);
+
+  // v89.0: Détection de collision au point projeté
+  useEffect(() => {
+    if (emetteur.vesselStatus === 'drifting' && emetteur.currentPos && mapCore.googleMap) {
+        const proj = calculateProjectedPosition(
+            emetteur.currentPos.lat,
+            emetteur.currentPos.lng,
+            emetteur.currentSpeed,
+            emetteur.currentHeading,
+            recepteur.vesselPrefs.driftProjectionMinutes || 5
+        );
+
+        const elevator = new google.maps.ElevationService();
+        elevator.getElevationForLocations({
+            locations: [new google.maps.LatLng(proj.lat, proj.lng)]
+        }, (results, status) => {
+            if (status === 'OK' && results && results[0]) {
+                const elevation = results[0].elevation;
+                if (elevation > 0) {
+                    if (!isImpactProbable) {
+                        setIsImpactProbable(true);
+                        toast({ 
+                            variant: "destructive", 
+                            title: "DANGER COLLISION", 
+                            description: "Dérive vers une zone côtière ou récifale détectée !",
+                            duration: 10000
+                        });
+                    }
+                } else {
+                    setIsImpactProbable(false);
+                }
+            }
+        });
+    } else {
+        setIsImpactProbable(false);
+    }
+  }, [emetteur.vesselStatus, emetteur.currentPos, emetteur.currentSpeed, emetteur.currentHeading, recepteur.vesselPrefs.driftProjectionMinutes, mapCore.googleMap, toast]);
 
   const [isLedActive, setIsLedActive] = useState(false);
   useEffect(() => {
@@ -399,9 +439,6 @@ export default function VesselTrackerPage() {
     }
   };
 
-  if (loadError) return <div className="p-4 text-destructive">Erreur Google Maps.</div>;
-  if (!isLoaded || isProfileLoading) return <Skeleton className="h-96 w-full" />;
-
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
       {recepteur.isAlarmActive && (
@@ -469,6 +506,7 @@ export default function VesselTrackerPage() {
                                     activeAnchorVessel.heading || 0,
                                     recepteur.vesselPrefs.driftProjectionMinutes || 5
                                 );
+                                const distToProj = Math.round(getDistance(activeAnchorVessel.location.latitude, activeAnchorVessel.location.longitude, proj.lat, proj.lng));
                                 return (
                                     <React.Fragment>
                                         <Circle 
@@ -476,19 +514,22 @@ export default function VesselTrackerPage() {
                                             center={proj}
                                             radius={15} 
                                             options={{ 
-                                                strokeColor: '#ef4444', 
+                                                strokeColor: isImpactProbable ? '#ef4444' : '#ffffff', 
                                                 strokeOpacity: 1, 
                                                 strokeWeight: 2, 
-                                                fillColor: '#ffffff', 
-                                                fillOpacity: 0.4, 
+                                                fillColor: isImpactProbable ? '#ef4444' : '#ffffff', 
+                                                fillOpacity: isImpactProbable ? (mapCore.isFlashOn ? 0.6 : 0.2) : 0.4, 
                                                 clickable: false, 
                                                 zIndex: 10 
                                             }} 
                                         />
                                         <OverlayView position={proj} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                             <div style={{ transform: 'translate(-50%, -320%)', zIndex: 10000 }} className="flex flex-col items-center pointer-events-none mb-3">
-                                                <div className="px-[10px] py-[4px] rounded-lg backdrop-blur-md border border-white text-[11px] font-black uppercase shadow-2xl whitespace-nowrap bg-orange-600/90 text-white">
-                                                    Estimation position dans {recepteur.vesselPrefs.driftProjectionMinutes || 5} min
+                                                <div className={cn(
+                                                    "px-[10px] py-[4px] rounded-lg backdrop-blur-md border border-white text-[11px] font-black uppercase shadow-2xl whitespace-nowrap bg-orange-600/90 text-white",
+                                                    isImpactProbable && "bg-red-600 animate-pulse"
+                                                )}>
+                                                    {isImpactProbable ? `⚠️ IMPACT POSSIBLE DANS ${distToProj}m` : `Estimation position dans ${recepteur.vesselPrefs.driftProjectionMinutes || 5} min`}
                                                 </div>
                                                 <div className="w-0.5 h-3 bg-white/40 shadow-sm" />
                                             </div>
@@ -614,7 +655,7 @@ export default function VesselTrackerPage() {
                           </CardHeader>
                           <CardContent className="p-5 space-y-5">
                               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">Mon Surnom</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg" /></div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="grid grid-cols-2 gap-3">
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 text-indigo-600">ID Flotte</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase" /></div>
                               </div>
