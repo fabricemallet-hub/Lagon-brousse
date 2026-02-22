@@ -91,7 +91,8 @@ import {
   EyeOff,
   Trash2,
   Phone,
-  Eye
+  Eye,
+  Check
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -178,6 +179,11 @@ export default function VesselTrackerPage() {
   const [isAdjustingRadius, setIsAdjustingRadius] = useState(false);
   const [hudMode, setHudMode] = useState<'AUTO' | 'TACTICAL' | 'TECHNICAL'>('AUTO');
   
+  // Radius States
+  const [tempRadius, setTempRadius] = useState<number>(100);
+  const [isConfirmingRadius, setIsConfirmingRadius] = useState(false);
+  const radiusTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const mapCore = useMapCore();
   const simulator = useSimulator();
 
@@ -236,26 +242,65 @@ export default function VesselTrackerPage() {
     }
   }, [followedVessels, emetteur.isSharing, emetteur.sharingId, firestore, mapCore]);
 
-  const activeCirclesRef = useRef<(google.maps.Circle | google.maps.Polyline)[]>([]);
-  const prevStatusRef = useRef<string>('');
-  const hasCenteredInitially = useRef(false);
-
-  const hardClearCircles = useCallback(() => {
-    activeCirclesRef.current.forEach(obj => { try { obj.setMap(null); } catch (e) {} });
-    activeCirclesRef.current = [];
-  }, []);
-
+  // Radius logic
   useEffect(() => {
-    if (prevStatusRef.current !== emetteur.vesselStatus) {
-        if (emetteur.vesselStatus === 'moving' || emetteur.vesselStatus === 'returning' || emetteur.vesselStatus === 'landed' || emetteur.vesselStatus === 'offline') {
-            hardClearCircles();
-            if (emetteur.vesselStatus !== 'drifting' && emetteur.vesselStatus !== 'emergency') {
-                recepteur.stopAllAlarms();
-            }
-        }
-        prevStatusRef.current = emetteur.vesselStatus;
+    setTempRadius(emetteur.mooringRadius);
+  }, [emetteur.mooringRadius]);
+
+  const handleRadiusChange = (val: number) => {
+    setTempRadius(val);
+    setIsConfirmingRadius(true);
+    
+    if (radiusTimerRef.current) clearTimeout(radiusTimerRef.current);
+    
+    radiusTimerRef.current = setTimeout(() => {
+        setTempRadius(emetteur.mooringRadius);
+        setIsConfirmingRadius(false);
+        emetteur.addTechLog('ERREUR', 'Changement de rayon annulé');
+        toast({ variant: "destructive", title: "Annulé", description: "Temps de validation écoulé." });
+    }, 5000);
+  };
+
+  const handleConfirmRadius = () => {
+    if (radiusTimerRef.current) clearTimeout(radiusTimerRef.current);
+    emetteur.saveMooringRadius(tempRadius);
+    setIsConfirmingRadius(false);
+  };
+
+  const activeAnchorVessel = useMemo(() => {
+    if (mapCore.isCirclesHidden) return null;
+    const radiusToUse = isConfirmingRadius ? tempRadius : emetteur.mooringRadius;
+    
+    if (simulator.isActive && simulator.simPos) {
+        const aPos = emetteur.anchorPos || simulator.simPos;
+        return { 
+            id: 'SANDBOX', status: emetteur.vesselStatus, anchorLocation: { latitude: aPos.lat, longitude: aPos.lng }, 
+            location: { latitude: simulator.simPos.lat, longitude: simulator.simPos.lng }, mooringRadius: radiusToUse,
+            accuracy: simulator.simAccuracy || 5, speed: simulator.simSpeed, heading: simulator.simBearing, isSim: true
+        };
     }
-  }, [emetteur.vesselStatus, hardClearCircles, recepteur]);
+    if (emetteur.isSharing && emetteur.currentPos) {
+        const aPos = emetteur.anchorPos || emetteur.currentPos;
+        return { 
+            id: emetteur.sharingId, status: emetteur.vesselStatus, anchorLocation: { latitude: aPos.lat, longitude: aPos.lng }, 
+            location: { latitude: emetteur.currentPos.lat, longitude: emetteur.currentPos.lng }, 
+            mooringRadius: radiusToUse, accuracy: emetteur.accuracy, speed: emetteur.currentSpeed, heading: emetteur.currentHeading, isSim: false
+        };
+    }
+    return null;
+  }, [simulator, emetteur, mapCore.isCirclesHidden, isConfirmingRadius, tempRadius]);
+
+  const mooringCircleOptions = useMemo(() => {
+    if (!activeAnchorVessel) return null;
+    const isDrifting = activeAnchorVessel.status === 'drifting';
+    return { 
+        strokeColor: isDrifting ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
+        strokeOpacity: (isDrifting && mapCore.isFlashOn) ? 1.0 : (activeAnchorVessel.isSim ? 0.4 : 0.8), 
+        strokeWeight: activeAnchorVessel.isSim ? 2 : 3, 
+        fillColor: isDrifting ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
+        fillOpacity: 0.15, clickable: false, zIndex: 1 
+    };
+  }, [activeAnchorVessel, mapCore.isFlashOn]);
 
   useEffect(() => {
     if ((emetteur.currentPos || simulator.simPos) && !hasCenteredInitially.current && mapCore.googleMap) {
@@ -266,30 +311,6 @@ export default function VesselTrackerPage() {
         }
     }
   }, [emetteur.currentPos, simulator.simPos, mapCore]);
-
-  useEffect(() => {
-    if (emetteur.vesselStatus === 'drifting' && emetteur.currentPos && mapCore.googleMap) {
-        const proj = calculateProjectedPosition(emetteur.currentPos.lat, emetteur.currentPos.lng, emetteur.currentSpeed, emetteur.currentHeading, recepteur.vesselPrefs.driftProjectionMinutes || 5);
-        const elevator = new google.maps.ElevationService();
-        elevator.getElevationForLocations({ locations: [new google.maps.LatLng(proj.lat, proj.lng)] }, (results, status) => {
-            if (status === 'OK' && results && results[0] && results[0].elevation > 0) {
-                if (!isImpactProbable) {
-                    setIsImpactProbable(true);
-                    toast({ variant: "destructive", title: "DANGER COLLISION", duration: 10000 });
-                }
-            } else { setIsImpactProbable(false); }
-        });
-    } else { setIsImpactProbable(false); }
-  }, [emetteur.vesselStatus, emetteur.currentPos, emetteur.currentSpeed, emetteur.currentHeading, recepteur.vesselPrefs.driftProjectionMinutes, mapCore.googleMap, isImpactProbable, toast]);
-
-  const [isLedActive, setIsLedActive] = useState(false);
-  useEffect(() => {
-    if (emetteur.lastSyncTime > 0) {
-      setIsLedActive(true);
-      const timer = setTimeout(() => setIsLedActive(false), 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [emetteur.lastSyncTime]);
 
   const handleRecenter = () => {
     recepteur.initAudio(); 
@@ -306,66 +327,6 @@ export default function VesselTrackerPage() {
     }
   }, [emetteur.currentPos, simulator.simPos, flotte, toast]);
 
-  const activeAnchorVessel = useMemo(() => {
-    if (mapCore.isCirclesHidden) return null;
-    if (simulator.isActive && simulator.simPos) {
-        const aPos = emetteur.anchorPos || simulator.simPos;
-        return { 
-            id: 'SANDBOX', status: emetteur.vesselStatus, anchorLocation: { latitude: aPos.lat, longitude: aPos.lng }, 
-            location: { latitude: simulator.simPos.lat, longitude: simulator.simPos.lng }, mooringRadius: emetteur.mooringRadius,
-            accuracy: simulator.simAccuracy || 5, speed: simulator.simSpeed, heading: simulator.simBearing, isSim: true
-        };
-    }
-    if (emetteur.isSharing && emetteur.currentPos) {
-        const aPos = emetteur.anchorPos || emetteur.currentPos;
-        return { 
-            id: emetteur.sharingId, status: emetteur.vesselStatus, anchorLocation: { latitude: aPos.lat, longitude: aPos.lng }, 
-            location: { latitude: emetteur.currentPos.lat, longitude: emetteur.currentPos.lng }, 
-            mooringRadius: emetteur.mooringRadius, accuracy: emetteur.accuracy, speed: emetteur.currentSpeed, heading: emetteur.currentHeading, isSim: false
-        };
-    }
-    return null;
-  }, [simulator, emetteur, mapCore.isCirclesHidden]);
-
-  const mooringCircleOptions = useMemo(() => {
-    if (!activeAnchorVessel) return null;
-    const isDrifting = activeAnchorVessel.status === 'drifting';
-    return { 
-        strokeColor: isDrifting ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
-        strokeOpacity: (isDrifting && mapCore.isFlashOn) ? 1.0 : (activeAnchorVessel.isSim ? 0.4 : 0.8), 
-        strokeWeight: activeAnchorVessel.isSim ? 2 : 3, 
-        fillColor: isDrifting ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
-        fillOpacity: 0.15, clickable: false, zIndex: 1 
-    };
-  }, [activeAnchorVessel, mapCore.isFlashOn]);
-
-  const handleSaveVessel = async () => {
-    if (!user || !firestore) return;
-    const cleanId = (vesselIdToFollow || emetteur.customSharingId).trim().toUpperCase();
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), { savedVesselIds: arrayUnion(cleanId), lastVesselId: cleanId });
-        if (vesselIdToFollow) setVesselIdToFollow('');
-        toast({ title: "ID enregistré" });
-    } catch (e) { toast({ variant: 'destructive', title: "Erreur" }); }
-  };
-
-  const handleSaveSmsSettings = async () => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            emergencyContact: emetteur.emergencyContact,
-            assistanceContact: emetteur.assistanceContact,
-            vesselSmsMessage: emetteur.vesselSmsMessage,
-            isEmergencyEnabled: emetteur.isEmergencyEnabled,
-            isCustomMessageEnabled: emetteur.isCustomMessageEnabled
-        });
-        toast({ title: "Réglages SMS mémorisés" });
-    } catch (e) {
-        console.error(e);
-        toast({ variant: 'destructive', title: "Erreur sauvegarde" });
-    }
-  };
-
   const hudLogs = useMemo(() => {
     const logs = [...emetteur.techLogs];
     const tacticalLabels = ['CHGT STATUT', 'DÉRIVE', 'URGENCE', 'CHGT MANUEL', 'MOUILLAGE', 'POSITION', 'ANNULATION'];
@@ -376,14 +337,6 @@ export default function VesselTrackerPage() {
         return true;
     }).slice(0, 8);
   }, [emetteur.techLogs, hudMode]);
-
-  const smsPreview = useMemo(() => {
-    const nicknamePrefix = emetteur.vesselNickname ? `[${emetteur.vesselNickname.toUpperCase()}] ` : "";
-    const customText = (emetteur.isCustomMessageEnabled && emetteur.vesselSmsMessage) ? emetteur.vesselSmsMessage : "Requiert assistance immédiate.";
-    const timeStr = format(new Date(), 'HH:mm');
-    const accStr = emetteur.accuracy ? ` (+/- ${emetteur.accuracy}m)` : "";
-    return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] à ${timeStr}. Position${accStr} : https://www.google.com/maps?q=-22.27,166.44`;
-  }, [emetteur.vesselSmsMessage, emetteur.isCustomMessageEnabled, emetteur.vesselNickname, emetteur.accuracy]);
 
   const sendEmergencySms = (type: 'SOS' | 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE') => {
     if (!emetteur.isEmergencyEnabled) {
@@ -404,12 +357,7 @@ export default function VesselTrackerPage() {
     window.location.href = `sms:${contact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
-  const handleMapClick = (e: google.maps.MapMouseEvent) => {
-    if (simulator.isActive && simulator.isTeleportMode && e.latLng) {
-        simulator.teleport(e.latLng.lat(), e.latLng.lng());
-        toast({ title: "Téléportation LABO effectuée" });
-    }
-  };
+  const hasCenteredInitially = useRef(false);
 
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
@@ -426,6 +374,7 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
+        {/* GHOST HUD LIFO v117 */}
         <div className="absolute top-[35%] right-[10px] z-[999] pointer-events-none flex flex-col items-end gap-2 max-w-[200px]">
             <div className="flex bg-black/40 backdrop-blur-md rounded-lg p-1 border border-white/10 pointer-events-auto shadow-xl group transition-opacity hover:opacity-100 opacity-40">
                 {['AUTO', 'TACTICAL', 'TECHNICAL'].map(m => (
@@ -462,6 +411,34 @@ export default function VesselTrackerPage() {
             </div>
         </div>
 
+        {/* RADIUS CONTROLLER v117 */}
+        <div className="absolute bottom-[80px] left-4 z-[1001] pointer-events-auto">
+            <Card className="bg-black/40 backdrop-blur-md border-white/10 p-3 rounded-xl shadow-2xl flex flex-col items-center gap-3 w-40 animate-in fade-in slide-in-from-left-2">
+                <div className="flex justify-between items-center w-full px-1">
+                    <span className="text-[8px] font-black uppercase text-white/60 tracking-widest">Rayon</span>
+                    <Badge variant="outline" className="bg-primary/20 text-white font-black text-[10px] h-5 border-primary/30">
+                        {tempRadius}M
+                    </Badge>
+                </div>
+                <Slider 
+                    value={[tempRadius]} 
+                    min={10} 
+                    max={500} 
+                    step={10} 
+                    onValueChange={v => handleRadiusChange(v[0])} 
+                    className="w-full"
+                />
+                {isConfirmingRadius && (
+                    <Button 
+                        onClick={handleConfirmRadius}
+                        className="w-full h-8 bg-primary text-white font-black uppercase text-[9px] shadow-lg animate-in zoom-in-95 duration-200 gap-2 rounded-lg"
+                    >
+                        <Check className="size-3" /> VALIDER
+                    </Button>
+                )}
+            </Card>
+        </div>
+
         <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>{mapCore.isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
         </div>
@@ -476,19 +453,16 @@ export default function VesselTrackerPage() {
             defaultZoom={12} 
             onLoad={mapCore.setGoogleMap} 
             onDragStart={() => mapCore.setIsFollowMode(false)} 
-            onClick={handleMapClick}
             options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
         >
             {!emetteur.isTrajectoryHidden && mapCore.breadcrumbs.length > 1 && <Polyline path={mapCore.breadcrumbs.map(p => ({ lat: p.lat, lng: p.lng }))} options={{ strokeColor: '#3b82f6', strokeOpacity: 0.6, strokeWeight: 2, zIndex: 1 }} />}
             
             {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
-                <React.Fragment>
-                    <Circle 
-                        center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
-                        radius={activeAnchorVessel.mooringRadius || 100} 
-                        options={mooringCircleOptions || {}} 
-                    />
-                </React.Fragment>
+                <Circle 
+                    center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
+                    radius={activeAnchorVessel.mooringRadius} 
+                    options={mooringCircleOptions || {}} 
+                />
             )}
             
             {followedVessels?.filter(v => v.isSharing && v.location && v.id !== emetteur.sharingId).map(vessel => (
@@ -897,12 +871,12 @@ export default function VesselTrackerPage() {
                                                 </p>
                                                 <div className="p-4 bg-muted/30 border-2 border-dashed border-slate-200 rounded-2xl">
                                                     <p className="text-[9px] font-medium leading-relaxed italic text-slate-600 font-mono">
-                                                        "{smsPreview}"
+                                                        {`[${(emetteur.vesselNickname || 'MON NAVIRE').toUpperCase()}] ${emetteur.vesselSmsMessage || 'Besoin assistance.'} à ${format(new Date(), 'HH:mm')}. +/- ${emetteur.accuracy || '...'}m : https://www.google.com/maps?q=${emetteur.currentPos?.lat || 0},${emetteur.currentPos?.lng || 0}`}
                                                     </p>
                                                 </div>
                                             </div>
 
-                                            <Button onClick={handleSaveSmsSettings} className="w-full h-14 bg-primary text-white font-black uppercase text-[11px] tracking-widest shadow-xl rounded-2xl gap-3">
+                                            <Button onClick={emetteur.handleSaveSmsSettings} className="w-full h-14 bg-primary text-white font-black uppercase text-[11px] tracking-widest shadow-xl rounded-2xl gap-3">
                                                 <Save className="size-5" /> SAUVEGARDER RÉGLAGES SMS
                                             </Button>
                                         </div>

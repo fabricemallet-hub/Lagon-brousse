@@ -14,7 +14,7 @@ const THRESHOLD_DRIFT = 0.2; // ND
 const THRESHOLD_MOVEMENT = 2.0; // ND
 
 /**
- * LOGIQUE ÉMETTEUR (A) v116.0 : Gestion SMS et Rollback de statut.
+ * LOGIQUE ÉMETTEUR (A) v117.0 : Gestion SMS, Rollback et Rayon de mouillage dynamique.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -94,7 +94,7 @@ export function useEmetteur(
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
   useEffect(() => { batteryRef.current = battery; }, [battery]);
 
-  // Sync SMS from Profile
+  // Sync SMS and Prefs from Profile
   useEffect(() => {
     if (userProfile) {
         setEmergencyContact(userProfile.emergencyContact || '');
@@ -102,6 +102,9 @@ export function useEmetteur(
         setVesselSmsMessage(userProfile.vesselSmsMessage || '');
         setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
         setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
+        if (userProfile.vesselPrefs?.mooringRadius) {
+            setMooringRadius(userProfile.vesselPrefs.mooringRadius);
+        }
     }
   }, [userProfile]);
 
@@ -364,10 +367,14 @@ export function useEmetteur(
         setVesselStatus('emergency'); updateVesselInFirestore({ status: 'emergency', eventLabel: type }, true);
         addTechLog('URGENCE', type);
     },
-    saveMooringRadius: async () => {
+    saveMooringRadius: async (val: number) => {
         if (!user || !firestore) return;
-        updateDoc(doc(firestore, 'users', user.uid), { 'vesselPrefs.mooringRadius': mooringRadiusRef.current });
-        toast({ title: "Rayon par défaut enregistré" });
+        setMooringRadius(val);
+        mooringRadiusRef.current = val;
+        updateVesselInFirestore({ mooringRadius: val });
+        updateDoc(doc(firestore, 'users', user.uid), { 'vesselPrefs.mooringRadius': val });
+        addTechLog('TECHNIQUE', `RAYON FIXÉ À ${val}M`);
+        toast({ title: `Rayon de ${val}m validé` });
     }
   }), [
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
