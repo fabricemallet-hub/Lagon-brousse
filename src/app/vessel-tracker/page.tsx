@@ -211,7 +211,7 @@ export default function VesselTrackerPage() {
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     const ids = [...savedVesselIds];
-    if (isSharing && !ids.includes(emetteur.sharingId)) ids.push(emetteur.sharingId);
+    if (emetteur.isSharing && !ids.includes(emetteur.sharingId)) ids.push(emetteur.sharingId);
     if (ids.length === 0) return null;
     return query(collection(firestore, 'vessels'), where('id', 'in', ids.slice(0, 10)));
   }, [firestore, user, savedVesselIds, emetteur.isSharing, emetteur.sharingId]);
