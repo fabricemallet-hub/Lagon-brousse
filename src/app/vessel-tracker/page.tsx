@@ -436,7 +436,7 @@ export default function VesselTrackerPage() {
             <Button variant={mapCore.viewMode === 'gamma' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl" onClick={() => mapCore.setViewMode('gamma')}>Windy</Button>
         </div>
 
-        <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={12} onLoad={mapCore.setGoogleMap} onDragStart={() => mapCore.setIsFollowMode(false)} onClick={(e) => { recepteur.initAudio(); if (simulator.isTeleportMode && e.latLng) simulator.teleport(e.latLng.lat(), e.latLng.lng()); }} options={{ disableDefaultUI: true, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}>
+        <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={12} onLoad={mapCore.setGoogleMap} onDragStart={() => mapCore.setIsFollowMode(false)} onClick={(e) => { recepteur.initAudio(); if (simulator.isTeleportMode && e.latLng) simulator.teleport(e.latLng.lat(), e.latLng.lng()); }} options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}>
             {!emetteur.isTrajectoryHidden && mapCore.breadcrumbs.length > 1 && <Polyline path={mapCore.breadcrumbs.map(p => ({ lat: p.lat, lng: p.lng }))} options={{ strokeColor: '#3b82f6', strokeOpacity: 0.6, strokeWeight: 2, zIndex: 1 }} />}
             
             {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
@@ -506,6 +506,37 @@ export default function VesselTrackerPage() {
             <Button onClick={handleRecenter} className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl flex items-center justify-center"><LocateFixed className="size-5"/></Button>
         </div>
       </div>
+
+      {/* v110.0: Restauration des boutons d'état manuel et d'assistance */}
+      {emetteur.isSharing && (
+        <div className="grid grid-cols-1 gap-2 mb-2">
+            <div className="grid grid-cols-2 gap-2">
+                <Button 
+                    variant="outline" 
+                    className="h-14 font-black uppercase text-[10px] border-2 bg-white/80 backdrop-blur-md gap-2 border-indigo-100 text-indigo-700 shadow-sm"
+                    onClick={() => emetteur.changeManualStatus('returning')}
+                    disabled={emetteur.vesselStatus === 'returning'}
+                >
+                    <Navigation className="size-4" /> RETOUR MAISON
+                </Button>
+                <Button 
+                    variant="outline" 
+                    className="h-14 font-black uppercase text-[10px] border-2 bg-white/80 backdrop-blur-md gap-2 border-green-100 text-green-700 shadow-sm"
+                    onClick={() => emetteur.changeManualStatus('landed')}
+                    disabled={emetteur.vesselStatus === 'landed'}
+                >
+                    <Home className="size-4" /> HOME (À TERRE)
+                </Button>
+            </div>
+            <Button 
+                variant="outline" 
+                className="w-full h-14 font-black uppercase text-xs border-2 bg-white/80 backdrop-blur-md gap-3 border-orange-200 text-orange-700 shadow-sm"
+                onClick={() => emetteur.triggerEmergency('ASSISTANCE')}
+            >
+                <Phone className="size-5" /> BESOIN D'ASSISTANCE
+            </Button>
+        </div>
+      )}
 
       {/* BOUTONS URGENCE RESTAURÉS v109.0 */}
       <div className="grid grid-cols-2 gap-2 mb-4">
@@ -904,8 +935,7 @@ export default function VesselTrackerPage() {
                                                             >
                                                                 <Play className="size-4 fill-primary text-primary" />
                                                             </Button>
-                                                        </div>
-                                                    </Card>
+                                                        </Card>
                                                 );
                                             })}
                                         </div>
