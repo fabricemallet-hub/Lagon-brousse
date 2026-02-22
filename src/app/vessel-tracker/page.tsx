@@ -85,7 +85,8 @@ import {
   Compass,
   Radio,
   ZapOff,
-  EyeOff
+  EyeOff,
+  Trash2
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -174,8 +175,8 @@ export default function VesselTrackerPage() {
 
   const handleStopCleanup = useCallback(() => { mapCore.clearBreadcrumbs(); }, [mapCore]);
 
-  const userProfileRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userProfileRef);
+  const userDocRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
   const savedVesselIds = userProfile?.savedVesselIds || [];
   
@@ -214,7 +215,6 @@ export default function VesselTrackerPage() {
     if (followedVessels) recepteur.processVesselAlerts(followedVessels, isImpactProbable); 
   }, [followedVessels, recepteur, isImpactProbable]);
 
-  // Sync Tactical Markers for the whole followed group
   useEffect(() => {
     if (firestore && (followedVessels || emetteur.isSharing)) {
         const ids = followedVessels?.map(v => v.id) || [];
@@ -301,10 +301,11 @@ export default function VesselTrackerPage() {
             accuracy: simulator.simAccuracy || 5, speed: simulator.simSpeed, heading: simulator.simBearing, isSim: true
         };
     }
-    if (emetteur.isSharing && emetteur.anchorPos) {
+    if (emetteur.isSharing && emetteur.currentPos) {
+        const aPos = emetteur.anchorPos || emetteur.currentPos;
         return { 
-            id: emetteur.sharingId, status: emetteur.vesselStatus, anchorLocation: { latitude: emetteur.anchorPos.lat, longitude: emetteur.anchorPos.lng }, 
-            location: emetteur.currentPos ? { latitude: emetteur.currentPos.lat, longitude: emetteur.currentPos.lng } : null, 
+            id: emetteur.sharingId, status: emetteur.vesselStatus, anchorLocation: { latitude: aPos.lat, longitude: aPos.lng }, 
+            location: { latitude: emetteur.currentPos.lat, longitude: emetteur.currentPos.lng }, 
             mooringRadius: emetteur.mooringRadius, accuracy: emetteur.accuracy, speed: emetteur.currentSpeed, heading: emetteur.currentHeading, isSim: false
         };
     }
@@ -469,14 +470,85 @@ export default function VesselTrackerPage() {
                       </Card>
                   ) : (
                       <Card className="border-2 shadow-lg rounded-3xl overflow-hidden border-primary/20">
-                          <CardHeader className="bg-primary/5 p-5 border-b"><CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-primary"><Navigation className="size-4" /> Identité & Partage</CardTitle></CardHeader>
+                          <CardHeader className="bg-primary/5 p-5 border-b">
+                              <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-primary">
+                                  <Navigation className="size-4" /> Identité &amp; Partage
+                              </CardTitle>
+                          </CardHeader>
                           <CardContent className="p-5 space-y-5">
-                              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Mon Surnom</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg" /></div>
-                              <div className="grid grid-cols-2 gap-3">
-                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
-                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 text-indigo-600">ID Flotte</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase" /></div>
+                              <div className="space-y-1.5">
+                                  <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Mon Surnom</Label>
+                                  <Input 
+                                      value={emetteur.vesselNickname} 
+                                      onChange={e => emetteur.setVesselNickname(e.target.value)} 
+                                      placeholder="EX: KOOLAPIK" 
+                                      className="h-12 border-2 font-black text-lg bg-slate-50" 
+                                  />
                               </div>
-                              <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl gap-3" onClick={() => { recepteur.initAudio(); emetteur.startSharing(); }}><Zap className="size-5 fill-white" /> Lancer le Partage GPS</Button>
+                              <div className="grid grid-cols-2 gap-3">
+                                  <div className="space-y-1.5">
+                                      <Label className="text-[10px] font-black uppercase opacity-60 ml-1">ID Navire</Label>
+                                      <Input 
+                                          value={emetteur.customSharingId} 
+                                          onChange={e => emetteur.setCustomSharingId(e.target.value)} 
+                                          placeholder="XXX" 
+                                          className="h-12 border-2 font-black text-center uppercase bg-slate-50" 
+                                      />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                      <Label className="text-[10px] font-black uppercase opacity-60 text-indigo-600">ID Flotte</Label>
+                                      <Input 
+                                          value={emetteur.customFleetId} 
+                                          onChange={e => emetteur.setCustomFleetId(e.target.value)} 
+                                          placeholder="ABC" 
+                                          className="h-12 border-2 border-indigo-100 font-black text-center uppercase bg-slate-50" 
+                                      />
+                                  </div>
+                              </div>
+                              <div className="space-y-1.5">
+                                  <Label className="text-[9px] font-black uppercase text-emerald-600 ml-1">Commentaire Flotte</Label>
+                                  <Input 
+                                      value={emetteur.fleetComment} 
+                                      onChange={e => emetteur.setFleetComment(e.target.value)} 
+                                      placeholder="Ex: Test Admin..." 
+                                      className="h-12 border-2 border-emerald-100 bg-[#ebf7f3] font-black text-center uppercase" 
+                                  />
+                              </div>
+                              <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl gap-3" onClick={() => { recepteur.initAudio(); emetteur.startSharing(); }}>
+                                  <Zap className="size-5 fill-white" /> Lancer le Partage GPS
+                              </Button>
+
+                              {emetteur.savedFleets.length > 0 && (
+                                  <div className="pt-4 border-t-2 border-dashed space-y-3">
+                                      <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">Mes Flottes Enregistrées</p>
+                                      <div className="grid gap-2">
+                                          {emetteur.savedFleets.map((f, i) => (
+                                              <div 
+                                                  key={i} 
+                                                  className="p-3 border-2 rounded-2xl flex items-center justify-between hover:border-primary/30 transition-all cursor-pointer bg-white shadow-sm group"
+                                                  onClick={() => {
+                                                      emetteur.setCustomFleetId(f.id);
+                                                      emetteur.setFleetComment(f.comment);
+                                                      toast({ title: `Groupe ${f.id} chargé` });
+                                                  }}
+                                              >
+                                                  <div className="flex flex-col min-w-0">
+                                                      <span className="font-black text-primary text-xs uppercase">{f.id}</span>
+                                                      <span className="text-[9px] font-bold text-muted-foreground uppercase truncate">{f.comment || 'Aucun commentaire'}</span>
+                                                  </div>
+                                                  <Button 
+                                                      variant="ghost" 
+                                                      size="icon" 
+                                                      className="size-8 text-destructive/30 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                                      onClick={(e) => { e.stopPropagation(); emetteur.removeFleet(f); }}
+                                                  >
+                                                      <Trash2 className="size-4" />
+                                                  </Button>
+                                              </div>
+                                          ))}
+                                      </div>
+                                  </div>
+                              )}
                           </CardContent>
                       </Card>
                   )}
@@ -503,7 +575,7 @@ export default function VesselTrackerPage() {
                       <AccordionTrigger className="h-12 px-6 hover:no-underline">
                           <div className="flex items-center gap-3">
                               <ClipboardList className="size-5 text-primary" />
-                              <span className="text-sm font-black uppercase tracking-tighter">COCKPIT : JOURNAL & RÉGLAGES</span>
+                              <span className="text-sm font-black uppercase tracking-tighter">COCKPIT : JOURNAL &amp; RÉGLAGES</span>
                               <Badge variant="outline" className="ml-2 text-[8px] font-black uppercase bg-primary/10 text-primary border-primary/20 animate-pulse">LIVE</Badge>
                           </div>
                       </AccordionTrigger>
@@ -629,7 +701,7 @@ export default function VesselTrackerPage() {
                                   <Card className="border-2 border-primary/10 bg-primary/5 rounded-2xl overflow-hidden">
                                       <CardContent className="p-4 flex items-center justify-between">
                                           <div className="space-y-0.5">
-                                              <p className="text-[11px] font-black uppercase text-primary tracking-tight">ACTIVER LES SIGNAUX SONORES GLOBAUX</p>
+                                              <p className="text-[11px] font-black uppercase text-primary tracking-tight">ACTIVER LES SIGNAURS SONORES GLOBAUX</p>
                                               <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">PILOTAGE GÉNÉRAL DU THREAD AUDIO</p>
                                           </div>
                                           <Switch 
@@ -822,7 +894,7 @@ export default function VesselTrackerPage() {
                                         </div>
 
                                         <div className={cn("space-y-6 transition-all", !simulator.isActive && "opacity-40 pointer-events-none grayscale")}>
-                                            {/* Vitesse & Cap */}
+                                            {/* Vitesse &amp; Cap */}
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="space-y-2">
                                                     <div className="flex justify-between text-[10px] font-black uppercase">
@@ -840,7 +912,7 @@ export default function VesselTrackerPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Précision & Bruit */}
+                                            {/* Précision &amp; Bruit */}
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="space-y-2">
                                                     <div className="flex justify-between text-[10px] font-black uppercase">
@@ -858,7 +930,7 @@ export default function VesselTrackerPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Temps & Batterie */}
+                                            {/* Temps &amp; Batterie */}
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="space-y-2">
                                                     <div className="flex justify-between text-[10px] font-black uppercase">
