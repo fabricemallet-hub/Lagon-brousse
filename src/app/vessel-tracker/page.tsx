@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -190,9 +191,14 @@ export default function VesselTrackerPage() {
   
   const [appMode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
+  const [isMounted, setIsMounted] = useState(false);
   
   const mapCore = useMapCore();
   const simulator = useSimulator();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handlePositionUpdate = useCallback((lat: number, lng: number, status: string) => {
     mapCore.updateBreadcrumbs(lat, lng, status);
@@ -238,6 +244,17 @@ export default function VesselTrackerPage() {
   useEffect(() => { 
     if (followedVessels) recepteur.processVesselAlerts(followedVessels, isImpactProbable); 
   }, [followedVessels, recepteur.processVesselAlerts, isImpactProbable]);
+
+  // Windy API Bridge
+  useEffect(() => {
+    if (isMounted && mapCore.viewMode === 'gamma') {
+        // Initialisation de l'API Windy si nécessaire
+        // On s'assure que window est disponible avant tout appel
+        if (typeof window !== 'undefined') {
+            console.log("Windy Bridge: Component mounted, initializing gamma view...");
+        }
+    }
+  }, [isMounted, mapCore.viewMode]);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const activeCirclesRef = useRef<(google.maps.Circle | google.maps.Polyline)[]>([]);
@@ -426,6 +443,32 @@ export default function VesselTrackerPage() {
     return { color, opacity };
   }, [activeAnchorVessel, currentDriftDist, isTensionVectorEnabled, mapCore.isFlashOn]);
 
+  const precisionCircleOptions = useMemo(() => {
+    if (!activeAnchorVessel) return null;
+    return { 
+        strokeColor: '#ffffff', 
+        strokeOpacity: 0.3, 
+        strokeWeight: 1, 
+        fillColor: '#ffffff', 
+        fillOpacity: 0.05, 
+        clickable: false, 
+        zIndex: 0 
+    };
+  }, [activeAnchorVessel]);
+
+  const mooringCircleOptions = useMemo(() => {
+    if (!activeAnchorVessel) return null;
+    return { 
+        strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
+        strokeOpacity: (activeAnchorVessel.status === 'drifting' && mapCore.isFlashOn) ? 1.0 : (activeAnchorVessel.isSim ? 0.4 : 0.8), 
+        strokeWeight: activeAnchorVessel.isSim ? 2 : 3, 
+        fillColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
+        fillOpacity: 0.15, 
+        clickable: false, 
+        zIndex: 1 
+    };
+  }, [activeAnchorVessel, mapCore.isFlashOn]);
+
   const handleUpdateAlertConfig = (key: keyof VesselPrefs['alerts'], field: 'enabled' | 'sound' | 'loop', value: any) => {
     const currentAlerts = { ...recepteur.vesselPrefs.alerts };
     currentAlerts[key] = { ...currentAlerts[key], [field]: value };
@@ -512,23 +555,17 @@ export default function VesselTrackerPage() {
                     {activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 20 && (
                         <Circle 
                             onLoad={c => activeCirclesRef.current.push(c)}
+                            onUnmount={c => { activeCirclesRef.current = activeCirclesRef.current.filter(obj => obj !== c); }}
                             center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
                             radius={activeAnchorVessel.accuracy} 
-                            options={{ 
-                                strokeColor: '#ffffff', 
-                                strokeOpacity: 0.3, 
-                                strokeWeight: 1, 
-                                fillColor: '#ffffff', 
-                                fillOpacity: 0.05, 
-                                clickable: false, 
-                                zIndex: 0 
-                            }} 
+                            options={precisionCircleOptions || {}} 
                         />
                     )}
 
                     {tensionVectorStyle && activeAnchorVessel.location && (
                         <Polyline 
                             onLoad={p => activeCirclesRef.current.push(p)}
+                            onUnmount={p => { activeCirclesRef.current = activeCirclesRef.current.filter(obj => obj !== p); }}
                             path={[
                                 { lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }, 
                                 { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }
@@ -583,6 +620,7 @@ export default function VesselTrackerPage() {
                                     <React.Fragment>
                                         <Circle 
                                             onLoad={c => activeCirclesRef.current.push(c)}
+                                            onUnmount={c => { activeCirclesRef.current = activeCirclesRef.current.filter(obj => obj !== c); }}
                                             center={proj}
                                             radius={15} 
                                             options={{ 
@@ -617,17 +655,10 @@ export default function VesselTrackerPage() {
                     </OverlayView>
                     <Circle 
                         onLoad={c => activeCirclesRef.current.push(c)}
+                        onUnmount={c => { activeCirclesRef.current = activeCirclesRef.current.filter(obj => obj !== c); }}
                         center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
                         radius={activeAnchorVessel.mooringRadius || 100} 
-                        options={{ 
-                            strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
-                            strokeOpacity: (activeAnchorVessel.status === 'drifting' && mapCore.isFlashOn) ? 1.0 : (activeAnchorVessel.isSim ? 0.4 : 0.8), 
-                            strokeWeight: activeAnchorVessel.isSim ? 2 : 3, 
-                            fillColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
-                            fillOpacity: 0.15, 
-                            clickable: false, 
-                            zIndex: 1 
-                        }} 
+                        options={mooringCircleOptions || {}} 
                     />
                 </React.Fragment>
             )}
@@ -675,7 +706,7 @@ export default function VesselTrackerPage() {
                                             <EyeOff className="size-3" />
                                         </button>
                                     </div>
-                                    <div className="w-0.5 h-4 bg-red-600/60 shadow-sm" />
+                                    <div className="size-0.5 h-4 bg-red-600/60 shadow-sm" />
                                 </div>
                             )}
                         </div>
