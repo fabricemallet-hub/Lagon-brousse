@@ -7,6 +7,7 @@ import { useSimulator } from '@/logic/shared/useSimulator';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
 import { useRecepteur } from '@/logic/recepteur/useRecepteur';
 import { useFlotte } from '@/logic/flotteC/useFlotte';
+import { useRadarIA } from '@/logic/shared/useRadarIA';
 import { GoogleMap, OverlayView, Circle, Polyline } from '@react-google-maps/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -212,6 +213,7 @@ export default function VesselTrackerPage() {
   const emetteur = useEmetteur(handlePositionUpdate, handleStopCleanup, simulator, userProfile);
   const recepteur = useRecepteur(emetteur.sharingId);
   const flotte = useFlotte(emetteur.sharingId, emetteur.vesselNickname);
+  const radar = useRadarIA(emetteur.currentPos, emetteur.currentSpeed);
   
   const isAdmin = useMemo(() => {
     if (!user) return false;
@@ -559,18 +561,41 @@ export default function VesselTrackerPage() {
             ))}
 
             {emetteur.isSharing && emetteur.currentPos && (
-                <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                    <VesselMarker vessel={{ 
-                        id: emetteur.sharingId, 
-                        displayName: emetteur.vesselNickname || 'Moi', 
-                        status: emetteur.vesselStatus, 
-                        batteryLevel: Math.round(emetteur.battery.level * 100), 
-                        isCharging: emetteur.battery.charging, 
-                        isSharing: true, 
-                        isGhostMode: emetteur.isGhostMode, 
-                        lastActive: new Date() 
-                    } as any} />
-                </OverlayView>
+                <React.Fragment>
+                    {/* RADAR SENTINEL v90.0 : Overlay des Dangers IA */}
+                    {emetteur.currentSpeed <= 10 && radar.dangers.map((danger) => (
+                        <OverlayView key={danger.id} position={{ lat: danger.lat, lng: danger.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                            <div style={{ transform: 'translate(-50%, -50%)' }} className="size-4 bg-red-600/40 rounded-full blur-[2px] animate-pulse" />
+                        </OverlayView>
+                    ))}
+
+                    <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                        <div className="relative">
+                            <VesselMarker vessel={{ 
+                                id: emetteur.sharingId, 
+                                displayName: emetteur.vesselNickname || 'Moi', 
+                                status: emetteur.vesselStatus, 
+                                batteryLevel: Math.round(emetteur.battery.level * 100), 
+                                isCharging: emetteur.battery.charging, 
+                                isSharing: true, 
+                                isGhostMode: emetteur.isGhostMode, 
+                                lastActive: new Date() 
+                            } as any} />
+
+                            {/* ÉTIQUETTE RADAR SENTINEL */}
+                            {radar.closestDanger && emetteur.currentSpeed <= 10 && (
+                                <div style={{ transform: 'translate(-50%, -380%)' }} className="absolute z-[10001] flex flex-col items-center">
+                                    <div className="px-3 py-1 bg-red-600/90 backdrop-blur-md border border-white rounded-lg shadow-2xl whitespace-nowrap animate-pulse">
+                                        <p className="text-[10px] font-black uppercase text-white flex items-center gap-2">
+                                            <AlertTriangle className="size-3" /> DANGER {radar.closestDanger.type === 'reef' ? 'RÉCIF' : 'CÔTE'} : {radar.closestDanger.distance}m
+                                        </p>
+                                    </div>
+                                    <div className="w-0.5 h-4 bg-red-600/60 shadow-sm" />
+                                </div>
+                            )}
+                        </div>
+                    </OverlayView>
+                </React.Fragment>
             )}
         </GoogleMap>
         

@@ -421,6 +421,14 @@ export interface HuntingMarker {
   photoUrl?: string;
 }
 
+export interface RadarDanger {
+  id: string;
+  lat: number;
+  lng: number;
+  distance: number;
+  type: 'reef' | 'land';
+}
+
 export interface VesselStatus {
   id: string;
   userId: string;
