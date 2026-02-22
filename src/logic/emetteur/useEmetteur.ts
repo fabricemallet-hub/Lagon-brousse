@@ -5,13 +5,14 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useUser, useFirestore } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, getDocs, writeBatch, Timestamp, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
 import type { VesselStatus, TechLogEntry, UserAccount, FleetEntry } from '@/lib/types';
-import { useToast } from '@/hooks/use-toast';
 import { format, differenceInMinutes, subMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v96.0 : Anchor Lock Strict & Rupture Labo.
+ * LOGIQUE ÉMETTEUR (A) v97.1 : Sandbox Sync & Reset Automatique.
+ * Correction v97.1 : Réinitialisation propre lors du basculement Sandbox/Réel.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -102,7 +103,6 @@ export function useEmetteur(
   }, [userProfile, setMooringRadius]);
 
   const watchIdRef = useRef<number | null>(null);
-  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
   
   const handlePositionUpdateRef = useRef(handlePositionUpdate);
@@ -150,6 +150,30 @@ export function useEmetteur(
         return [logEntry, ...prev].slice(0, 50);
     });
   }, [firestore, sharingId, accuracy, simulator?.timeOffset]);
+
+  // v97.1 : Reset ancre et statut lors de l'activation/désactivation de la Sandbox
+  useEffect(() => {
+    if (simulator?.isActive) {
+        // Initialisation propre du mode Labo
+        setAnchorPos(null);
+        anchorPosRef.current = null;
+        lastSentStatusRef.current = null;
+        distanceHistoryRef.current = [];
+        // On démarre en stationnaire pour que le premier point simu lock l'ancre et affiche le cercle
+        setVesselStatus('stationary');
+        vesselStatusRef.current = 'stationary';
+        addTechLog('LABO', 'SANDBOX ACTIVÉE (PRÊT AU MOUILLAGE)');
+    } else {
+        // Retour au mode réel : on nettoie pour laisser le GPS reprendre la main
+        setAnchorPos(null);
+        anchorPosRef.current = null;
+        lastSentStatusRef.current = null;
+        distanceHistoryRef.current = [];
+        setVesselStatus('moving');
+        vesselStatusRef.current = 'moving';
+        addTechLog('LABO', 'RETOUR MODE RÉEL');
+    }
+  }, [simulator?.isActive, addTechLog]);
 
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
     if (!user || !firestore) return;
@@ -212,6 +236,20 @@ export function useEmetteur(
             setAnchorPos(newAnchor);
             anchorPosRef.current = newAnchor;
             addTechLog('LABO', 'ANCHOR LOCK ACTIVE');
+            // Si on vient de lock l'ancre en simu, on est forcément stationnaire au départ
+            nextStatus = 'stationary';
+        }
+
+        // v97.1 : Transitions de statut en mode simulation
+        if (knotSpeed < 2 && nextStatus === 'moving') {
+            nextStatus = 'stationary';
+            addTechLog('LABO', 'ARRÊT SIMULÉ');
+        } else if (knotSpeed >= 4 && (nextStatus === 'stationary' || nextStatus === 'drifting')) {
+            // Un départ volontaire (>4nd) réinitialise le mouillage même en simu
+            nextStatus = 'moving';
+            setAnchorPos(null);
+            anchorPosRef.current = null;
+            addTechLog('LABO', 'DÉPART SIMULÉ');
         }
     } else {
         if (knotSpeed >= 4) {
