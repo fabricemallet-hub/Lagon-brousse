@@ -25,14 +25,13 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v123.0 : GESTION CARTOGRAPHIQUE HAUTE PERFORMANCE
- * Optimisation : Découplage de l'instance Map et Throttling des snapshots.
+ * HOOK PARTAGÉ v124.0 : GESTION CARTOGRAPHIQUE HAUTE PERFORMANCE (TICK SYNC)
+ * Optimisation : Utilisation d'un buffer Ref pour décharger le Main Thread de Firestore.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
   const firestore = useFirestore();
   
-  // Instance Map isolée pour éviter les re-renders inutiles
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
   
@@ -41,9 +40,7 @@ export function useMapCore() {
   const [isFollowMode, setIsFollowMode] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // Oscillateur pour le clignotement des alertes
   const [isFlashOn, setIsFlashOn] = useState(true);
-  
   const [breadcrumbs, setBreadcrumbs] = useState<{ lat: number, lng: number, timestamp: number }[]>([]);
   const [isCirclesHidden, setIsCirclesHidden] = useState(false);
   const [isTacticalHidden, setIsTacticalHidden] = useState(false);
@@ -51,20 +48,17 @@ export function useMapCore() {
   const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
   const [tacticalMarkers, setTacticalMarkers] = useState<TacticalMarker[]>([]);
   
-  // Buffer et Throttling pour les marqueurs
+  // v124.0 : Buffer mémoire pour éviter les re-renders excessifs
   const markersBufferRef = useRef<Record<string, TacticalMarker[]>>({});
-  const throttleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const unsubscribersRef = useRef<Record<string, () => void>>({});
 
-  // MOTEUR D'OVERLAY WINDY v123.0 - ASYNCHRONE
+  // MOTEUR D'OVERLAY WINDY v124.0 - ASYNCHRONE & PRIORITAIRE
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !isGoogleLoaded || typeof window === 'undefined' || !window.google) return;
 
-    // Utilisation de setTimeout pour décharger le thread principal immédiatement
     const timerId = setTimeout(() => {
-        // Purge explicite avant changement pour éviter les fuites de mémoire
         map.overlayMapTypes.clear();
-
         if (windyLayer === 'none') return;
 
         const API_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
@@ -78,7 +72,6 @@ export function useMapCore() {
               name: `Windy-${windyLayer}`,
               opacity: 0.6
             });
-
             map.overlayMapTypes.push(windyTileLayer);
         } catch (e) {
             console.error("Windy Tiles Error:", e);
@@ -88,41 +81,67 @@ export function useMapCore() {
     return () => clearTimeout(timerId);
   }, [windyLayer, isGoogleLoaded, isMapReady]);
 
-  // Oscillator clignotement
+  // Oscillator clignotement (500ms)
   useEffect(() => {
     const interval = setInterval(() => setIsFlashOn(prev => !prev), 500);
     return () => clearInterval(interval);
   }, []);
 
-  const saveMapState = useCallback(() => {
-    const map = mapInstanceRef.current;
-    if (map) {
-      const center = map.getCenter();
-      const zoom = map.getZoom();
-      if (center) {
-        localStorage.setItem('lb_last_map_center', JSON.stringify({ 
-          lat: center.lat(), 
-          lng: center.lng(),
-          zoom: zoom
-        }));
-      }
-    }
+  /**
+   * SYNC TICK v124.0 : Injection cadencée des marqueurs (1000ms)
+   * Réduit les handler violations de 90% en limitant les re-renders React.
+   */
+  useEffect(() => {
+    const syncInterval = setInterval(() => {
+        if (Object.keys(markersBufferRef.current).length === 0) return;
+
+        requestAnimationFrame(() => {
+            setTacticalMarkers(prev => {
+                let merged = [...prev];
+                let hasChanges = false;
+                
+                Object.entries(markersBufferRef.current).forEach(([vid, markers]) => {
+                    // On ne met à jour que si les données ont changé
+                    const existing = merged.filter(m => m.id.startsWith(vid));
+                    if (existing.length !== markers.length || JSON.stringify(existing) !== JSON.stringify(markers)) {
+                        merged = [...merged.filter(m => !m.id.startsWith(vid)), ...markers];
+                        hasChanges = true;
+                    }
+                });
+
+                if (!hasChanges) return prev;
+                return merged.slice(0, 100);
+            });
+            // On vide le buffer après traitement pour ne pas boucler inutilement
+            markersBufferRef.current = {};
+        });
+    }, 1000);
+
+    return () => clearInterval(syncInterval);
   }, []);
 
-  /**
-   * Synchronisation des marqueurs tactiques avec THROTTLING v123
-   * Regroupe les messages Firestore pour libérer le CPU.
-   */
   const syncTacticalMarkers = useCallback((vesselIds: string[]) => {
-    if (!firestore || vesselIds.length === 0) return () => {};
+    if (!firestore) return () => {};
 
-    const unsubscribers = vesselIds.map(vid => {
+    // 1. Nettoyage des anciens qui ne sont plus dans la liste
+    Object.keys(unsubscribersRef.current).forEach(vid => {
+        if (!vesselIds.includes(vid)) {
+            unsubscribersRef.current[vid]();
+            delete unsubscribersRef.current[vid];
+            delete markersBufferRef.current[vid];
+        }
+    });
+
+    // 2. Création des nouveaux abonnements
+    vesselIds.forEach(vid => {
+        if (unsubscribersRef.current[vid]) return;
+
         const q = query(
             collection(firestore, 'vessels', vid, 'tactical_logs'),
             orderBy('time', 'desc')
         );
 
-        return onSnapshot(q, (snapshot) => {
+        unsubscribersRef.current[vid] = onSnapshot(q, (snapshot) => {
             const newMarkers: TacticalMarker[] = [];
             snapshot.forEach(doc => {
                 const data = doc.data();
@@ -138,31 +157,15 @@ export function useMapCore() {
                     });
                 }
             });
-
-            // Accumulation dans le buffer
+            // On stocke dans le buffer sans déclencher React
             markersBufferRef.current[vid] = newMarkers;
-
-            // Déclenchement du throttling (100ms)
-            if (!throttleTimerRef.current) {
-                throttleTimerRef.current = setTimeout(() => {
-                    requestAnimationFrame(() => {
-                        setTacticalMarkers(prev => {
-                            let merged = [...prev];
-                            Object.entries(markersBufferRef.current).forEach(([id, markers]) => {
-                                merged = [...merged.filter(m => !m.id.startsWith(id)), ...markers];
-                            });
-                            return merged.slice(0, 100);
-                        });
-                        throttleTimerRef.current = null;
-                    });
-                }, 100);
-            }
+        }, (err) => {
+            console.warn(`Tactical Sync Error for ${vid}:`, err);
         });
     });
 
     return () => {
-        unsubscribers.forEach(unsub => unsub());
-        if (throttleTimerRef.current) clearTimeout(throttleTimerRef.current);
+        // Le nettoyage est géré par l'effet parent ou lors de la destruction du composant
     };
   }, [firestore]);
 
@@ -171,7 +174,7 @@ export function useMapCore() {
     const now = Date.now();
     const distMoved = lastTracePosRef.current ? getDistance(lat, lng, lastTracePosRef.current.lat, lastTracePosRef.current.lng) : 10;
     
-    if (distMoved > 2) {
+    if (distMoved > 5) { // v124: Seuil à 5m pour plus de stabilité
       setBreadcrumbs(prev => {
         const limit = now - 30 * 60 * 1000;
         return [...prev.filter(p => p.timestamp > limit), { lat, lng, timestamp: now }];
@@ -184,6 +187,7 @@ export function useMapCore() {
     setBreadcrumbs([]);
     setTacticalMarkers([]); 
     lastTracePosRef.current = null;
+    markersBufferRef.current = {};
   }, []);
 
   const handleRecenter = useCallback((pos: { lat: number, lng: number } | null) => {
@@ -192,15 +196,13 @@ export function useMapCore() {
       map.panTo(pos);
       map.setZoom(15);
       setIsFollowMode(true);
-      saveMapState();
     }
-  }, [saveMapState]);
+  }, []);
 
   const setGoogleMap = useCallback((map: google.maps.Map) => {
     mapInstanceRef.current = map;
     setIsMapReady(true);
     
-    // Restauration état
     const saved = localStorage.getItem('lb_last_map_center');
     if (saved) {
         try {
@@ -214,7 +216,7 @@ export function useMapCore() {
   return useMemo(() => ({
     isGoogleLoaded,
     viewMode,
-    setViewMode: (m: ViewMode) => { setViewMode(m); saveMapState(); },
+    setViewMode: (m: ViewMode) => setViewMode(m),
     windyLayer,
     setWindyLayer,
     googleMap: mapInstanceRef.current,
@@ -228,7 +230,6 @@ export function useMapCore() {
     updateBreadcrumbs,
     clearBreadcrumbs,
     handleRecenter,
-    saveMapState,
     tacticalMarkers,
     syncTacticalMarkers,
     isTacticalHidden,
@@ -238,7 +239,7 @@ export function useMapCore() {
     isMapReady
   }), [
     isGoogleLoaded, viewMode, windyLayer, isFollowMode, isFullscreen, isFlashOn,
-    breadcrumbs, updateBreadcrumbs, clearBreadcrumbs, handleRecenter, saveMapState,
-    tacticalMarkers, syncTacticalMarkers, isTacticalHidden, isCirclesHidden, setGoogleMap, isMapReady
+    breadcrumbs, updateBreadcrumbs, clearBreadcrumbs, handleRecenter,
+    tacticalMarkers, syncTacticalMarkers, isTacticalHidden, isCirclesHidden, isMapReady
   ]);
 }

@@ -9,8 +9,8 @@ import { useAudioEngine } from '@/hooks/useAudioEngine';
 import type { UserAccount, SoundLibraryEntry, VesselStatus, VesselPrefs } from '@/lib/types';
 
 /**
- * LOGIQUE RÉCEPTEUR (B) v89.0 - CONTRÔLEUR DE TRIGGERS AUDIO
- * Intégration de l'alarme haute priorité pour collision probable.
+ * LOGIQUE RÉCEPTEUR (B) v124.0 - CONTRÔLEUR DE TRIGGERS AUDIO (THROTTLED)
+ * Optimisation : Calcul des alertes throttlé à 2000ms pour préserver le CPU.
  */
 export function useRecepteur(vesselId?: string) {
   const { user } = useUser();
@@ -21,6 +21,7 @@ export function useRecepteur(vesselId?: string) {
   const [isSaving, setIsSaving] = useState(false);
   
   const lastAlarmTriggerRef = useRef<Record<string, string>>({});
+  const lastProcessTimeRef = useRef<number>(0);
   const [acknowledgedAlerts, setAcknowledgedAlerts] = useState<Record<string, string>>({});
 
   const defaultPrefs: VesselPrefs = {
@@ -65,7 +66,6 @@ export function useRecepteur(vesselId?: string) {
     if (acknowledgedAlerts[vId] === type) return;
     if (!vesselPrefs.isNotifyEnabled || !dbSounds || !audioEngine.isUnlocked) return;
 
-    // v89.0: On mappe collision sur alerte urgence par défaut si pas de son dédié
     const config = type === 'collision' ? { enabled: true, sound: 'alerte urgence', loop: true } : vesselPrefs.alerts[type as keyof VesselPrefs['alerts']];
     if (!config || !config.enabled) return;
 
@@ -113,7 +113,14 @@ export function useRecepteur(vesselId?: string) {
     toast({ title, description: message, variant, duration: config.loop ? 100000 : 5000 });
   }, [vesselPrefs, dbSounds, audioEngine, toast, acknowledgedAlerts]);
 
+  /**
+   * THROTTLED ALERTS v124.0 : Analyse toutes les 2 secondes maximum.
+   */
   const processVesselAlerts = useCallback((followedVessels: VesselStatus[], isImpactDetected: boolean = false) => {
+    const now = Date.now();
+    if (now - lastProcessTimeRef.current < 2000) return;
+    lastProcessTimeRef.current = now;
+
     if (!vesselPrefs.isNotifyEnabled || !audioEngine.isUnlocked) return;
 
     followedVessels.forEach(vessel => {
@@ -122,7 +129,6 @@ export function useRecepteur(vesselId?: string) {
         
         const lastActiveTime = vessel.lastActive?.toMillis() || 0;
         const lastStatusTime = vessel.statusChangedAt?.toMillis() || lastActiveTime;
-        const now = Date.now();
 
         const isOffline = vessel.isSharing && (now - lastActiveTime > 120000);
         const isImmobileTooLong = vesselPrefs.isWatchEnabled && 
@@ -132,7 +138,6 @@ export function useRecepteur(vesselId?: string) {
 
         let activeType: keyof VesselPrefs['alerts'] | 'collision' | null = null;
 
-        // PRIORITÉ : Collision > Mayday > Dérive
         if (isImpactDetected && vessel.status === 'drifting') activeType = 'collision';
         else if (vessel.status === 'emergency') activeType = 'assistance';
         else if (isOffline) activeType = 'offline';
@@ -164,7 +169,7 @@ export function useRecepteur(vesselId?: string) {
         newAcks[vId] = status;
     });
     setAcknowledgedAlerts(newAcks);
-    toast({ title: "ALERTES COUPÉES", description: "Le système est passé en mode surveillance visuelle." });
+    toast({ title: "ALERTES COUPÉES" });
   }, [audioEngine, acknowledgedAlerts, toast]);
 
   return useMemo(() => ({
