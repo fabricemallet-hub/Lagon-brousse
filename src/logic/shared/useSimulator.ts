@@ -4,14 +4,15 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
 /**
- * HOOK SIMULATEUR v78.0 : "Sandbox Tactique Totale"
- * Gère l'état et les commandes de simulation GPS, vitesse et batterie.
+ * HOOK SIMULATEUR v80.0 : "Moteur de Navigation & Injection Temporelle"
+ * Gère l'état et les commandes de simulation GPS, vitesse, batterie et temps.
  */
 export function useSimulator() {
   const [isActive, setIsActive] = useState(false);
   const [isGpsCut, setIsGpsCut] = useState(false);
   const [isComCut, setIsComCut] = useState(false);
   const [isTeleportMode, setIsTeleportMode] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
   
   // États simulés
   const [simSpeed, setSimSpeed] = useState(0);
@@ -19,6 +20,7 @@ export function useSimulator() {
   const [simBattery, setSimBattery] = useState(100);
   const [simPos, setSimPos] = useState<{lat: number, lng: number} | null>(null);
   const [timeOffset, setTimeOffset] = useState(0);
+  const [simBearing, setSimBearing] = useState(45); // Direction par défaut (Nord-Est)
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -30,6 +32,7 @@ export function useSimulator() {
 
   const stopSim = useCallback(() => {
     setIsActive(false);
+    setIsMoving(false);
     setIsGpsCut(false);
     setIsComCut(false);
     setIsTeleportMode(false);
@@ -48,33 +51,40 @@ export function useSimulator() {
   const forceDrift = useCallback((anchorPos: {lat: number, lng: number} | null, radius: number) => {
     if (!anchorPos) return;
     const degPerMeter = 1 / 111320;
-    const driftDist = radius + 20; // Juste assez pour sortir
+    const driftDist = radius + 20; // Juste assez pour sortir du cercle
     const angle = 45 * (Math.PI / 180);
     const offsetLat = Math.cos(angle) * (driftDist * degPerMeter);
     const offsetLng = Math.sin(angle) * (driftDist * degPerMeter);
     setSimPos({ lat: anchorPos.lat + offsetLat, lng: anchorPos.lng + offsetLng });
-    setSimSpeed(1); // Faible vitesse pour simuler la dérive
+    setSimSpeed(1); // Faible vitesse pour simuler la dérive lente
     setIsActive(true);
-  }, []);
+    setIsMoving(true);
+  }, [isActive]);
 
-  // Boucle de mouvement automatique (vitesse > 0)
+  // MOTEUR DE NAVIGATION FICTIVE (v80.0)
   useEffect(() => {
-    if (isActive && simSpeed > 0 && !isGpsCut) {
+    if (isActive && isMoving && simSpeed > 0 && !isGpsCut) {
         timerRef.current = setInterval(() => {
             setSimPos(prev => {
                 if (!prev) return prev;
-                // Calcul du déplacement par seconde : 1 nds = 0.514 m/s
+                // Calcul du déplacement par seconde : 1 nds = 0.514444 m/s
                 const metersPerSec = simSpeed * 0.514444;
                 const degPerMeter = 1 / 111320;
                 const step = metersPerSec * degPerMeter;
-                return { lat: prev.lat + step, lng: prev.lng + step };
+                
+                // On avance selon le cap (bearing)
+                const rad = (simBearing * Math.PI) / 180;
+                return { 
+                    lat: prev.lat + Math.cos(rad) * step, 
+                    lng: prev.lng + Math.sin(rad) * step 
+                };
             });
         }, 1000);
     } else {
         if (timerRef.current) clearInterval(timerRef.current);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [isActive, simSpeed, isGpsCut]);
+  }, [isActive, isMoving, simSpeed, isGpsCut, simBearing]);
 
   return useMemo(() => ({
     isActive,
@@ -87,6 +97,8 @@ export function useSimulator() {
     setIsComCut,
     isTeleportMode,
     setIsTeleportMode,
+    isMoving,
+    setIsMoving,
     simSpeed,
     setSimSpeed,
     simAccuracy,
@@ -98,9 +110,11 @@ export function useSimulator() {
     teleport,
     forceDrift,
     timeOffset,
-    setTimeOffset
+    setTimeOffset,
+    simBearing,
+    setSimBearing
   }), [
-    isActive, simPos, simSpeed, simAccuracy, simBattery, isGpsCut, isComCut, isTeleportMode, timeOffset,
+    isActive, simPos, simSpeed, simAccuracy, simBattery, isGpsCut, isComCut, isTeleportMode, isMoving, timeOffset, simBearing,
     startSim, stopSim, teleport, forceDrift, setTimeOffset
   ]);
 }

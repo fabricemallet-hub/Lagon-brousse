@@ -11,7 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v78.0 : "Sandbox & Multi-Source GPS"
+ * LOGIQUE ÉMETTEUR (A) v80.0 : "Sandbox & Injection Temporelle Firestore"
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -172,12 +172,12 @@ export function useEmetteur(
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
     if (!user || !firestore) return;
     if (!isSharingRef.current && !force) return;
-    if (simulator?.isComCut && !force) return; 
+    if (simulator?.isComCut && !force) return; // RÈGLE v80.0 : On bloque les écritures vers Firestore
     
     const batteryLevel = Math.round(batteryRef.current.level * 100);
     const isCharging = batteryRef.current.charging;
 
-    // Simulation Temporelle v77.0
+    // Simulation Temporelle v80.0
     const effectiveNow = simulator?.timeOffset ? subMinutes(new Date(), simulator.timeOffset) : new Date();
     const firestoreTimestamp = Timestamp.fromDate(effectiveNow);
 
@@ -299,11 +299,11 @@ export function useEmetteur(
             simulator.simPos.lat, 
             simulator.simPos.lng, 
             simulator.simSpeed, 
-            0, 
+            simulator.simBearing || 0, 
             simulator.simAccuracy
         );
     }
-  }, [simulator?.isActive, simulator?.simPos, simulator?.simSpeed, simulator?.simAccuracy, handlePositionLogic]);
+  }, [simulator?.isActive, simulator?.simPos, simulator?.simSpeed, simulator?.simAccuracy, simulator?.simBearing, handlePositionLogic]);
 
   useEffect(() => {
     if (isSharing) {
@@ -468,8 +468,11 @@ export function useEmetteur(
     if (!simulator) return;
     simulator.setTimeOffset(minutes);
     addTechLog('LABO', `Injection temporelle: +${minutes} min`);
+    
+    // v80.0 : On force une mise à jour Firestore immédiate avec le nouveau décalage
     updateVesselInFirestore({}, true);
-    toast({ title: "Temps forcé", description: `+${minutes} min appliquées` });
+    
+    toast({ title: "Temps forcé", description: `+${minutes} min appliquées sur Firestore` });
   }, [simulator, addTechLog, updateVesselInFirestore, toast]);
 
   return useMemo(() => ({

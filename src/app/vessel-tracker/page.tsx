@@ -95,7 +95,9 @@ import {
   BatteryMedium,
   History,
   MousePointer2,
-  Undo2
+  Undo2,
+  PlayCircle,
+  StopCircle
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -207,7 +209,7 @@ export default function VesselTrackerPage() {
     return masterEmails.includes(user.email?.toLowerCase() || '') || userProfile?.role === 'admin';
   }, [user, userProfile]);
 
-  const [testMinutes, setTestTestMinutes] = useState('60');
+  const [testMinutes, setTestMinutes] = useState('60');
 
   const savedVesselIds = userProfile?.savedVesselIds || [];
   const vesselsQuery = useMemoFirebase(() => {
@@ -448,7 +450,7 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v79.0 prêt</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v80.0 prêt</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm border-slate-100", (log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') || log.label === 'DÉRIVE' || log.label === 'SANDBOX' || log.label === 'LABO') && 'border-red-200 bg-red-50')}>
                                                   <div className="flex justify-between items-start">
@@ -582,7 +584,7 @@ export default function VesselTrackerPage() {
                                 <TabsContent value="labo" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
                                     <div className="space-y-4 p-4 border-2 border-dashed border-red-200 rounded-3xl bg-red-50/30">
                                         <div className="flex items-center justify-between border-b pb-2">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v80.0</p>
                                             <Switch checked={simulator.isActive} onCheckedChange={simulator.setIsActive} />
                                         </div>
                                         
@@ -591,8 +593,13 @@ export default function VesselTrackerPage() {
                                                 <Button variant={simulator.isTeleportMode ? "default" : "outline"} className="h-12 text-[10px] font-black uppercase gap-2 border-2" onClick={() => simulator.setIsTeleportMode(!simulator.isTeleportMode)}>
                                                     <MousePointer2 className="size-4" /> Injection Clic
                                                 </Button>
-                                                <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2" onClick={() => simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius)}>
-                                                    <Move className="size-4" /> Forcer Dérive
+                                                <Button 
+                                                    variant={simulator.isMoving ? "destructive" : "default"} 
+                                                    className="h-12 text-[10px] font-black uppercase gap-2 border-2" 
+                                                    onClick={() => simulator.setIsMoving(!simulator.isMoving)}
+                                                >
+                                                    {simulator.isMoving ? <StopCircle className="size-4" /> : <PlayCircle className="size-4" />}
+                                                    {simulator.isMoving ? 'ARRÊTER' : 'LANCER SIMU'}
                                                 </Button>
                                             </div>
 
@@ -606,6 +613,14 @@ export default function VesselTrackerPage() {
 
                                             <div className="space-y-2">
                                                 <div className="flex justify-between text-[9px] font-black uppercase">
+                                                    <span>Cap (Bearing)</span>
+                                                    <span className="text-red-600">{simulator.simBearing}°</span>
+                                                </div>
+                                                <Slider value={[simulator.simBearing]} min={0} max={360} step={5} onValueChange={v => simulator.setSimBearing(v[0])} />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-[9px] font-black uppercase">
                                                     <span>Batterie Simulée</span>
                                                     <span className="text-red-600">{simulator.simBattery}%</span>
                                                 </div>
@@ -613,22 +628,28 @@ export default function VesselTrackerPage() {
                                             </div>
 
                                             <div className="flex items-center justify-between p-2 bg-white rounded-xl border">
-                                                <div className="space-y-0.5"><Label className="text-[10px] font-black uppercase">Perte de Signal</Label><p className="text-[8px] font-bold text-muted-foreground uppercase">Couper updates Firestore</p></div>
+                                                <div className="space-y-0.5"><Label className="text-[10px] font-black uppercase">Coupure Firestore</Label><p className="text-[8px] font-bold text-muted-foreground uppercase">Simuler "Signal Perdu"</p></div>
                                                 <Switch checked={simulator.isComCut} onCheckedChange={simulator.setIsComCut} />
                                             </div>
 
                                             <div className="space-y-2 border-t pt-3">
-                                                <Label className="text-[9px] font-black uppercase opacity-60">Avancer le temps (min)</Label>
+                                                <Label className="text-[9px] font-black uppercase opacity-60">Décalage temporel (min)</Label>
                                                 <div className="flex gap-2">
-                                                    <Input type="number" value={testMinutes} onChange={e => setTestTestMinutes(e.target.value)} className="h-10 border-2 font-black text-center" />
-                                                    <Button className="h-10 font-black uppercase text-[10px] gap-2" onClick={() => emetteur.forceTimeOffset(parseInt(testMinutes))}>Injecter</Button>
+                                                    <Input type="number" value={testMinutes} onChange={e => setTestMinutes(e.target.value)} className="h-10 border-2 font-black text-center" />
+                                                    <Button className="h-10 font-black uppercase text-[10px] gap-2 flex-1" onClick={() => emetteur.forceTimeOffset(parseInt(testMinutes))}>Injecter Temps</Button>
                                                 </div>
+                                                <p className="text-[8px] font-bold text-red-600 italic leading-tight mt-1">L'injection met à jour statusChangedAt pour tester la Veille Stratégique.</p>
                                             </div>
                                         </div>
 
-                                        <Button variant="outline" className="w-full h-12 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => { simulator.stopSim(); emetteur.resetTrajectory(); }}>
-                                            <Undo2 className="size-4" /> Rétablir GPS Réel
-                                        </Button>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2 bg-white" onClick={() => simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius)}>
+                                                <Move className="size-4" /> Forcer Dérive
+                                            </Button>
+                                            <Button variant="outline" className="h-12 text-[10px] font-black uppercase gap-2 border-2 bg-white" onClick={() => { simulator.stopSim(); emetteur.resetTrajectory(); }}>
+                                                <Undo2 className="size-4" /> Rétablir Réel
+                                            </Button>
+                                        </div>
                                     </div>
                                 </TabsContent>
                               )}
