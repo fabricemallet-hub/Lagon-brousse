@@ -405,9 +405,9 @@ export default function VesselTrackerPage() {
                     {activeAnchorVessel.location && <Polyline path={[{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }, { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }]} options={{ strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6', strokeOpacity: 0.8, strokeWeight: 2, zIndex: 2 }} />}
                     
                     <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                        <div style={{ transform: 'translate(-50%, -240%)', zIndex: 9999 }} className="flex flex-col items-center pointer-events-none">
+                        <div style={{ transform: 'translate(-50%, -320%)', zIndex: 9999 }} className="flex flex-col items-center pointer-events-none mb-3">
                             <div className={cn(
-                                "px-[10px] py-[4px] rounded-lg backdrop-blur-md border-2 text-[10px] font-black uppercase shadow-2xl whitespace-nowrap transition-all",
+                                "px-[10px] py-[4px] rounded-lg backdrop-blur-md border text-[11px] font-black uppercase shadow-2xl whitespace-nowrap transition-all border-white",
                                 activeAnchorVessel.status === 'drifting' ? "bg-red-600/90 border-red-400 text-white animate-pulse" : 
                                 (activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15) ? "bg-orange-500/90 border-orange-300 text-white" : "bg-slate-900/80 border-white/20 text-white"
                             )}>
@@ -515,7 +515,7 @@ export default function VesselTrackerPage() {
                           <CardContent className="p-5 space-y-5">
                               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">Mon Surnom</Label><Input value={emetteur.vesselNickname} onChange={e => emetteur.setVesselNickname(e.target.value)} placeholder="EX: KOOLAPIK" className="h-12 border-2 font-black text-lg" /></div>
                               <div className="grid grid-cols-2 gap-3">
-                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => emetteur.setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
+                                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire</Label><Input value={emetteur.customSharingId} onChange={e => setCustomSharingId(e.target.value)} placeholder="ABC-123" className="h-12 border-2 font-black text-center uppercase" /></div>
                                   <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 text-indigo-600">ID Flotte</Label><Input value={emetteur.customFleetId} onChange={e => emetteur.setCustomFleetId(e.target.value)} placeholder="GROUPE" className="h-12 border-2 border-indigo-100 font-black text-center uppercase" /></div>
                               </div>
                               <Button className="w-full h-16 font-black uppercase text-base bg-primary rounded-2xl shadow-xl gap-3" onClick={() => { recepteur.initAudio(); emetteur.startSharing(); }}><Zap className="size-5 fill-white" /> Lancer le Partage GPS</Button>
@@ -529,7 +529,8 @@ export default function VesselTrackerPage() {
               <Card className="border-2 shadow-lg rounded-3xl overflow-hidden border-blue-200">
                   <CardHeader className="bg-blue-50 p-5 border-b"><CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-blue-800"><Smartphone className="size-4" /> Récepteur B</CardTitle></CardHeader>
                   <CardContent className="p-5 space-y-4">
-                      <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID du Navire à suivre</Label>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase ml-1 opacity-60">ID du Navire à suivre</Label>
                           <div className="flex gap-2">
                               <Input placeholder="ENTREZ L'ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow" />
                               <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={() => { recepteur.initAudio(); handleSaveVessel(); }}>Suivre</Button>
@@ -591,7 +592,7 @@ export default function VesselTrackerPage() {
                                       <div className="space-y-2">
                                           <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v85.0 prêt</div>
                                           {emetteur.techLogs.map((log, i) => (
-                                              <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm border-slate-100", (log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') || log.label === 'DÉRIVE' || log.label === 'SIGNAL' || log.label === 'SANDBOX' || log.label === 'LABO' || log.label === 'PURGE' || log.label === 'RESET' || log.label === 'CHGT STATUT' || log.label === 'CHGT MANUEL') && 'border-red-200 bg-red-50')}>
+                                              <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm border-slate-100", (log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') || log.label === 'DÉRIVE' || log.label === 'SIGNAL' || log.label === 'SANDBOX' || log.label === 'LABO' || log.label === 'PURGE' || log.label === 'RESET' || log.label === 'CHGT STATUT' || log.label === 'CHGT MANUEL' || log.label === 'SIGNAL') && 'border-red-200 bg-red-50')}>
                                                   <div className="flex justify-between items-start">
                                                       <div className="flex flex-col gap-0.5">
                                                           <span className={cn("font-black uppercase text-[10px]", (log.label.includes('ÉNERGIE') || log.label.includes('URGENCE') || log.label === 'DÉRIVE' || log.label === 'SIGNAL' || log.label === 'SANDBOX' || log.label === 'LABO' || log.label === 'PURGE') ? 'text-red-600' : 'text-slate-800')}>
