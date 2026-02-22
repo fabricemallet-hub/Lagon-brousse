@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -115,20 +114,26 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
   return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
 };
 
-const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
+const VesselMarker = ({ vessel, isRollingBack }: { vessel: VesselStatus, isRollingBack?: boolean }) => {
     const status = vessel.status || 'moving';
     let Icon = Navigation;
     let bgColor = 'bg-green-600'; 
     let animationClass = '';
     let statusLabel = 'EN ROUTE';
 
-    switch (status) {
-        case 'stationary': Icon = Anchor; bgColor = 'bg-blue-600'; statusLabel = 'MOUILLAGE'; break;
-        case 'drifting': Icon = AlertTriangle; bgColor = 'bg-red-600'; animationClass = 'animate-blink-red'; statusLabel = 'DÉRIVE'; break;
-        case 'emergency': Icon = ShieldAlert; bgColor = 'bg-red-600'; animationClass = 'animate-pulse-red'; statusLabel = 'URGENCE'; break;
-        case 'returning': Icon = Navigation; bgColor = 'bg-indigo-600'; statusLabel = 'RETOUR'; break;
-        case 'landed': Icon = Home; bgColor = 'bg-green-600'; statusLabel = 'À TERRE'; break;
-        case 'moving': default: Icon = Navigation; bgColor = 'bg-green-600'; statusLabel = 'MOUVEMENT'; break;
+    if (isRollingBack) {
+        bgColor = 'bg-slate-400';
+        animationClass = 'animate-pulse';
+        statusLabel = 'REVERSION...';
+    } else {
+        switch (status) {
+            case 'stationary': Icon = Anchor; bgColor = 'bg-blue-600'; statusLabel = 'MOUILLAGE'; break;
+            case 'drifting': Icon = AlertTriangle; bgColor = 'bg-red-600'; animationClass = 'animate-blink-red'; statusLabel = 'DÉRIVE'; break;
+            case 'emergency': Icon = ShieldAlert; bgColor = 'bg-red-600'; animationClass = 'animate-pulse-red'; statusLabel = 'URGENCE'; break;
+            case 'returning': Icon = Navigation; bgColor = 'bg-indigo-600'; statusLabel = 'RETOUR'; break;
+            case 'landed': Icon = Home; bgColor = 'bg-green-600'; statusLabel = 'À TERRE'; break;
+            case 'moving': default: Icon = Navigation; bgColor = 'bg-green-600'; statusLabel = 'MOUVEMENT'; break;
+        }
     }
 
     return (
@@ -144,6 +149,7 @@ const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
                     </div>
                     <div className="flex items-center gap-1 mt-0.5 border-t border-white/10 pt-0.5 w-full justify-center">
                         <span className={cn("text-[7px] font-black uppercase tracking-tighter", 
+                            isRollingBack ? "text-slate-300" :
                             statusLabel === 'MOUVEMENT' ? "text-green-400" : 
                             statusLabel === 'MOUILLAGE' ? "text-blue-400" : 
                             statusLabel === 'RETOUR' ? "text-indigo-400" : "text-red-400"
@@ -362,7 +368,7 @@ export default function VesselTrackerPage() {
 
   const hudLogs = useMemo(() => {
     const logs = [...emetteur.techLogs];
-    const tacticalLabels = ['CHGT STATUT', 'DÉRIVE', 'URGENCE', 'CHGT MANUEL', 'MOUILLAGE', 'POSITION'];
+    const tacticalLabels = ['CHGT STATUT', 'DÉRIVE', 'URGENCE', 'CHGT MANUEL', 'MOUILLAGE', 'POSITION', 'ANNULATION'];
     
     return logs.filter(log => {
         if (hudMode === 'TACTICAL') return tacticalLabels.includes(log.label);
@@ -435,8 +441,9 @@ export default function VesselTrackerPage() {
             
             <div className="flex flex-col items-end gap-1 font-mono text-[9px] whitespace-pre transition-all">
                 {hudLogs.map((log, i) => {
-                    const isTactical = ['CHGT STATUT', 'DÉRIVE', 'URGENCE', 'CHGT MANUEL', 'MOUILLAGE', 'POSITION'].includes(log.label);
+                    const isTactical = ['CHGT STATUT', 'DÉRIVE', 'URGENCE', 'CHGT MANUEL', 'MOUILLAGE', 'POSITION', 'ANNULATION'].includes(log.label);
                     const isDrift = log.label === 'DÉRIVE' || log.label === 'URGENCE';
+                    const isAnnul = log.label === 'ANNULATION';
                     return (
                         <div 
                             key={i} 
@@ -444,7 +451,8 @@ export default function VesselTrackerPage() {
                             className={cn(
                                 "font-black uppercase tracking-tight text-right animate-in fade-in slide-in-from-top-1 duration-300",
                                 isTactical ? "text-cyan-400" : "text-white/80",
-                                isDrift && "text-red-500 animate-pulse"
+                                isDrift && "text-red-500 animate-pulse",
+                                isAnnul && "text-orange-400"
                             )}
                         >
                             [{format(log.time, 'HH:mm')}] {log.label}: {log.status}
@@ -491,7 +499,7 @@ export default function VesselTrackerPage() {
 
             {(emetteur.isSharing || simulator.isActive) && (emetteur.currentPos || simulator.simPos) && (
                 <OverlayView position={emetteur.currentPos || simulator.simPos!} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                    <VesselMarker vessel={{ id: emetteur.sharingId, displayName: emetteur.vesselNickname || 'Moi', status: emetteur.vesselStatus, speed: emetteur.currentSpeed, batteryLevel: Math.round(emetteur.battery.level * 100), isCharging: emetteur.battery.charging, isSharing: true, isGhostMode: emetteur.isGhostMode, lastActive: new Date() } as any} />
+                    <VesselMarker isRollingBack={emetteur.isRollingBack} vessel={{ id: emetteur.sharingId, displayName: emetteur.vesselNickname || 'Moi', status: emetteur.vesselStatus, speed: emetteur.currentSpeed, batteryLevel: Math.round(emetteur.battery.level * 100), isCharging: emetteur.battery.charging, isSharing: true, isGhostMode: emetteur.isGhostMode, lastActive: new Date() } as any} />
                 </OverlayView>
             )}
 
@@ -515,37 +523,43 @@ export default function VesselTrackerPage() {
         <div className="grid grid-cols-1 gap-2 mb-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="grid grid-cols-2 gap-2">
                 <Button 
-                    variant="outline" 
-                    className="h-14 font-black uppercase text-[10px] border-2 bg-white gap-2 border-indigo-50 text-indigo-700 shadow-sm hover:bg-indigo-50/50"
+                    variant={emetteur.vesselStatus === 'returning' ? 'default' : 'outline'}
+                    className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2 shadow-sm transition-all", emetteur.vesselStatus === 'returning' ? "bg-indigo-600 text-white border-indigo-400" : "bg-white border-indigo-50 text-indigo-700 hover:bg-indigo-50/50")}
                     onClick={() => emetteur.changeManualStatus('returning')}
-                    disabled={emetteur.vesselStatus === 'returning'}
                 >
-                    <Navigation className="size-4 text-indigo-600" /> RETOUR MAISON
+                    <Navigation className="size-4 text-indigo-600 group-data-[state=active]:text-white" /> RETOUR MAISON
                 </Button>
                 <Button 
-                    variant="outline" 
-                    className="h-14 font-black uppercase text-[10px] border-2 bg-white gap-2 border-green-50 text-green-700 shadow-sm hover:bg-green-50/50"
+                    variant={emetteur.vesselStatus === 'landed' ? 'default' : 'outline'}
+                    className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2 shadow-sm transition-all", emetteur.vesselStatus === 'landed' ? "bg-green-600 text-white border-green-400" : "bg-white border-green-50 text-green-700 hover:bg-green-50/50")}
                     onClick={() => emetteur.changeManualStatus('landed')}
-                    disabled={emetteur.vesselStatus === 'landed'}
                 >
-                    <Home className="size-4 text-green-600" /> HOME (À TERRE)
+                    <Home className="size-4 text-green-600 group-data-[state=active]:text-white" /> HOME (À TERRE)
                 </Button>
             </div>
             <Button 
-                variant="outline" 
-                className="w-full h-14 font-black uppercase text-xs border-2 bg-white gap-3 border-orange-50 text-orange-700 shadow-sm hover:bg-orange-50/50"
-                onClick={() => { emetteur.triggerEmergency('ASSISTANCE'); sendEmergencySms('ASSISTANCE'); }}
+                variant={emetteur.vesselStatus === 'emergency' ? 'default' : 'outline'}
+                className={cn("w-full h-14 font-black uppercase text-xs border-2 gap-3 shadow-sm transition-all", emetteur.vesselStatus === 'emergency' ? "bg-orange-600 text-white border-orange-400" : "bg-white border-orange-50 text-orange-700 hover:bg-orange-50/50")}
+                onClick={() => { emetteur.triggerEmergency('ASSISTANCE'); if (emetteur.vesselStatus !== 'emergency') sendEmergencySms('ASSISTANCE'); }}
             >
-                <Phone className="size-5 text-orange-600" /> BESOIN D'ASSISTANCE
+                <Phone className="size-5 text-orange-600 group-data-[state=active]:text-white" /> BESOIN D'ASSISTANCE
             </Button>
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-2 mb-4">
-          <Button variant="destructive" className="h-14 font-black uppercase rounded-2xl shadow-xl gap-3 text-xs border-2 border-white/20 animate-pulse" onClick={() => { emetteur.triggerEmergency('MAYDAY'); sendEmergencySms('MAYDAY'); }}>
+          <Button 
+            variant="destructive" 
+            className={cn("h-14 font-black uppercase rounded-2xl shadow-xl gap-3 text-xs border-2 border-white/20 transition-all", emetteur.vesselStatus === 'emergency' ? "ring-4 ring-red-500 animate-pulse" : "")} 
+            onClick={() => { emetteur.triggerEmergency('MAYDAY'); if (emetteur.vesselStatus !== 'emergency') sendEmergencySms('MAYDAY'); }}
+          >
               <ShieldAlert className="size-5" /> MAYDAY (SOS)
           </Button>
-          <Button variant="secondary" className="h-14 font-black uppercase rounded-2xl shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => { emetteur.triggerEmergency('PAN PAN'); sendEmergencySms('PAN PAN'); }}>
+          <Button 
+            variant="secondary" 
+            className={cn("h-14 font-black uppercase rounded-2xl shadow-lg gap-3 text-xs border-2 border-primary/20 transition-all", emetteur.vesselStatus === 'emergency' ? "opacity-50" : "")} 
+            onClick={() => { emetteur.triggerEmergency('PAN PAN'); if (emetteur.vesselStatus !== 'emergency') sendEmergencySms('PAN PAN'); }}
+          >
               <AlertTriangle className="size-5 text-primary" /> PAN PAN
           </Button>
       </div>
@@ -860,7 +874,7 @@ export default function VesselTrackerPage() {
                                                     <Input 
                                                         value={emetteur.assistanceContact} 
                                                         onChange={e => emetteur.setAssistanceContact(e.target.value)} 
-                                                        placeholder="Ex: 771234" 
+                                                        placeholder="Ex: 742929" 
                                                         className="h-12 border-2 bg-slate-100 font-black text-lg pl-10" 
                                                     />
                                                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-blue-400" />
@@ -966,7 +980,7 @@ export default function VesselTrackerPage() {
                                                 <Label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
                                                     <Battery className="size-3" /> Batterie
                                                 </Label>
-                                                <span className="text-xs font-black text-red-600">{simulator.simBattery}%</span>
+                                                <span className="text-red-600">{simulator.simBattery}%</span>
                                             </div>
                                             <Slider value={[simulator.simBattery]} max={100} step={1} onValueChange={v => simulator.setSimBattery(v[0])} />
                                         </div>
