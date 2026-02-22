@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -252,7 +253,6 @@ export default function VesselTrackerPage() {
   }, [emetteur.mooringRadius]);
 
   const handleRadiusChange = (val: number) => {
-    // v122 : On ne met à jour que l'UI locale pendant le glissement
     setTempRadius(val);
     setIsConfirmingRadius(true);
     
@@ -308,7 +308,7 @@ export default function VesselTrackerPage() {
   }, [activeAnchorVessel, mapCore.isFlashOn]);
 
   useEffect(() => {
-    if ((emetteur.currentPos || simulator.simPos) && !hasCenteredInitially.current && mapCore.googleMap) {
+    if ((emetteur.currentPos || simulator.simPos) && !hasCenteredInitially.current && mapCore.isMapReady) {
         const pos = emetteur.currentPos || simulator.simPos;
         if (pos) {
             mapCore.handleRecenter(pos);
@@ -433,8 +433,8 @@ export default function VesselTrackerPage() {
                     min={10} 
                     max={500} 
                     step={10} 
-                    onValueChange={v => setTempRadius(v[0])} // v122 : Uniquement UI locale pendant le glissement
-                    onValueCommit={v => handleRadiusChange(v[0])} // v122 : Déclenche la validation logicielle au relâchement
+                    onValueChange={v => setTempRadius(v[0])} 
+                    onValueCommit={v => handleRadiusChange(v[0])} 
                     className="w-full"
                 />
                 {isConfirmingRadius && (
@@ -451,7 +451,6 @@ export default function VesselTrackerPage() {
         <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2 pointer-events-auto">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>{mapCore.isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
             
-            {/* WINDY SELECTOR v119 */}
             <div className="mt-4 flex flex-col gap-2">
                 <Button 
                     size="icon" 
@@ -566,7 +565,7 @@ export default function VesselTrackerPage() {
             </div>
             <Button 
                 variant={emetteur.vesselStatus === 'emergency' ? 'default' : 'outline'}
-                className={cn("w-full h-14 font-black uppercase text-xs border-2 gap-3 shadow-sm transition-all", emetteur.vesselStatus === 'emergency' ? "bg-orange-600 text-white border-orange-400" : "bg-white border-orange-50 text-orange-700 hover:bg-orange-50/50")}
+                className={cn("w-full h-14 font-black uppercase text-xs border-2 gap-3 shadow-sm transition-all z-[10000]", emetteur.vesselStatus === 'emergency' ? "bg-orange-600 text-white border-orange-400" : "bg-white border-orange-50 text-orange-700 hover:bg-orange-50/50")}
                 onClick={() => { emetteur.triggerEmergency('ASSISTANCE'); if (emetteur.vesselStatus !== 'emergency') sendEmergencySms('ASSISTANCE'); }}
             >
                 <Phone className="size-5 text-orange-600 group-data-[state=active]:text-white" /> BESOIN D'ASSISTANCE
@@ -577,14 +576,14 @@ export default function VesselTrackerPage() {
       <div className="grid grid-cols-2 gap-2 mb-4">
           <Button 
             variant="destructive" 
-            className={cn("h-14 font-black uppercase rounded-2xl shadow-xl gap-3 text-xs border-2 border-white/20 transition-all", emetteur.vesselStatus === 'emergency' ? "ring-4 ring-red-500 animate-pulse" : "")} 
+            className={cn("h-14 font-black uppercase rounded-2xl shadow-xl gap-3 text-xs border-2 border-white/20 transition-all z-[10000]", emetteur.vesselStatus === 'emergency' ? "ring-4 ring-red-500 animate-pulse" : "")} 
             onClick={() => { emetteur.triggerEmergency('MAYDAY'); if (emetteur.vesselStatus !== 'emergency') sendEmergencySms('MAYDAY'); }}
           >
               <ShieldAlert className="size-5" /> MAYDAY (SOS)
           </Button>
           <Button 
             variant="secondary" 
-            className={cn("h-14 font-black uppercase rounded-2xl shadow-lg gap-3 text-xs border-2 border-primary/20 transition-all", emetteur.vesselStatus === 'emergency' ? "opacity-50" : "")} 
+            className={cn("h-14 font-black uppercase rounded-2xl shadow-lg gap-3 text-xs border-2 border-primary/20 transition-all z-[10000]", emetteur.vesselStatus === 'emergency' ? "opacity-50" : "")} 
             onClick={() => { emetteur.triggerEmergency('PAN PAN'); if (emetteur.vesselStatus !== 'emergency') sendEmergencySms('PAN PAN'); }}
           >
               <AlertTriangle className="size-5 text-primary" /> PAN PAN
@@ -916,7 +915,7 @@ export default function VesselTrackerPage() {
                                                 <Textarea 
                                                     placeholder="Ex: Problème moteur, besoin aide immédiate." 
                                                     value={emetteur.vesselSmsMessage} 
-                                                    onChange={e => setVesselSmsMessage(e.target.value)} 
+                                                    onChange={e => emetteur.setVesselSmsMessage(e.target.value)} 
                                                     className="border-2 font-medium min-h-[100px] bg-slate-100 text-sm"
                                                 />
                                             </div>

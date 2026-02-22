@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -14,7 +15,8 @@ const THRESHOLD_DRIFT = 0.2; // ND
 const THRESHOLD_MOVEMENT = 2.0; // ND
 
 /**
- * LOGIQUE ÉMETTEUR (A) v117.0 : Gestion SMS, Rollback et Rayon de mouillage dynamique.
+ * LOGIQUE ÉMETTEUR (A) v123.0 : GESTION DES FLUX FIRESTORE ET SMS
+ * Optimisation : Throttling des mises à jour pour préserver le thread principal.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -132,7 +134,9 @@ export function useEmetteur(
     if (!user || !firestore || (!isSharingRef.current && !force) || (simulator?.isComCut && !force)) return;
     
     const nowTs = Date.now();
-    if (simulator?.isActive && !force && nowTs - lastFirestoreSyncRef.current < 5000) return;
+    // Throttling v123: Limite à une mise à jour toutes les 2s en mode simulation ou 1s en réel
+    const throttleLimit = simulator?.isActive ? 2000 : 1000;
+    if (!force && nowTs - lastFirestoreSyncRef.current < throttleLimit) return;
     lastFirestoreSyncRef.current = nowTs;
 
     const batteryLevel = Math.round(batteryRef.current.level * 100);
@@ -313,6 +317,22 @@ export function useEmetteur(
     setTimeout(() => setIsRollingBack(false), 2000);
   }, [updateVesselInFirestore, addTechLog, toast]);
 
+  const handleSaveSmsSettings = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            emergencyContact: emergencyContact,
+            vesselSmsMessage: vesselSmsMessage,
+            isEmergencyEnabled: isEmergencyEnabled,
+            isCustomMessageEnabled: isCustomMessageEnabled
+        });
+        toast({ title: "Paramètres SMS sauvegardés" });
+    } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: "Erreur sauvegarde SMS" });
+    }
+  };
+
   return useMemo(() => ({
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     anchorPos, mooringRadius, setMooringRadius, accuracy, battery, smoothedDistance,
@@ -375,7 +395,9 @@ export function useEmetteur(
         updateDoc(doc(firestore, 'users', user.uid), { 'vesselPrefs.mooringRadius': val });
         addTechLog('TECHNIQUE', `RAYON FIXÉ À ${val}M`);
         toast({ title: `Rayon de ${val}m validé` });
-    }
+    },
+    setVesselSmsMessage,
+    handleSaveSmsSettings
   }), [
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     anchorPos, mooringRadius, accuracy, battery, smoothedDistance,

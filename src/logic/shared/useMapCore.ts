@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -24,89 +25,80 @@ export interface TacticalMarker {
 }
 
 /**
- * HOOK PARTAGÉ v122.0 : Gestion de la carte et du moteur de tuiles Windy.
- * OPTIMISATION : Debouncing des snapshots et priorisation du rendu.
+ * HOOK PARTAGÉ v123.0 : GESTION CARTOGRAPHIQUE HAUTE PERFORMANCE
+ * Optimisation : Découplage de l'instance Map et Throttling des snapshots.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
   const firestore = useFirestore();
+  
+  // Instance Map isolée pour éviter les re-renders inutiles
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
+  
   const [viewMode, setViewMode] = useState<ViewMode>('alpha');
   const [windyLayer, setWindyLayer] = useState<WindyLayer>('none');
-  const [googleMap, setGoogleMap] = useState<google.maps.Map | null>(null);
   const [isFollowMode, setIsFollowMode] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // Oscillateur pour le clignotement des alertes (1Hz)
+  // Oscillateur pour le clignotement des alertes
   const [isFlashOn, setIsFlashOn] = useState(true);
   
-  // États de nettoyage visuel
   const [breadcrumbs, setBreadcrumbs] = useState<{ lat: number, lng: number, timestamp: number }[]>([]);
   const [isCirclesHidden, setIsCirclesHidden] = useState(false);
   const [isTacticalHidden, setIsTacticalHidden] = useState(false);
   
   const lastTracePosRef = useRef<{ lat: number, lng: number } | null>(null);
   const [tacticalMarkers, setTacticalMarkers] = useState<TacticalMarker[]>([]);
-  const pendingMarkersRef = useRef<Record<string, TacticalMarker[]>>({});
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Buffer et Throttling pour les marqueurs
+  const markersBufferRef = useRef<Record<string, TacticalMarker[]>>({});
+  const throttleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // MOTEUR D'OVERLAY WINDY v121.0
+  // MOTEUR D'OVERLAY WINDY v123.0 - ASYNCHRONE
   useEffect(() => {
-    if (!googleMap || !isGoogleLoaded || typeof window === 'undefined' || !window.google) return;
+    const map = mapInstanceRef.current;
+    if (!map || !isGoogleLoaded || typeof window === 'undefined' || !window.google) return;
 
-    // 1. Nettoyage radical des calques existants
-    googleMap.overlayMapTypes.clear();
+    // Utilisation de setTimeout pour décharger le thread principal immédiatement
+    const timerId = setTimeout(() => {
+        // Purge explicite avant changement pour éviter les fuites de mémoire
+        map.overlayMapTypes.clear();
 
-    if (windyLayer === 'none') return;
+        if (windyLayer === 'none') return;
 
-    // 2. Création du calque de tuiles Windy avec la CLÉ UTILISATEUR
-    const API_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
-    
-    try {
-        const windyTileLayer = new window.google.maps.ImageMapType({
-          getTileUrl: (coord, zoom) => {
-            return `https://tiles.windy.com/tiles/v1.0/gfs/layers/${windyLayer}/${zoom}/${coord.x}/${coord.y}.png?key=${API_KEY}`;
-          },
-          tileSize: new window.google.maps.Size(256, 256),
-          name: `Windy-${windyLayer}`,
-          opacity: 0.6
-        });
+        const API_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
+        
+        try {
+            const windyTileLayer = new window.google.maps.ImageMapType({
+              getTileUrl: (coord, zoom) => {
+                return `https://tiles.windy.com/tiles/v1.0/gfs/layers/${windyLayer}/${zoom}/${coord.x}/${coord.y}.png?key=${API_KEY}`;
+              },
+              tileSize: new window.google.maps.Size(256, 256),
+              name: `Windy-${windyLayer}`,
+              opacity: 0.6
+            });
 
-        // 3. Injection dans Google Maps
-        googleMap.overlayMapTypes.push(windyTileLayer);
-    } catch (e) {
-        console.error("Erreur instanciation calque Windy:", e);
-    }
+            map.overlayMapTypes.push(windyTileLayer);
+        } catch (e) {
+            console.error("Windy Tiles Error:", e);
+        }
+    }, 0);
 
-  }, [googleMap, windyLayer, isGoogleLoaded]);
+    return () => clearTimeout(timerId);
+  }, [windyLayer, isGoogleLoaded, isMapReady]);
 
-  // Moteur de clignotement global
+  // Oscillator clignotement
   useEffect(() => {
-    const interval = setInterval(() => {
-      setIsFlashOn(prev => !prev);
-    }, 500);
+    const interval = setInterval(() => setIsFlashOn(prev => !prev), 500);
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (googleMap) {
-      google.maps.event.trigger(googleMap, 'resize');
-      const saved = localStorage.getItem('lb_last_map_center');
-      if (saved) {
-        try {
-          const { lat, lng, zoom } = JSON.parse(saved);
-          googleMap.setCenter({ lat, lng });
-          if (zoom) googleMap.setZoom(zoom);
-        } catch (e) {
-          console.warn("Erreur restauration centre map", e);
-        }
-      }
-    }
-  }, [googleMap]);
-
   const saveMapState = useCallback(() => {
-    if (googleMap) {
-      const center = googleMap.getCenter();
-      const zoom = googleMap.getZoom();
+    const map = mapInstanceRef.current;
+    if (map) {
+      const center = map.getCenter();
+      const zoom = map.getZoom();
       if (center) {
         localStorage.setItem('lb_last_map_center', JSON.stringify({ 
           lat: center.lat(), 
@@ -115,11 +107,11 @@ export function useMapCore() {
         }));
       }
     }
-  }, [googleMap]);
+  }, []);
 
   /**
-   * Synchronisation des marqueurs tactiques avec DEBOUNCING v122
-   * Évite de surcharger React si 50 marqueurs arrivent en même temps.
+   * Synchronisation des marqueurs tactiques avec THROTTLING v123
+   * Regroupe les messages Firestore pour libérer le CPU.
    */
   const syncTacticalMarkers = useCallback((vesselIds: string[]) => {
     if (!firestore || vesselIds.length === 0) return () => {};
@@ -147,34 +139,35 @@ export function useMapCore() {
                 }
             });
 
-            // Stockage temporaire pour batching
-            pendingMarkersRef.current[vid] = newMarkers;
+            // Accumulation dans le buffer
+            markersBufferRef.current[vid] = newMarkers;
 
-            if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-            debounceTimerRef.current = setTimeout(() => {
-                // v122 : Utilisation de requestAnimationFrame pour le refresh UI final
-                requestAnimationFrame(() => {
-                    setTacticalMarkers(prev => {
-                        let merged = [...prev];
-                        Object.entries(pendingMarkersRef.current).forEach(([id, markers]) => {
-                            merged = [...merged.filter(m => !m.id.startsWith(id)), ...markers];
+            // Déclenchement du throttling (100ms)
+            if (!throttleTimerRef.current) {
+                throttleTimerRef.current = setTimeout(() => {
+                    requestAnimationFrame(() => {
+                        setTacticalMarkers(prev => {
+                            let merged = [...prev];
+                            Object.entries(markersBufferRef.current).forEach(([id, markers]) => {
+                                merged = [...merged.filter(m => !m.id.startsWith(id)), ...markers];
+                            });
+                            return merged.slice(0, 100);
                         });
-                        return merged.slice(0, 100);
+                        throttleTimerRef.current = null;
                     });
-                });
-            }, 300);
+                }, 100);
+            }
         });
     });
 
     return () => {
         unsubscribers.forEach(unsub => unsub());
-        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        if (throttleTimerRef.current) clearTimeout(throttleTimerRef.current);
     };
   }, [firestore]);
 
   const updateBreadcrumbs = useCallback((lat: number, lng: number, status: string) => {
     if (status !== 'moving' && status !== 'returning') return;
-
     const now = Date.now();
     const distMoved = lastTracePosRef.current ? getDistance(lat, lng, lastTracePosRef.current.lat, lastTracePosRef.current.lng) : 10;
     
@@ -194,38 +187,37 @@ export function useMapCore() {
   }, []);
 
   const handleRecenter = useCallback((pos: { lat: number, lng: number } | null) => {
-    if (pos && googleMap) {
-      googleMap.panTo(pos);
-      googleMap.setZoom(15);
+    const map = mapInstanceRef.current;
+    if (pos && map) {
+      map.panTo(pos);
+      map.setZoom(15);
       setIsFollowMode(true);
       saveMapState();
     }
-  }, [googleMap, saveMapState]);
+  }, [saveMapState]);
 
-  const switchViewMode = useCallback((newMode: ViewMode) => {
-    if (googleMap) {
-        saveMapState();
-        const center = googleMap.getCenter();
-        setViewMode(newMode);
-        
-        setTimeout(() => {
-            if (center) {
-                googleMap.setCenter(center);
-                google.maps.event.trigger(googleMap, 'resize');
-            }
-        }, 50);
-    } else {
-        setViewMode(newMode);
+  const setGoogleMap = useCallback((map: google.maps.Map) => {
+    mapInstanceRef.current = map;
+    setIsMapReady(true);
+    
+    // Restauration état
+    const saved = localStorage.getItem('lb_last_map_center');
+    if (saved) {
+        try {
+            const { lat, lng, zoom } = JSON.parse(saved);
+            map.setCenter({ lat, lng });
+            if (zoom) map.setZoom(zoom);
+        } catch (e) {}
     }
-  }, [googleMap, saveMapState]);
+  }, []);
 
   return useMemo(() => ({
     isGoogleLoaded,
     viewMode,
-    setViewMode: switchViewMode,
+    setViewMode: (m: ViewMode) => { setViewMode(m); saveMapState(); },
     windyLayer,
     setWindyLayer,
-    googleMap,
+    googleMap: mapInstanceRef.current,
     setGoogleMap,
     isFollowMode,
     setIsFollowMode,
@@ -238,15 +230,15 @@ export function useMapCore() {
     handleRecenter,
     saveMapState,
     tacticalMarkers,
-    setTacticalMarkers,
     syncTacticalMarkers,
     isTacticalHidden,
     setIsTacticalHidden,
     isCirclesHidden,
-    setIsCirclesHidden
+    setIsCirclesHidden,
+    isMapReady
   }), [
-    isGoogleLoaded, viewMode, switchViewMode, windyLayer, setWindyLayer, googleMap, isFollowMode, isFullscreen, isFlashOn,
+    isGoogleLoaded, viewMode, windyLayer, isFollowMode, isFullscreen, isFlashOn,
     breadcrumbs, updateBreadcrumbs, clearBreadcrumbs, handleRecenter, saveMapState,
-    tacticalMarkers, syncTacticalMarkers, isTacticalHidden, isCirclesHidden
+    tacticalMarkers, syncTacticalMarkers, isTacticalHidden, isCirclesHidden, setGoogleMap, isMapReady
   ]);
 }
