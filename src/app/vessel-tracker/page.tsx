@@ -91,7 +91,7 @@ import { useRouter } from 'next/navigation';
 import { cn, calculateProjectedPosition } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import type { UserAccount, VesselStatus, SoundLibraryEntry, TechLogEntry } from '@/lib/types';
+import type { UserAccount, VesselStatus, SoundLibraryEntry, TechLogEntry, VesselPrefs } from '@/lib/types';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -605,6 +605,89 @@ export default function VesselTrackerPage() {
                                         onValueChange={v => recepteur.updateLocalPrefs({ volume: v[0] / 100 })} 
                                         className="py-2"
                                       />
+                                  </div>
+
+                                  <div className="grid gap-4 pt-4 border-t border-dashed">
+                                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Réglages par type d'alerte</p>
+                                      {[
+                                          { key: 'moving', label: 'Mouvement' },
+                                          { key: 'stationary', label: 'Mouillage' },
+                                          { key: 'drifting', label: 'Dérive' },
+                                          { key: 'offline', label: 'Signal Perdu' },
+                                          { key: 'assistance', label: 'Assistance' },
+                                          { key: 'tactical', label: 'Signal Tactique' },
+                                          { key: 'battery', label: 'Batterie Faible' },
+                                      ].map(({ key, label }) => {
+                                          const config = recepteur.vesselPrefs.alerts[key as keyof typeof recepteur.vesselPrefs.alerts];
+                                          if (!config) return null;
+
+                                          return (
+                                              <Card key={key} className="border-2 rounded-2xl overflow-hidden shadow-sm">
+                                                  <div className="p-3 bg-slate-50 border-b flex items-center justify-between">
+                                                      <div className="flex items-center gap-2">
+                                                          <Bell className="size-3.5 text-primary" />
+                                                          <span className="text-[10px] font-black uppercase">{label}</span>
+                                                      </div>
+                                                      <Switch 
+                                                          checked={config.enabled} 
+                                                          onCheckedChange={(v) => {
+                                                              const newAlerts = { ...recepteur.vesselPrefs.alerts };
+                                                              newAlerts[key as keyof typeof recepteur.vesselPrefs.alerts] = { ...config, enabled: v };
+                                                              recepteur.updateLocalPrefs({ alerts: newAlerts });
+                                                          }}
+                                                      />
+                                                  </div>
+                                                  <div className="p-3 bg-white flex items-center gap-2">
+                                                      <div className="flex-1">
+                                                          <Select 
+                                                              value={config.sound} 
+                                                              onValueChange={(v) => {
+                                                                  const newAlerts = { ...recepteur.vesselPrefs.alerts };
+                                                                  newAlerts[key as keyof typeof recepteur.vesselPrefs.alerts] = { ...config, sound: v };
+                                                                  recepteur.updateLocalPrefs({ alerts: newAlerts });
+                                                              }}
+                                                          >
+                                                              <SelectTrigger className="h-10 border-2 font-black uppercase text-[10px]">
+                                                                  <SelectValue placeholder="Son..." />
+                                                              </SelectTrigger>
+                                                              <SelectContent>
+                                                                  {recepteur.availableSounds.map(s => (
+                                                                      <SelectItem key={s.id} value={s.label} className="text-[10px] font-black uppercase">{s.label}</SelectItem>
+                                                                  ))}
+                                                              </SelectContent>
+                                                          </Select>
+                                                      </div>
+                                                      <div className="flex items-center gap-2 border-2 rounded-xl px-2 h-10 bg-slate-50">
+                                                          <span className="text-[8px] font-black uppercase text-slate-400">LOOP</span>
+                                                          <Switch 
+                                                              checked={config.loop} 
+                                                              onCheckedChange={(v) => {
+                                                                  const newAlerts = { ...recepteur.vesselPrefs.alerts };
+                                                                  newAlerts[key as keyof typeof recepteur.vesselPrefs.alerts] = { ...config, loop: v };
+                                                                  recepteur.updateLocalPrefs({ alerts: newAlerts });
+                                                              }}
+                                                              className="scale-75"
+                                                          />
+                                                      </div>
+                                                      <Button 
+                                                          variant="outline" 
+                                                          size="icon" 
+                                                          className="h-10 w-10 border-2"
+                                                          onClick={() => {
+                                                              const sound = recepteur.availableSounds.find(s => s.label === config.sound);
+                                                              if (sound) {
+                                                                  const audio = new Audio(sound.url);
+                                                                  audio.volume = recepteur.vesselPrefs.volume;
+                                                                  audio.play();
+                                                              }
+                                                          }}
+                                                      >
+                                                          <Play className="size-4 fill-primary" />
+                                                      </Button>
+                                                  </div>
+                                              </Card>
+                                          );
+                                      })}
                                   </div>
 
                                   <Card className="border-2 border-dashed border-primary/20 bg-muted/5 rounded-2xl p-4 space-y-4">
