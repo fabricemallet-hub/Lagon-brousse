@@ -117,6 +117,7 @@ export interface UserAccount {
   isEmergencyEnabled?: boolean;
   isCustomMessageEnabled?: boolean;
   emergencyContact?: string;
+  assistanceContact?: string;
   vesselSmsMessage?: string;
   favoriteNavLinks?: string[];
   huntingNickname_v2?: string;

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -14,8 +15,7 @@ const THRESHOLD_DRIFT = 0.2; // ND
 const THRESHOLD_MOVEMENT = 2.0; // ND
 
 /**
- * LOGIQUE ÉMETTEUR (A) v106.1 : Identité, Partage et Gestion des Flottes.
- * Correction ReferenceError: startSharing et renforcement de la stabilité.
+ * LOGIQUE ÉMETTEUR (A) v114.0 : Gestion SMS différenciée et persistante.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -53,7 +53,9 @@ export function useEmetteur(
 
   const [battery, setBattery] = useState<{ level: number, charging: boolean }>({ level: 1, charging: false });
 
+  // ÉTATS SMS
   const [emergencyContact, setEmergencyContact] = useState('');
+  const [assistanceContact, setAssistanceContact] = useState('');
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
   const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
@@ -78,13 +80,24 @@ export function useEmetteur(
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  // Synchronisation critique des refs pour les callbacks asynchrones (GPS / Timer)
+  // Sync refs
   useEffect(() => { mooringRadiusRef.current = mooringRadius; }, [mooringRadius]);
   useEffect(() => { isGhostModeRef.current = isGhostMode; }, [isGhostMode]);
   useEffect(() => { isTrajectoryHiddenRef.current = isTrajectoryHidden; }, [isTrajectoryHidden]);
   useEffect(() => { isSharingRef.current = isSharing; }, [isSharing]);
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
   useEffect(() => { batteryRef.current = battery; }, [battery]);
+
+  // Sync SMS from Profile
+  useEffect(() => {
+    if (userProfile) {
+        setEmergencyContact(userProfile.emergencyContact || '');
+        setAssistanceContact(userProfile.assistanceContact || '');
+        setVesselSmsMessage(userProfile.vesselSmsMessage || '');
+        setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
+        setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
+    }
+  }, [userProfile]);
 
   const addTechLog = useCallback(async (label: string, details?: string, statusOverride?: string) => {
     if (!firestore || !sharingId) return;
@@ -235,7 +248,6 @@ export function useEmetteur(
     isSharingRef.current = true;
     addTechLog('LANCEMENT', 'Initialisation...');
 
-    // ENREGISTREMENT FLOTTE DANS FAVORIS v106.0
     if (customFleetId.trim()) {
         const fleetId = customFleetId.trim().toUpperCase();
         const entry: FleetEntry = { id: fleetId, comment: fleetComment };
@@ -287,7 +299,9 @@ export function useEmetteur(
     vesselNickname, setVesselNickname, customSharingId, setCustomSharingId, customFleetId, setCustomFleetId, 
     fleetComment, setFleetComment, sharingId,
     lastSyncTime, techLogs, 
-    emergencyContact, setEmergencyContact, vesselSmsMessage, setVesselSmsMessage, isEmergencyEnabled, setIsEmergencyEnabled,
+    emergencyContact, setEmergencyContact, 
+    assistanceContact, setAssistanceContact,
+    vesselSmsMessage, setVesselSmsMessage, isEmergencyEnabled, setIsEmergencyEnabled,
     isCustomMessageEnabled, setIsCustomMessageEnabled, clearLogs: () => setTechLogs([]),
     isGhostMode, 
     toggleGhostMode: () => {
@@ -317,7 +331,8 @@ export function useEmetteur(
         addTechLog('CHGT MANUEL', st.toUpperCase());
     },
     triggerEmergency: (type: string) => {
-        if (!emergencyContact) return;
+        const contact = type === 'ASSISTANCE' ? assistanceContact : emergencyContact;
+        if (!contact) return;
         setVesselStatus('emergency'); updateVesselInFirestore({ status: 'emergency', eventLabel: type }, true);
         addTechLog('URGENCE', type);
     },
@@ -330,7 +345,7 @@ export function useEmetteur(
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     anchorPos, mooringRadius, accuracy, battery, smoothedDistance,
     vesselNickname, customSharingId, customFleetId, fleetComment, sharingId,
-    lastSyncTime, techLogs, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
+    lastSyncTime, techLogs, emergencyContact, assistanceContact, vesselSmsMessage, isEmergencyEnabled,
     isCustomMessageEnabled, toast, user, firestore, isGhostMode, isTrajectoryHidden, updateVesselInFirestore,
     userProfile?.savedFleets, addTechLog
   ]);

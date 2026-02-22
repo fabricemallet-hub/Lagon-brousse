@@ -344,6 +344,7 @@ export default function VesselTrackerPage() {
     try {
         await updateDoc(doc(firestore, 'users', user.uid), {
             emergencyContact: emetteur.emergencyContact,
+            assistanceContact: emetteur.assistanceContact,
             vesselSmsMessage: emetteur.vesselSmsMessage,
             isEmergencyEnabled: emetteur.isEmergencyEnabled,
             isCustomMessageEnabled: emetteur.isCustomMessageEnabled
@@ -371,8 +372,27 @@ export default function VesselTrackerPage() {
     const customText = (emetteur.isCustomMessageEnabled && emetteur.vesselSmsMessage) ? emetteur.vesselSmsMessage : "Requiert assistance immédiate.";
     const timeStr = format(new Date(), 'HH:mm');
     const accStr = emetteur.accuracy ? ` (+/- ${emetteur.accuracy}m)` : "";
-    return `${nicknamePrefix}${customText} [MAYDAY] à ${timeStr}. Position${accStr} : https://www.google.com/maps?q=-22.27,166.44`;
+    return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] à ${timeStr}. Position${accStr} : https://www.google.com/maps?q=-22.27,166.44`;
   }, [emetteur.vesselSmsMessage, emetteur.isCustomMessageEnabled, emetteur.vesselNickname, emetteur.accuracy]);
+
+  const sendEmergencySms = (type: 'SOS' | 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE') => {
+    if (!emetteur.isEmergencyEnabled) {
+        toast({ variant: "destructive", title: "Service désactivé", description: "Veuillez activer les réglages d'urgence dans vos paramètres." });
+        return;
+    }
+    
+    const contact = type === 'ASSISTANCE' ? emetteur.assistanceContact : emetteur.emergencyContact;
+    if (!contact) { toast({ variant: "destructive", title: "Numéro requis" }); return; }
+    
+    const pos = emetteur.currentPos;
+    const posUrl = pos ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
+    
+    const nicknamePrefix = emetteur.vesselNickname ? `[${emetteur.vesselNickname.toUpperCase()}] ` : "";
+    const customText = (emetteur.isCustomMessageEnabled && emetteur.vesselSmsMessage) ? emetteur.vesselSmsMessage : "Requiert assistance immédiate.";
+    const body = `${nicknamePrefix}${customText} [${type}] Position : ${posUrl}`;
+    
+    window.location.href = `sms:${contact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+  };
 
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
@@ -495,7 +515,7 @@ export default function VesselTrackerPage() {
             <Button 
                 variant="outline" 
                 className="w-full h-14 font-black uppercase text-xs border-2 bg-white gap-3 border-orange-50 text-orange-700 shadow-sm hover:bg-orange-50/50"
-                onClick={() => emetteur.triggerEmergency('ASSISTANCE')}
+                onClick={() => { emetteur.triggerEmergency('ASSISTANCE'); sendEmergencySms('ASSISTANCE'); }}
             >
                 <Phone className="size-5 text-orange-600" /> BESOIN D'ASSISTANCE
             </Button>
@@ -503,10 +523,10 @@ export default function VesselTrackerPage() {
       )}
 
       <div className="grid grid-cols-2 gap-2 mb-4">
-          <Button variant="destructive" className="h-14 font-black uppercase rounded-2xl shadow-xl gap-3 text-xs border-2 border-white/20 animate-pulse" onClick={() => emetteur.triggerEmergency('MAYDAY')}>
+          <Button variant="destructive" className="h-14 font-black uppercase rounded-2xl shadow-xl gap-3 text-xs border-2 border-white/20 animate-pulse" onClick={() => { emetteur.triggerEmergency('MAYDAY'); sendEmergencySms('MAYDAY'); }}>
               <ShieldAlert className="size-5" /> MAYDAY (SOS)
           </Button>
-          <Button variant="secondary" className="h-14 font-black uppercase rounded-2xl shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => emetteur.triggerEmergency('PAN PAN')}>
+          <Button variant="secondary" className="h-14 font-black uppercase rounded-2xl shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => { emetteur.triggerEmergency('PAN PAN'); sendEmergencySms('PAN PAN'); }}>
               <AlertTriangle className="size-5 text-primary" /> PAN PAN
           </Button>
       </div>
@@ -632,10 +652,11 @@ export default function VesselTrackerPage() {
               </AccordionTrigger>
               <AccordionContent className="pt-4 space-y-4">
                   <Tabs defaultValue="tactical" className="w-full">
-                      <TabsList className={cn("grid h-12 bg-muted/20 border-y rounded-none", isAdmin ? "grid-cols-4" : "grid-cols-3")}>
+                      <TabsList className={cn("grid h-12 bg-muted/20 border-y rounded-none", isAdmin ? "grid-cols-5" : "grid-cols-4")}>
                           <TabsTrigger value="tactical" className="text-[10px] font-black uppercase">Tactique</TabsTrigger>
                           <TabsTrigger value="technical" className="text-[10px] font-black uppercase">Journal</TabsTrigger>
                           <TabsTrigger value="settings" className="text-[10px] font-black uppercase">Sons</TabsTrigger>
+                          <TabsTrigger value="sms" className="text-[10px] font-black uppercase text-orange-600">SMS</TabsTrigger>
                           {isAdmin && <TabsTrigger value="labo" className="text-[10px] font-black uppercase text-red-600">Labo</TabsTrigger>}
                       </TabsList>
                       
@@ -706,7 +727,7 @@ export default function VesselTrackerPage() {
                             <div className="p-4 space-y-6 pb-10">
                                 <Card className="border-2 border-primary/10 bg-primary/5 rounded-2xl p-4 flex items-center justify-between">
                                     <div className="space-y-0.5">
-                                        <p className="text-[11px] font-black uppercase text-primary">Alertes Sonores</p>
+                                        <p className="text-11px] font-black uppercase text-primary">Alertes Sonores</p>
                                         <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">Activer les signaux audio</p>
                                     </div>
                                     <Switch checked={recepteur.vesselPrefs.isNotifyEnabled} onCheckedChange={v => recepteur.updateLocalPrefs({ isNotifyEnabled: v })} />
@@ -777,67 +798,84 @@ export default function VesselTrackerPage() {
                                         );
                                     })}
                                 </div>
+                            </div>
+                          </ScrollArea>
+                      </TabsContent>
 
-                                <Card className="border-2 border-dashed border-orange-200 bg-orange-50/20 rounded-3xl p-5 space-y-5">
-                                    <div className="flex items-center justify-between border-b border-orange-100 pb-3">
-                                        <div className="flex items-center gap-2">
-                                            <Smartphone className="size-4 text-orange-600" />
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-black uppercase text-orange-800">Réglages d'Urgence (SMS)</span>
-                                                <span className="text-[7px] font-bold text-orange-600 uppercase">Envoi auto lors d'un Mayday/Pan Pan</span>
-                                            </div>
+                      <TabsContent value="sms" className="m-0 p-0 bg-slate-50">
+                          <ScrollArea className="h-[500px]">
+                              <div className="p-4 space-y-6 pb-10">
+                                <Card className="border-2 shadow-lg overflow-hidden rounded-3xl bg-white border-primary/10">
+                                    <CardHeader className="bg-slate-50 border-b p-4">
+                                        <div className="flex items-center gap-3">
+                                            <Smartphone className="size-5 text-orange-600" />
+                                            <CardTitle className="text-[11px] font-black uppercase tracking-tight text-slate-800">RÉGLAGES D'URGENCE (SMS)</CardTitle>
                                         </div>
-                                        <Switch checked={emetteur.isEmergencyEnabled} onCheckedChange={emetteur.setIsEmergencyEnabled} />
-                                    </div>
-
-                                    <div className={cn("space-y-5", !emetteur.isEmergencyEnabled && "opacity-40 pointer-events-none")}>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[9px] font-black uppercase text-slate-500 tracking-widest ml-1">Numéro du contact à terre</Label>
-                                            <div className="relative">
-                                                <Input 
-                                                    value={emetteur.emergencyContact} 
-                                                    onChange={e => emetteur.setEmergencyContact(e.target.value)} 
-                                                    placeholder="Ex: 742929" 
-                                                    className="h-12 border-2 bg-slate-100 font-black text-lg pl-10" 
-                                                />
-                                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                                    </CardHeader>
+                                    <CardContent className="p-5 space-y-6">
+                                        <div className="flex items-center justify-between border-b border-dashed pb-4">
+                                            <div className="space-y-0.5">
+                                                <Label className="text-xs font-black uppercase text-slate-800">ACTIVER LE CONTACT SMS</Label>
+                                                <p className="text-[8px] font-bold text-orange-600 uppercase">ENVOI AUTO LORS D'UN MAYDAY/PAN PAN</p>
                                             </div>
+                                            <Switch checked={emetteur.isEmergencyEnabled} onCheckedChange={emetteur.setIsEmergencyEnabled} />
                                         </div>
 
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <Label className="text-[9px] font-black uppercase text-slate-500 tracking-widest ml-1">Message personnalisé</Label>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[8px] font-bold uppercase opacity-40">{emetteur.isCustomMessageEnabled ? 'Activé' : 'Désactivé'}</span>
-                                                    <Switch checked={emetteur.isCustomMessageEnabled} onCheckedChange={emetteur.setIsCustomMessageEnabled} className="scale-75 touch-manipulation" disabled={!emetteur.isEmergencyEnabled} />
+                                        <div className={cn("space-y-5", !emetteur.isEmergencyEnabled && "opacity-40 pointer-events-none")}>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[9px] font-black uppercase text-slate-500 tracking-widest ml-1">NUMÉRO D'URGENCE (MAYDAY/PAN PAN)</Label>
+                                                <div className="relative">
+                                                    <Input 
+                                                        value={emetteur.emergencyContact} 
+                                                        onChange={e => emetteur.setEmergencyContact(e.target.value)} 
+                                                        placeholder="Ex: 742929" 
+                                                        className="h-12 border-2 bg-slate-100 font-black text-lg pl-10" 
+                                                    />
+                                                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                                                 </div>
                                             </div>
-                                            <Textarea 
-                                                placeholder="Ex: Problème moteur, besoin aide immédiate." 
-                                                value={emetteur.vesselSmsMessage} 
-                                                onChange={e => emetteur.setVesselSmsMessage(e.target.value)} 
-                                                className={cn("border-2 font-medium min-h-[80px] bg-slate-100 text-sm", !emetteur.isCustomMessageEnabled && "opacity-50")}
-                                                disabled={!emetteur.isEmergencyEnabled || !emetteur.isCustomMessageEnabled}
-                                            />
-                                        </div>
 
-                                        <div className="space-y-2 pt-2 border-t border-orange-100/50">
-                                            <p className="text-[9px] font-black uppercase text-primary flex items-center gap-2 ml-1">
-                                                <Eye className="size-3" /> Aperçu du message
-                                            </p>
-                                            <div className="p-4 bg-white border-2 border-dashed border-slate-200 rounded-2xl">
-                                                <p className="text-[10px] font-medium leading-relaxed italic text-slate-600">
-                                                    "{smsPreview}"
-                                                </p>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[9px] font-black uppercase text-slate-500 tracking-widest ml-1">NUMÉRO POUR ASSISTANCE</Label>
+                                                <div className="relative">
+                                                    <Input 
+                                                        value={emetteur.assistanceContact} 
+                                                        onChange={e => emetteur.setAssistanceContact(e.target.value)} 
+                                                        placeholder="Ex: 771234" 
+                                                        className="h-12 border-2 bg-slate-100 font-black text-lg pl-10" 
+                                                    />
+                                                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-blue-400" />
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        <Button onClick={handleSaveSmsSettings} className="w-full h-14 bg-primary text-white font-black uppercase text-[11px] tracking-widest shadow-xl rounded-2xl gap-3">
-                                            <Save className="size-5" /> Sauvegarder réglages SMS
-                                        </Button>
-                                    </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-[9px] font-black uppercase text-slate-500 tracking-widest ml-1">MESSAGE PERSONNALISÉ</Label>
+                                                <Textarea 
+                                                    placeholder="Ex: Problème moteur, besoin aide immédiate." 
+                                                    value={emetteur.vesselSmsMessage} 
+                                                    onChange={e => emetteur.setVesselSmsMessage(e.target.value)} 
+                                                    className="border-2 font-medium min-h-[100px] bg-slate-100 text-sm"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2 pt-2 border-t border-dashed">
+                                                <p className="text-[9px] font-black uppercase text-primary flex items-center gap-2 ml-1">
+                                                    <Eye className="size-3" /> APERÇU DU MESSAGE :
+                                                </p>
+                                                <div className="p-4 bg-muted/30 border-2 border-dashed border-slate-200 rounded-2xl">
+                                                    <p className="text-[9px] font-medium leading-relaxed italic text-slate-600 font-mono">
+                                                        "{smsPreview}"
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <Button onClick={handleSaveSmsSettings} className="w-full h-14 bg-primary text-white font-black uppercase text-[11px] tracking-widest shadow-xl rounded-2xl gap-3">
+                                                <Save className="size-5" /> SAUVEGARDER RÉGLAGES SMS
+                                            </Button>
+                                        </div>
+                                    </CardContent>
                                 </Card>
-                            </div>
+                              </div>
                           </ScrollArea>
                       </TabsContent>
 
