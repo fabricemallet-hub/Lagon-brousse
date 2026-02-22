@@ -4,7 +4,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
 /**
- * HOOK SIMULATEUR v80.0 : "Moteur de Navigation & Injection Temporelle"
+ * HOOK SIMULATEUR v80.1 : "Correction Navigation & Fluidité Sandbox"
  * Gère l'état et les commandes de simulation GPS, vitesse, batterie et temps.
  */
 export function useSimulator() {
@@ -20,7 +20,7 @@ export function useSimulator() {
   const [simBattery, setSimBattery] = useState(100);
   const [simPos, setSimPos] = useState<{lat: number, lng: number} | null>(null);
   const [timeOffset, setTimeOffset] = useState(0);
-  const [simBearing, setSimBearing] = useState(45); // Direction par défaut (Nord-Est)
+  const [simBearing, setSimBearing] = useState(45); 
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -51,32 +51,39 @@ export function useSimulator() {
   const forceDrift = useCallback((anchorPos: {lat: number, lng: number} | null, radius: number) => {
     if (!anchorPos) return;
     const degPerMeter = 1 / 111320;
-    const driftDist = radius + 20; // Juste assez pour sortir du cercle
+    const driftDist = radius + 20; 
     const angle = 45 * (Math.PI / 180);
     const offsetLat = Math.cos(angle) * (driftDist * degPerMeter);
     const offsetLng = Math.sin(angle) * (driftDist * degPerMeter);
     setSimPos({ lat: anchorPos.lat + offsetLat, lng: anchorPos.lng + offsetLng });
-    setSimSpeed(1); // Faible vitesse pour simuler la dérive lente
+    setSimSpeed(1); 
     setIsActive(true);
     setIsMoving(true);
   }, [isActive]);
 
-  // MOTEUR DE NAVIGATION FICTIVE (v80.0)
+  // MOTEUR DE NAVIGATION FICTIVE (v80.1)
   useEffect(() => {
     if (isActive && isMoving && simSpeed > 0 && !isGpsCut) {
         timerRef.current = setInterval(() => {
             setSimPos(prev => {
                 if (!prev) return prev;
-                // Calcul du déplacement par seconde : 1 nds = 0.514444 m/s
+                
+                // Formule v80.1 : Calcul précis du déplacement
+                // 1 nds = 0.514444 m/s
                 const metersPerSec = simSpeed * 0.514444;
                 const degPerMeter = 1 / 111320;
-                const step = metersPerSec * degPerMeter;
                 
-                // On avance selon le cap (bearing)
+                // Facteur de correction de longitude basé sur la latitude
+                const lngCorrection = 1 / Math.cos(prev.lat * Math.PI / 180);
+                
                 const rad = (simBearing * Math.PI) / 180;
+                
+                const dLat = Math.cos(rad) * (metersPerSec * degPerMeter);
+                const dLng = Math.sin(rad) * (metersPerSec * degPerMeter * lngCorrection);
+                
                 return { 
-                    lat: prev.lat + Math.cos(rad) * step, 
-                    lng: prev.lng + Math.sin(rad) * step 
+                    lat: prev.lat + dLat, 
+                    lng: prev.lng + dLng 
                 };
             });
         }, 1000);
