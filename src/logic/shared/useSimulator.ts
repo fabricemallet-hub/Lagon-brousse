@@ -4,8 +4,8 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
 /**
- * HOOK SIMULATEUR v80.1 : "Correction Navigation & Fluidité Sandbox"
- * Gère l'état et les commandes de simulation GPS, vitesse, batterie et temps.
+ * HOOK SIMULATEUR v80.2 : "Moteur de Mouvement Fluide & Boucle RAF"
+ * Gère l'état et les commandes de simulation GPS avec rendu haute fréquence.
  */
 export function useSimulator() {
   const [isActive, setIsActive] = useState(false);
@@ -22,7 +22,8 @@ export function useSimulator() {
   const [timeOffset, setTimeOffset] = useState(0);
   const [simBearing, setSimBearing] = useState(45); 
   
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const lastUpdateRef = useRef<number>(0);
 
   const startSim = useCallback((currentPos: {lat: number, lng: number} | null) => {
     setIsActive(true);
@@ -39,7 +40,7 @@ export function useSimulator() {
     setSimSpeed(0);
     setTimeOffset(0);
     setSimPos(null);
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
   }, []);
 
   const teleport = useCallback((lat: number, lng: number) => {
@@ -61,36 +62,43 @@ export function useSimulator() {
     setIsMoving(true);
   }, [isActive]);
 
-  // MOTEUR DE NAVIGATION FICTIVE (v80.1)
+  // MOTEUR DE NAVIGATION FICTIVE (v80.2) - BOUCLE FLUIDE
   useEffect(() => {
     if (isActive && isMoving && simSpeed > 0 && !isGpsCut) {
-        timerRef.current = setInterval(() => {
+        lastUpdateRef.current = performance.now();
+
+        const animate = (time: number) => {
+            const dt = (time - lastUpdateRef.current) / 1000; // Delta en secondes
+            lastUpdateRef.current = time;
+
             setSimPos(prev => {
                 if (!prev) return prev;
                 
-                // Formule v80.1 : Calcul précis du déplacement
                 // 1 nds = 0.514444 m/s
                 const metersPerSec = simSpeed * 0.514444;
+                const distanceMoved = metersPerSec * dt;
+                
                 const degPerMeter = 1 / 111320;
-                
-                // Facteur de correction de longitude basé sur la latitude
                 const lngCorrection = 1 / Math.cos(prev.lat * Math.PI / 180);
-                
                 const rad = (simBearing * Math.PI) / 180;
                 
-                const dLat = Math.cos(rad) * (metersPerSec * degPerMeter);
-                const dLng = Math.sin(rad) * (metersPerSec * degPerMeter * lngCorrection);
+                const dLat = Math.cos(rad) * (distanceMoved * degPerMeter);
+                const dLng = Math.sin(rad) * (distanceMoved * degPerMeter * lngCorrection);
                 
                 return { 
                     lat: prev.lat + dLat, 
                     lng: prev.lng + dLng 
                 };
             });
-        }, 1000);
+
+            rafRef.current = requestAnimationFrame(animate);
+        };
+
+        rafRef.current = requestAnimationFrame(animate);
     } else {
-        if (timerRef.current) clearInterval(timerRef.current);
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [isActive, isMoving, simSpeed, isGpsCut, simBearing]);
 
   return useMemo(() => ({

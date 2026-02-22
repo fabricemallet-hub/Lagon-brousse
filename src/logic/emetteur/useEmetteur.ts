@@ -11,7 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v80.1 : "Sandbox Prioritaire & Correction Gel GPS"
+ * LOGIQUE ÉMETTEUR (A) v80.2 : "Priorité Rendu Sandbox & Throttling Firestore"
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -57,6 +57,7 @@ export function useEmetteur(
   const isSharingRef = useRef(isSharing);
   const isGhostModeRef = useRef(isGhostMode);
   const isTrajectoryHiddenRef = useRef(isTrajectoryHidden);
+  const lastFirestoreSyncRef = useRef<number>(0);
 
   useEffect(() => { vesselStatusRef.current = vesselStatus; }, [vesselStatus]);
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
@@ -132,7 +133,6 @@ export function useEmetteur(
   const addTechLog = useCallback(async (label: string, details?: string, statusOverride?: string) => {
     if (!firestore || !sharingId) return;
     
-    // Application du décalage simulateur
     const now = simulator?.timeOffset ? subMinutes(new Date(), simulator.timeOffset) : new Date();
     const currentStatus = statusOverride || vesselStatusRef.current;
     const batteryLevel = Math.round(batteryRef.current.level * 100);
@@ -174,6 +174,13 @@ export function useEmetteur(
     if (!isSharingRef.current && !force) return;
     if (simulator?.isComCut && !force) return; 
     
+    // Throttling en mode simulation pour préserver les quotas
+    const now = Date.now();
+    if (simulator?.isActive && !force && now - lastFirestoreSyncRef.current < 5000) {
+        return;
+    }
+    lastFirestoreSyncRef.current = now;
+
     const batteryLevel = Math.round(batteryRef.current.level * 100);
     const isCharging = batteryRef.current.charging;
 
@@ -222,13 +229,13 @@ export function useEmetteur(
     return setDoc(doc(firestore, 'vessels', sharingId), payload, { merge: true })
       .then(() => setLastSyncTime(Date.now()))
       .catch(() => {});
-  }, [user, firestore, sharingId, vesselNickname, customFleetId, simulator?.isComCut, simulator?.timeOffset, addTechLog]);
+  }, [user, firestore, sharingId, vesselNickname, customFleetId, simulator?.isComCut, simulator?.isActive, simulator?.timeOffset, addTechLog]);
 
   const triggerEmergency = useCallback((type: 'MAYDAY' | 'PAN PAN' | 'ASSISTANCE' | 'DÉRIVE') => {
     if (!isSharingRef.current) return;
     vesselStatusRef.current = 'emergency';
     setVesselStatus('emergency');
-    updateVesselInFirestore({ status: 'emergency', eventLabel: type });
+    updateVesselInFirestore({ status: 'emergency', eventLabel: type }, true);
     addTechLog('URGENCE', `${type} DÉCLENCHÉ`, 'emergency');
     
     if (isEmergencyEnabled && emergencyContact) {
@@ -242,7 +249,7 @@ export function useEmetteur(
     const knotSpeed = speed;
     let nextStatus = vesselStatusRef.current;
 
-    // RÈGLE v80.1 : Navigation détectée
+    // RÈGLE v80.2 : Détection auto
     if (knotSpeed > 5) {
         if (nextStatus !== 'moving') {
             nextStatus = 'moving';
@@ -256,11 +263,9 @@ export function useEmetteur(
         addTechLog('CHGT STATUT', 'Mouillage stabilisé (<2 nds)');
     }
 
-    // RÈGLE v80.1 : Surveillance de la dérive (Réel et Simulée)
     if ((nextStatus === 'stationary' || nextStatus === 'drifting') && anchorPosRef.current) {
         const dist = getDistance(lat, lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
         if (dist > mooringRadiusRef.current) {
-            // En simulation, on force la dérive sans vérifier la précision GPS
             if (acc <= 25 || simulator?.isActive) {
                 if (nextStatus !== 'drifting' && nextStatus !== 'emergency') {
                     nextStatus = 'drifting';
@@ -294,7 +299,7 @@ export function useEmetteur(
     });
   }, [addTechLog, updateVesselInFirestore, simulator?.isActive]);
 
-  // ÉCOUTEUR POSITION SIMULÉE (COURT-CIRCUIT GPS)
+  // ÉCOUTEUR POSITION SIMULÉE (RENDU PRIORITAIRE)
   useEffect(() => {
     if (simulator?.isActive && simulator?.simPos) {
         handlePositionLogic(
@@ -314,7 +319,6 @@ export function useEmetteur(
             const lastPos = lastHeartbeatPosRef.current;
             const currentStatus = vesselStatusRef.current;
             
-            // Stabilité auto seulement en mode réel
             if (nowPos && lastPos && currentStatus === 'moving' && !simulator?.isActive) {
                 const dist = getDistance(nowPos.lat, nowPos.lng, lastPos.lat, lastPos.lng);
                 if (dist < mooringRadiusRef.current) {
@@ -322,13 +326,13 @@ export function useEmetteur(
                     setVesselStatus('stationary');
                     setAnchorPos(nowPos);
                     addTechLog('MOUILLAGE AUTO', 'Détecté par stabilité GPS (30s)');
-                    updateVesselInFirestore({ status: 'stationary', anchorLocation: { latitude: nowPos.lat, longitude: nowPos.lng } });
+                    updateVesselInFirestore({ status: 'stationary', anchorLocation: { latitude: nowPos.lat, longitude: nowPos.lng } }, true);
                 }
             }
 
             lastHeartbeatPosRef.current = nowPos;
             addTechLog('AUTO', 'Heartbeat 30s');
-            updateVesselInFirestore({});
+            updateVesselInFirestore({}, true);
         }, 30000);
     } else {
         if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
@@ -343,41 +347,24 @@ export function useEmetteur(
     isSharingRef.current = true;
     addTechLog('LANCEMENT', 'Initialisation en cours...');
 
-    // Premier point immédiat
-    const triggerInitialFix = (lat: number, lng: number, acc: number, spd: number, hdg: number) => {
-        setCurrentPos({ lat, lng });
-        lastHeartbeatPosRef.current = { lat, lng };
-        
-        updateVesselInFirestore({
-            location: { latitude: lat, longitude: lng },
-            status: 'moving',
-            accuracy: Math.round(acc),
-            speed: Math.round(spd),
-            heading: hdg
-        }, true);
-
-        handlePositionLogic(lat, lng, spd, hdg, acc);
-    };
-
     if (simulator?.isActive && simulator?.simPos) {
-        triggerInitialFix(simulator.simPos.lat, simulator.simPos.lng, simulator.simAccuracy, simulator.simSpeed, simulator.simBearing);
+        handlePositionLogic(simulator.simPos.lat, simulator.simPos.lng, simulator.simSpeed, simulator.simBearing, simulator.simAccuracy);
     } else {
         navigator.geolocation.getCurrentPosition((pos) => {
             if (simulator?.isActive) return;
-            triggerInitialFix(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, (pos.coords.speed || 0) * 1.94384, pos.coords.heading || 0);
+            handlePositionLogic(pos.coords.latitude, pos.coords.longitude, (pos.coords.speed || 0) * 1.94384, pos.coords.heading || 0, pos.coords.accuracy);
         });
     }
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        // COURT-CIRCUIT v80.1 : On ignore le GPS réel si la sandbox est ON
         if (simulator?.isActive) return;
         handlePositionLogic(pos.coords.latitude, pos.coords.longitude, (pos.coords.speed || 0) * 1.94384, pos.coords.heading || 0, pos.coords.accuracy);
       },
       () => { if (!simulator?.isActive) toast({ variant: 'destructive', title: "Signal GPS perdu" }); },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
-  }, [user, firestore, simulator?.isActive, simulator?.simPos, simulator?.simAccuracy, simulator?.simSpeed, simulator?.simBearing, addTechLog, handlePositionLogic, updateVesselInFirestore, toast]);
+  }, [user, firestore, simulator?.isActive, simulator?.simPos, simulator?.simAccuracy, simulator?.simSpeed, simulator?.simBearing, addTechLog, handlePositionLogic, toast]);
 
   const stopSharing = useCallback(async () => {
     if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
@@ -444,7 +431,7 @@ export function useEmetteur(
         anchorLocation: (st === 'stationary' || st === 'drifting') && currentPosRef.current 
             ? { latitude: currentPosRef.current.lat, longitude: currentPosRef.current.lng } 
             : null
-    });
+    }, true);
     addTechLog('CHGT MANUEL', label || st.toUpperCase());
     toast({ title: label || `Statut : ${st}` });
   }, [updateVesselInFirestore, toast, addTechLog]);
@@ -454,7 +441,7 @@ export function useEmetteur(
     setIsGhostMode(newVal);
     isGhostModeRef.current = newVal;
     localStorage.setItem('lb_vessel_ghost', newVal.toString());
-    updateVesselInFirestore({ isGhostMode: newVal });
+    updateVesselInFirestore({ isGhostMode: newVal }, true);
     toast({ title: newVal ? "Mode Fantôme activé" : "Mode Fantôme désactivé" });
   }, [isGhostMode, updateVesselInFirestore, toast]);
 
@@ -463,7 +450,7 @@ export function useEmetteur(
     setIsTrajectoryHidden(newVal);
     isTrajectoryHiddenRef.current = newVal;
     localStorage.setItem('lb_vessel_traj_hidden', newVal.toString());
-    updateVesselInFirestore({ isTrajectoryHidden: newVal });
+    updateVesselInFirestore({ isTrajectoryHidden: newVal }, true);
     toast({ title: newVal ? "Trajectoire masquée" : "Trajectoire affichée" });
   }, [isTrajectoryHidden, updateVesselInFirestore, toast]);
 
