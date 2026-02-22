@@ -25,7 +25,7 @@ export interface TacticalMarker {
 
 /**
  * HOOK PARTAGÉ v76.3 : Gestion de la carte et du tracé intelligent.
- * Correction clearBreadcrumbs : Ne masque plus les cercles de sécurité lors d'un reset.
+ * Correction v118.0 : Inclusion de windyLayer dans les dépendances de mémoïsation.
  */
 export function useMapCore() {
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
@@ -195,7 +195,7 @@ export function useMapCore() {
     isCirclesHidden,
     setIsCirclesHidden
   }), [
-    isGoogleLoaded, viewMode, switchViewMode, windyLayer, googleMap, isFollowMode, isFullscreen, isFlashOn,
+    isGoogleLoaded, viewMode, switchViewMode, windyLayer, setWindyLayer, googleMap, isFollowMode, isFullscreen, isFlashOn,
     breadcrumbs, updateBreadcrumbs, clearBreadcrumbs, handleRecenter, saveMapState,
     tacticalMarkers, syncTacticalMarkers, isTacticalHidden, isCirclesHidden
   ]);

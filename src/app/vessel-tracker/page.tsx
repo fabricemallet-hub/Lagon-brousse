@@ -92,14 +92,17 @@ import {
   Trash2,
   Phone,
   Eye,
-  Check
+  Check,
+  Wind,
+  Thermometer,
+  CloudRain
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { cn, getDistance, calculateProjectedPosition } from '@/lib/utils';
+import { cn, getDistance } from '@/lib/utils';
 import { format, subMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import type { UserAccount, VesselStatus, SoundLibraryEntry, TechLogEntry, VesselPrefs } from '@/lib/types';
+import type { UserAccount, VesselStatus, SoundLibraryEntry, TechLogEntry } from '@/lib/types';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -439,9 +442,37 @@ export default function VesselTrackerPage() {
             </Card>
         </div>
 
-        <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
+        <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2 pointer-events-auto">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>{mapCore.isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
+            
+            {/* WINDY SELECTOR v118 */}
+            <div className="mt-4 flex flex-col gap-2">
+                {[
+                    { id: 'wind', icon: Wind, title: 'Vent' },
+                    { id: 'waves', icon: Waves, title: 'Mer' },
+                    { id: 'temp', icon: Thermometer, title: 'Temp' },
+                    { id: 'rain', icon: CloudRain, title: 'Pluie' }
+                ].map(layer => (
+                    <Button 
+                        key={layer.id}
+                        size="icon" 
+                        className={cn(
+                            "h-10 w-10 border-2 shadow-xl rounded-xl transition-all",
+                            mapCore.windyLayer === layer.id ? "bg-primary text-white border-primary scale-110" : "bg-white/90 backdrop-blur-md text-slate-600 hover:bg-white"
+                        )}
+                        onClick={() => {
+                            mapCore.setWindyLayer(layer.id as any);
+                            toast({ title: `Calque ${layer.title} activé` });
+                            emetteur.addTechLog('TECHNIQUE', `CALQUE ${layer.title.toUpperCase()} ACTIVÉ`);
+                        }}
+                        title={layer.title}
+                    >
+                        <layer.icon className="size-5" />
+                    </Button>
+                ))}
+            </div>
         </div>
+
         <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
             <Button onClick={() => mapCore.setIsFollowMode(!mapCore.isFollowMode)} className={cn("h-10 w-10 border-2 shadow-xl rounded-xl transition-all", mapCore.isFollowMode ? "bg-primary text-white" : "bg-white text-primary")}>{mapCore.isFollowMode ? <Lock className="size-5" /> : <Unlock className="size-5" />}</Button>
             <Button onClick={handleRecenter} className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl flex items-center justify-center"><LocateFixed className="size-5"/></Button>
