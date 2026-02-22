@@ -57,6 +57,7 @@ export interface VesselPrefs {
   watchSound: string;
   watchLoop: boolean;
   isWatchEnabled: boolean;
+  mooringRadius?: number;
   alerts: {
     moving: VesselAlertConfig;
     stationary: VesselAlertConfig;

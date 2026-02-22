@@ -194,16 +194,16 @@ export default function VesselTrackerPage() {
 
   const handleStopCleanup = useCallback(() => { mapCore.clearBreadcrumbs(); }, [mapCore]);
 
-  const emetteur = useEmetteur(handlePositionUpdate, handleStopCleanup, simulator);
-  const recepteur = useRecepteur(emetteur.sharingId);
-  const flotte = useFlotte(emetteur.sharingId, emetteur.vesselNickname);
-  
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
+  const emetteur = useEmetteur(handlePositionUpdate, handleStopCleanup, simulator, userProfile);
+  const recepteur = useRecepteur(emetteur.sharingId);
+  const flotte = useFlotte(emetteur.sharingId, emetteur.vesselNickname);
+  
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com', 'kledostyle@hotmail.com', 'kledostyle@outlook.com'];
@@ -249,7 +249,6 @@ export default function VesselTrackerPage() {
     if (prevStatusRef.current !== emetteur.vesselStatus) {
         if (emetteur.vesselStatus === 'moving' || emetteur.vesselStatus === 'returning' || emetteur.vesselStatus === 'landed' || emetteur.vesselStatus === 'offline') {
             hardClearCircles();
-            // v83.1 : La purge ne coupe l'audio QUE si on est plus en dérive/urgence
             if (emetteur.vesselStatus !== 'drifting' && emetteur.vesselStatus !== 'emergency') {
                 recepteur.stopAllAlarms();
             }
@@ -339,12 +338,12 @@ export default function VesselTrackerPage() {
 
   const handleSaveVessel = async () => {
     if (!user || !firestore) return;
-    const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
+    const cleanId = (vesselIdToFollow || emetteur.customSharingId).trim().toUpperCase();
     try {
         await updateDoc(doc(firestore, 'users', user.uid), {
             savedVesselIds: cleanId ? arrayUnion(cleanId) : savedVesselIds,
-            lastVesselId: cleanId || customSharingId,
-            vesselNickname: vesselNickname
+            lastVesselId: cleanId || emetteur.customSharingId,
+            vesselNickname: emetteur.vesselNickname
         });
         if (vesselIdToFollow) setVesselIdToFollow('');
         toast({ title: "ID enregistré" });
@@ -464,7 +463,17 @@ export default function VesselTrackerPage() {
                                           <p className="text-lg font-black text-orange-950 leading-none">{emetteur.mooringRadius}m</p>
                                       </div>
                                   </div>
-                                  <Slider value={[emetteur.mooringRadius]} min={10} max={200} step={10} onValueChange={(v) => emetteur.setMooringRadius(v[0])} />
+                                  <div className="space-y-3">
+                                      <Slider value={[emetteur.mooringRadius]} min={10} max={100} step={10} onValueChange={(v) => emetteur.setMooringRadius(v[0])} />
+                                      <Button 
+                                          variant="outline" 
+                                          size="sm" 
+                                          className="w-full h-10 font-black uppercase text-[9px] border-2 bg-white text-orange-600 border-orange-200 gap-2 shadow-sm transition-all active:scale-95"
+                                          onClick={emetteur.saveMooringRadius}
+                                      >
+                                          <Save className="size-3" /> Enregistrer ce rayon par défaut
+                                      </Button>
+                                  </div>
                               </div>
                               <Button variant="destructive" className="w-full h-16 font-black uppercase text-xs tracking-widest shadow-xl rounded-2xl" onClick={() => { emetteur.stopSharing(); hardClearCircles(); }}>ARRÊTER LE PARTAGE</Button>
                           </CardContent>
@@ -775,6 +784,14 @@ export default function VesselTrackerPage() {
               </Accordion>
           </div>
       </div>
+      <input type="file" accept="image/*" capture="environment" ref={photoInputRef} className="hidden" onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && emetteur.currentPos) {
+              const reader = new FileReader();
+              reader.onload = (ev) => emetteur.addTacticalLog('PRISE', ev.target?.result as string);
+              reader.readAsDataURL(file);
+          }
+      }} />
     </div>
   );
 }

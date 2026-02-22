@@ -11,12 +11,13 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v83.1 : Synchronisation Batterie et Signal Sandbox.
+ * LOGIQUE ÉMETTEUR (A) v84.0 : Persistance du rayon de dérive.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
     handleStopCleanup?: () => void,
-    simulator?: any
+    simulator?: any,
+    userProfile?: UserAccount | null
 ) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -70,6 +71,15 @@ export function useEmetteur(
   useEffect(() => { isSharingRef.current = isSharing; }, [isSharing]);
   useEffect(() => { isGhostModeRef.current = isGhostMode; }, [isGhostMode]);
   useEffect(() => { isTrajectoryHiddenRef.current = isTrajectoryHidden; }, [isTrajectoryHidden]);
+
+  // Chargement des préférences de rayon
+  useEffect(() => {
+    if (userProfile?.vesselPrefs?.mooringRadius) {
+      const radius = Math.min(userProfile.vesselPrefs.mooringRadius, 100);
+      setMooringRadius(radius);
+      mooringRadiusRef.current = radius;
+    }
+  }, [userProfile]);
 
   const watchIdRef = useRef<number | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -161,7 +171,6 @@ export function useEmetteur(
     const effectiveNow = simulator?.timeOffset ? subMinutes(new Date(), simulator.timeOffset) : new Date();
     const firestoreTimestamp = Timestamp.fromDate(effectiveNow);
 
-    // v83.1 : Déclenchement alerte batterie immédiat
     if (batteryLevel <= 20 && !isBatteryAlertSentRef.current) {
         isBatteryAlertSentRef.current = true;
         addTechLog('ALERTE ÉNERGIE', `Batterie faible: ${batteryLevel}%`);
@@ -465,9 +474,21 @@ export function useEmetteur(
     toast({ title: "Temps forcé", description: `+${minutes} min appliquées sur Firestore` });
   }, [simulator, addTechLog, updateVesselInFirestore, toast]);
 
+  const saveMooringRadius = useCallback(async () => {
+    if (!user || !firestore) return;
+    try {
+      await updateDoc(doc(firestore, 'users', user.uid), {
+        'vesselPrefs.mooringRadius': mooringRadiusRef.current
+      });
+      toast({ title: "Rayon sauvegardé", description: `${mooringRadiusRef.current} mètres par défaut.` });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur sauvegarde" });
+    }
+  }, [user, firestore, toast]);
+
   return useMemo(() => ({
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
-    triggerEmergency, changeManualStatus, anchorPos, setAnchorPos, mooringRadius, setMooringRadius, accuracy, battery,
+    triggerEmergency, changeManualStatus, anchorPos, setAnchorPos, mooringRadius, setMooringRadius, saveMooringRadius, accuracy, battery,
     vesselNickname, setVesselNickname, customSharingId, setCustomSharingId, customFleetId, setCustomFleetId, sharingId,
     lastSyncTime, techLogs, tacticalLogs, addTacticalLog: async (type: string) => {
         if (!firestore || !sharingId || !currentPosRef.current) return;
@@ -484,7 +505,7 @@ export function useEmetteur(
     forceTimeOffset, addTechLog
   }), [
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
-    triggerEmergency, changeManualStatus, anchorPos, mooringRadius, accuracy, battery,
+    triggerEmergency, changeManualStatus, anchorPos, mooringRadius, saveMooringRadius, accuracy, battery,
     vesselNickname, customSharingId, customFleetId, sharingId,
     lastSyncTime, techLogs, tacticalLogs, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
     isCustomMessageEnabled, toast, user, firestore, clearLogs,
