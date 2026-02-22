@@ -389,6 +389,7 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
+        {/* GHOST HUD v111.0 - POSITION BASSE (35%) ET LIFO (TOP FOCUS) */}
         <div className="absolute top-[35%] right-[10px] z-[999] pointer-events-none flex flex-col items-end gap-2 max-w-[200px]">
             <div className="flex bg-black/40 backdrop-blur-md rounded-lg p-1 border border-white/10 pointer-events-auto shadow-xl group transition-opacity hover:opacity-100 opacity-40">
                 {['AUTO', 'TACTICAL', 'TECHNICAL'].map(m => (
@@ -411,7 +412,7 @@ export default function VesselTrackerPage() {
                             key={i} 
                             style={{ textShadow: '1px 1px 2px #000' }}
                             className={cn(
-                                "font-black uppercase tracking-tight text-right animate-in fade-in slide-in-from-right-1 duration-300",
+                                "font-black uppercase tracking-tight text-right animate-in fade-in slide-in-from-top-1 duration-300",
                                 isTactical ? "text-cyan-400" : "text-white/80",
                                 isDrift && "text-red-500 animate-pulse"
                             )}
@@ -472,36 +473,38 @@ export default function VesselTrackerPage() {
         </GoogleMap>
       </div>
 
-      {emetteur.isSharing && (
-        <div className="grid grid-cols-1 gap-2 mb-2">
+      {/* BOUTONS DE NAVIGATION ET ASSISTANCE v112.0 - VISIBLES EN MODE SHARING OU SIMU */}
+      {(emetteur.isSharing || simulator.isActive) && (
+        <div className="grid grid-cols-1 gap-2 mb-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="grid grid-cols-2 gap-2">
                 <Button 
                     variant="outline" 
-                    className="h-14 font-black uppercase text-[10px] border-2 bg-white/80 backdrop-blur-md gap-2 border-indigo-100 text-indigo-700 shadow-sm"
+                    className="h-14 font-black uppercase text-[10px] border-2 bg-white gap-2 border-indigo-50 text-indigo-700 shadow-sm hover:bg-indigo-50/50"
                     onClick={() => emetteur.changeManualStatus('returning')}
                     disabled={emetteur.vesselStatus === 'returning'}
                 >
-                    <Navigation className="size-4" /> RETOUR MAISON
+                    <Navigation className="size-4 text-indigo-600" /> RETOUR MAISON
                 </Button>
                 <Button 
                     variant="outline" 
-                    className="h-14 font-black uppercase text-[10px] border-2 bg-white/80 backdrop-blur-md gap-2 border-green-100 text-green-700 shadow-sm"
+                    className="h-14 font-black uppercase text-[10px] border-2 bg-white gap-2 border-green-50 text-green-700 shadow-sm hover:bg-green-50/50"
                     onClick={() => emetteur.changeManualStatus('landed')}
                     disabled={emetteur.vesselStatus === 'landed'}
                 >
-                    <Home className="size-4" /> HOME (À TERRE)
+                    <Home className="size-4 text-green-600" /> HOME (À TERRE)
                 </Button>
             </div>
             <Button 
                 variant="outline" 
-                className="w-full h-14 font-black uppercase text-xs border-2 bg-white/80 backdrop-blur-md gap-3 border-orange-200 text-orange-700 shadow-sm"
+                className="w-full h-14 font-black uppercase text-xs border-2 bg-white gap-3 border-orange-50 text-orange-700 shadow-sm hover:bg-orange-50/50"
                 onClick={() => emetteur.triggerEmergency('ASSISTANCE')}
             >
-                <Phone className="size-5" /> BESOIN D'ASSISTANCE
+                <Phone className="size-5 text-orange-600" /> BESOIN D'ASSISTANCE
             </Button>
         </div>
       )}
 
+      {/* BOUTONS D'URGENCE CRITIQUE */}
       <div className="grid grid-cols-2 gap-2 mb-4">
           <Button variant="destructive" className="h-14 font-black uppercase rounded-2xl shadow-xl gap-3 text-xs border-2 border-white/20 animate-pulse" onClick={() => emetteur.triggerEmergency('MAYDAY')}>
               <ShieldAlert className="size-5" /> MAYDAY (SOS)
@@ -540,6 +543,7 @@ export default function VesselTrackerPage() {
                               ))}
                           </div>
 
+                          {/* SECTION CONFIDENTIALITÉ TACTIQUE v105.0 */}
                           <div className="p-5 bg-slate-900 text-white rounded-3xl space-y-6 shadow-2xl border border-white/10">
                               <div className="flex items-center gap-2 mb-2">
                                   <Ghost className="size-4 text-primary" />
@@ -666,6 +670,151 @@ export default function VesselTrackerPage() {
                                         );
                                     })}
                                 </div>
+
+                                {/* SECTION IDENTITÉ & PARTAGE v106.0 */}
+                                <Card className="border-2 border-dashed border-primary/20 bg-muted/5 rounded-3xl p-5 space-y-5">
+                                    <div className="flex items-center justify-between border-b border-primary/10 pb-3">
+                                        <div className="flex items-center gap-2">
+                                            <Navigation className="size-4 text-primary" />
+                                            <span className="text-xs font-black uppercase tracking-widest text-slate-800">Identité & Partage</span>
+                                        </div>
+                                        {emetteur.isSharing && <Badge className="bg-green-600 animate-pulse text-[8px] h-5 px-2">PARTAGE ACTIF</Badge>}
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">Mon Surnom</Label>
+                                            <Input 
+                                                value={emetteur.vesselNickname} 
+                                                onChange={e => emetteur.setVesselNickname(e.target.value)} 
+                                                placeholder="Ex: Capitaine Nemo" 
+                                                className="h-12 border-2 font-black text-center text-base" 
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">ID Navire (Sharing)</Label>
+                                                <Input 
+                                                    value={emetteur.customSharingId} 
+                                                    onChange={e => emetteur.setCustomSharingId(e.target.value)} 
+                                                    placeholder="BATEAU-1" 
+                                                    className="h-12 border-2 font-black text-center text-xs uppercase" 
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">ID Flotte (Group)</Label>
+                                                <Input 
+                                                    value={emetteur.customFleetId} 
+                                                    onChange={e => emetteur.setCustomFleetId(e.target.value)} 
+                                                    placeholder="FLOTTE-A" 
+                                                    className="h-12 border-2 font-black text-center text-xs uppercase" 
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1.5 p-3 bg-[#ebf7f3] rounded-2xl border-2 border-[#d1e9e0]">
+                                            <Label className="text-[10px] font-black uppercase text-[#2d6a4f] ml-1">Commentaire Flotte (Tactique)</Label>
+                                            <Input 
+                                                value={emetteur.fleetComment} 
+                                                onChange={e => emetteur.setFleetComment(e.target.value)} 
+                                                placeholder="Ex: Pêche au vif, Test admin..." 
+                                                className="h-10 border-none bg-transparent font-bold text-xs text-[#1b4332] focus-visible:ring-0 p-0" 
+                                            />
+                                        </div>
+
+                                        <Button 
+                                            onClick={emetteur.isSharing ? emetteur.stopSharing : emetteur.startSharing} 
+                                            className={cn("w-full h-16 font-black uppercase tracking-widest text-sm shadow-xl gap-3 rounded-2xl", emetteur.isSharing ? "bg-red-600 hover:bg-red-700" : "bg-primary hover:bg-primary/90")}
+                                        >
+                                            {emetteur.isSharing ? <X className="size-6" /> : <Zap className="size-6 fill-white" />}
+                                            {emetteur.isSharing ? "Arrêter le partage" : "Lancer le partage GPS"}
+                                        </Button>
+                                    </div>
+
+                                    {emetteur.savedFleets.length > 0 && (
+                                        <div className="space-y-3 pt-4 border-t border-dashed">
+                                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Mes Flottes Enregistrées</p>
+                                            <div className="grid gap-2">
+                                                {emetteur.savedFleets.map((fleet, idx) => (
+                                                    <div key={idx} className="p-3 bg-white border-2 rounded-xl shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all" onClick={() => { emetteur.setCustomFleetId(fleet.id); if (fleet.comment) emetteur.setFleetComment(fleet.comment); }}>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="p-2 bg-primary/10 rounded-lg"><Users className="size-4 text-primary" /></div>
+                                                            <div className="flex flex-col">
+                                                                <span className="font-black text-xs uppercase">{fleet.id}</span>
+                                                                {fleet.comment && <span className="text-[9px] font-bold text-muted-foreground uppercase">{fleet.comment}</span>}
+                                                            </div>
+                                                        </div>
+                                                        <Button variant="ghost" size="icon" className="size-8 text-destructive/40 hover:text-destructive opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); emetteur.removeFleet(fleet); }}>
+                                                            <Trash2 className="size-4" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </Card>
+
+                                {/* SECTION RÉGLAGES D'URGENCE SMS v107.0 */}
+                                <Card className="border-2 border-dashed border-orange-200 bg-orange-50/20 rounded-3xl p-5 space-y-5">
+                                    <div className="flex items-center justify-between border-b border-orange-100 pb-3">
+                                        <div className="flex items-center gap-2">
+                                            <Smartphone className="size-4 text-orange-600" />
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-black uppercase text-orange-800">Réglages d'Urgence (SMS)</span>
+                                                <span className="text-[7px] font-bold text-orange-600 uppercase">Envoi auto lors d'un Mayday/Pan Pan</span>
+                                            </div>
+                                        </div>
+                                        <Switch checked={emetteur.isEmergencyEnabled} onCheckedChange={emetteur.setIsEmergencyEnabled} />
+                                    </div>
+
+                                    <div className={cn("space-y-5", !emetteur.isEmergencyEnabled && "opacity-40 pointer-events-none")}>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[9px] font-black uppercase text-slate-500 tracking-widest ml-1">Numéro du contact à terre</Label>
+                                            <div className="relative">
+                                                <Input 
+                                                    value={emetteur.emergencyContact} 
+                                                    onChange={e => emetteur.setEmergencyContact(e.target.value)} 
+                                                    placeholder="Ex: 742929" 
+                                                    className="h-12 border-2 bg-slate-100 font-black text-lg pl-10" 
+                                                />
+                                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-[9px] font-black uppercase text-slate-500 tracking-widest ml-1">Message personnalisé</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[8px] font-bold uppercase opacity-40">Personnalisé</span>
+                                                    <Switch checked={emetteur.isCustomMessageEnabled} onCheckedChange={emetteur.setIsCustomMessageEnabled} className="scale-75" />
+                                                </div>
+                                            </div>
+                                            <Textarea 
+                                                placeholder="Ex: Problème moteur, besoin aide immédiate." 
+                                                value={emetteur.vesselSmsMessage} 
+                                                onChange={e => emetteur.setVesselSmsMessage(e.target.value)} 
+                                                className="border-2 font-medium min-h-[80px] bg-slate-100 text-sm"
+                                                disabled={!emetteur.isCustomMessageEnabled}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2 pt-2 border-t border-orange-100/50">
+                                            <p className="text-[9px] font-black uppercase text-primary flex items-center gap-2 ml-1">
+                                                <Eye className="size-3" /> Aperçu du message
+                                            </p>
+                                            <div className="p-4 bg-white border-2 border-dashed border-slate-200 rounded-2xl">
+                                                <p className="text-[10px] font-medium leading-relaxed italic text-slate-600">
+                                                    "{smsPreview}"
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <Button onClick={handleSaveSmsSettings} className="w-full h-14 bg-primary text-white font-black uppercase text-[11px] tracking-widest shadow-xl rounded-2xl gap-3">
+                                            <Save className="size-5" /> Sauvegarder réglages SMS
+                                        </Button>
+                                    </div>
+                                </Card>
                             </div>
                           </ScrollArea>
                       </TabsContent>
