@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -110,7 +109,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { cn, getDistance, calculateProjectedPosition } from '@/lib/utils';
+import { cn, getDistance, getBearing, calculateProjectedPosition } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -314,6 +313,38 @@ export default function VesselTrackerPage() {
     }
   }, [emetteur.vesselStatus, emetteur.currentPos, emetteur.currentSpeed, emetteur.currentHeading, recepteur.vesselPrefs.driftProjectionMinutes, mapCore.googleMap, toast]);
 
+  // v91.0: Détection de dérive vers un récif (Sentinel + Tension)
+  const isDangerDriftTowardsReef = useMemo(() => {
+    if (!emetteur.isSharing || emetteur.vesselStatus !== 'stationary' || !emetteur.anchorPos || !emetteur.currentPos || radar.dangers.length === 0) return false;
+    
+    // Distance de l'ancre
+    const dist = getDistance(emetteur.anchorPos.lat, emetteur.anchorPos.lng, emetteur.currentPos.lat, emetteur.currentPos.lng);
+    if (dist < 5) return false; // Trop proche du centre pour définir un axe de dérive fiable
+
+    // Direction du bateau par rapport à l'ancre (Vecteur de tension)
+    const driftBearing = getBearing(
+        emetteur.anchorPos.lat, 
+        emetteur.anchorPos.lng, 
+        emetteur.currentPos.lat, 
+        emetteur.currentPos.lng
+    );
+    
+    // On regarde si un danger détecté par Sentinel est dans cet axe (secteur de 45°)
+    return radar.dangers.some(d => {
+        const dangerBearingFromBoat = getBearing(
+            emetteur.currentPos!.lat, 
+            emetteur.currentPos!.lng, 
+            d.lat, 
+            d.lng
+        );
+        let diff = Math.abs(driftBearing - dangerBearingFromBoat);
+        if (diff > 180) diff = 360 - diff;
+        
+        // Si on dérive vers lui (angle < 45°) et qu'il est très proche (< 150m)
+        return diff < 45 && d.distance < 150;
+    });
+  }, [emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, radar.dangers]);
+
   const [isLedActive, setIsLedActive] = useState(false);
   useEffect(() => {
     if (emetteur.lastSyncTime > 0) {
@@ -488,11 +519,18 @@ export default function VesselTrackerPage() {
                         <div style={{ transform: 'translate(-50%, -320%)', zIndex: 9999 }} className="flex flex-col items-center pointer-events-none mb-3">
                             <div className={cn(
                                 "px-[10px] py-[4px] rounded-lg backdrop-blur-md border text-[11px] font-black uppercase shadow-2xl whitespace-nowrap transition-all border-white",
+                                (activeAnchorVessel.id === emetteur.sharingId && isDangerDriftTowardsReef) ? "bg-violet-600/90 border-violet-400 text-white animate-pulse-violet" :
                                 activeAnchorVessel.status === 'drifting' ? "bg-red-600/90 border-red-400 text-white animate-pulse" : 
                                 (activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15) ? "bg-orange-50/90 border-orange-300 text-white" : "bg-slate-900/80 border-white/20 text-white"
                             )}>
-                                Rayon : {activeAnchorVessel.mooringRadius}m | Distance : {currentDriftDist !== null ? `${currentDriftDist}m` : '...'}
-                                {activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15 && " (Prec +/-" + activeAnchorVessel.accuracy + "m)"}
+                                {(activeAnchorVessel.id === emetteur.sharingId && isDangerDriftTowardsReef) ? (
+                                    "⚠️ DANGER DÉRIVE VERS RÉCIF"
+                                ) : (
+                                    <>
+                                        Rayon : {activeAnchorVessel.mooringRadius}m | Distance : {currentDriftDist !== null ? `${currentDriftDist}m` : '...'}
+                                        {activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15 && " (Prec +/-" + activeAnchorVessel.accuracy + "m)"}
+                                    </>
+                                )}
                             </div>
                             <div className="w-0.5 h-3 bg-white/40 shadow-sm" />
                         </div>
