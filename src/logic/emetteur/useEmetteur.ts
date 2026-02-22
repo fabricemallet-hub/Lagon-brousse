@@ -11,7 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v82.2 : Stabilisation de l'ancrage simu et verrous de sécurité.
+ * LOGIQUE ÉMETTEUR (A) v83.0 : Unification du nettoyage impératif et fiabilisation Sandbox.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -59,7 +59,7 @@ export function useEmetteur(
   const isTrajectoryHiddenRef = useRef(isTrajectoryHidden);
   const lastFirestoreSyncRef = useRef<number>(0);
 
-  // Verrous de simulation v82.2
+  // Verrous de simulation v83.0
   const driftCheckLockedUntilRef = useRef<number>(0);
   const prevSimPosRef = useRef<{ lat: number; lng: number } | null>(null);
 
@@ -141,7 +141,7 @@ export function useEmetteur(
 
     setTechLogs(prev => {
         const lastLog = prev[0];
-        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE' || label === 'MOUILLAGE AUTO' || label === 'RESET' || label === 'LABO' || label === 'SANDBOX' || label === 'CHGT STATUT' || label === 'CHGT MANUEL';
+        const statusChanged = !lastLog || lastLog.status !== currentStatus || label === 'URGENCE' || label === 'ALERTE ÉNERGIE' || label === 'MOUILLAGE AUTO' || label === 'RESET' || label === 'LABO' || label === 'PURGE' || label === 'SANDBOX' || label === 'CHGT STATUT' || label === 'CHGT MANUEL';
 
         if (!statusChanged && label === 'AUTO') {
             const duration = differenceInMinutes(now, lastLog.time);
@@ -254,7 +254,7 @@ export function useEmetteur(
     const nowTs = Date.now();
     const isLocked = nowTs < driftCheckLockedUntilRef.current;
 
-    // LOGIQUE v82.2 : Stabilisation ancrage Sandbox
+    // LOGIQUE v83.0 : Stabilisation ancrage Sandbox (Marge de sécurité accrue)
     if (isSimActive && knotSpeed < 2) {
         const isNewPoint = !prevSimPosRef.current;
         const isJump = prevSimPosRef.current && getDistance(lat, lng, prevSimPosRef.current.lat, prevSimPosRef.current.lng) > 10;
@@ -487,7 +487,7 @@ export function useEmetteur(
     setAnchorPos(null);
     anchorPosRef.current = null;
     updateVesselInFirestore({ anchorLocation: null, status: 'moving' }, true);
-    addTechLog('RESET', 'Purge tracé bleu et cercle');
+    addTechLog('RESET', 'Purge tracé bleu et registre cercles');
     if (currentPosRef.current) {
         handlePositionUpdateRef.current?.(currentPosRef.current.lat, currentPosRef.current.lng, 'moving');
     }
