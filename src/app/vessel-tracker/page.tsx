@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useMapCore } from '@/logic/shared/useMapCore';
 import { useSimulator } from '@/logic/shared/useSimulator';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
@@ -72,7 +72,8 @@ import {
   Move,
   Copy,
   ChevronDown,
-  ClipboardList
+  ClipboardList,
+  Save
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
