@@ -11,7 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v83.0 : Unification du nettoyage impératif et fiabilisation Sandbox.
+ * LOGIQUE ÉMETTEUR (A) v83.1 : Synchronisation Batterie et Signal Sandbox.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -59,7 +59,6 @@ export function useEmetteur(
   const isTrajectoryHiddenRef = useRef(isTrajectoryHidden);
   const lastFirestoreSyncRef = useRef<number>(0);
 
-  // Verrous de simulation v83.0
   const driftCheckLockedUntilRef = useRef<number>(0);
   const prevSimPosRef = useRef<{ lat: number; lng: number } | null>(null);
 
@@ -105,32 +104,6 @@ export function useEmetteur(
       }
     };
   }, [simulator?.isActive, simulator?.simBattery]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedNickname = localStorage.getItem('lb_vessel_nickname');
-      const savedVesselId = localStorage.getItem('lb_vessel_id');
-      const savedFleetId = localStorage.getItem('lb_fleet_id');
-      const savedStatus = localStorage.getItem('lb_vessel_status') as VesselStatus['status'];
-      const savedRadius = localStorage.getItem('lb_mooring_radius');
-      const savedEmergencyContact = localStorage.getItem('lb_emergency_contact');
-      const savedSmsMessage = localStorage.getItem('lb_vessel_sms_message');
-      const savedEmergencyEnabled = localStorage.getItem('lb_emergency_enabled');
-      const savedGhost = localStorage.getItem('lb_vessel_ghost');
-      const savedTrajHidden = localStorage.getItem('lb_vessel_traj_hidden');
-
-      if (savedNickname) setVesselNickname(savedNickname);
-      if (savedVesselId) setCustomSharingId(savedVesselId);
-      if (savedFleetId) setCustomFleetId(savedFleetId);
-      if (savedStatus) { setVesselStatus(savedStatus); vesselStatusRef.current = savedStatus; }
-      if (savedRadius) setMooringRadius(parseInt(savedRadius));
-      if (savedEmergencyContact) setEmergencyContact(savedEmergencyContact);
-      if (savedSmsMessage) setVesselSmsMessage(savedSmsMessage);
-      if (savedEmergencyEnabled !== null) setIsEmergencyEnabled(savedEmergencyEnabled === 'true');
-      if (savedGhost === 'true') setIsGhostMode(true);
-      if (savedTrajHidden === 'true') setIsTrajectoryHidden(true);
-    }
-  }, []);
 
   const addTechLog = useCallback(async (label: string, details?: string, statusOverride?: string) => {
     if (!firestore || !sharingId) return;
@@ -188,19 +161,11 @@ export function useEmetteur(
     const effectiveNow = simulator?.timeOffset ? subMinutes(new Date(), simulator.timeOffset) : new Date();
     const firestoreTimestamp = Timestamp.fromDate(effectiveNow);
 
-    if (batteryLevel < 10 && !isBatteryAlertSentRef.current) {
+    // v83.1 : Déclenchement alerte batterie immédiat
+    if (batteryLevel <= 20 && !isBatteryAlertSentRef.current) {
         isBatteryAlertSentRef.current = true;
-        addTechLog('ALERTE ÉNERGIE', `Batterie critique: ${batteryLevel}%`, 'emergency');
-        if (currentPosRef.current) {
-            updateDoc(doc(firestore, 'vessels', sharingId), {
-                lastSafePos: {
-                    latitude: currentPosRef.current.lat,
-                    longitude: currentPosRef.current.lng,
-                    timestamp: firestoreTimestamp
-                }
-            }).catch(() => {});
-        }
-    } else if (batteryLevel >= 10) {
+        addTechLog('ALERTE ÉNERGIE', `Batterie faible: ${batteryLevel}%`);
+    } else if (batteryLevel > 20) {
         isBatteryAlertSentRef.current = false;
     }
 
@@ -254,7 +219,6 @@ export function useEmetteur(
     const nowTs = Date.now();
     const isLocked = nowTs < driftCheckLockedUntilRef.current;
 
-    // LOGIQUE v83.0 : Stabilisation ancrage Sandbox (Marge de sécurité accrue)
     if (isSimActive && knotSpeed < 2) {
         const isNewPoint = !prevSimPosRef.current;
         const isJump = prevSimPosRef.current && getDistance(lat, lng, prevSimPosRef.current.lat, prevSimPosRef.current.lng) > 10;
@@ -264,7 +228,6 @@ export function useEmetteur(
             const newAnchor = { lat, lng };
             setAnchorPos(newAnchor);
             anchorPosRef.current = newAnchor;
-            // Marge de sécurité 1.5s pour éviter le trigger dérive immédiat
             driftCheckLockedUntilRef.current = nowTs + 1500;
             addTechLog('LABO', 'ANCRAGE SIMU FIXÉ (STABLE)');
         }
@@ -352,7 +315,7 @@ export function useEmetteur(
                     setVesselStatus('stationary');
                     setAnchorPos(nowPos);
                     anchorPosRef.current = nowPos;
-                    addTechLog('MOUILLAGE AUTO', 'Détecté par stabilité GPS (30s)');
+                    addTechLog('MOUILLAGE AUTO', 'Stabilité GPS (30s)');
                     updateVesselInFirestore({ status: 'stationary', anchorLocation: { latitude: nowPos.lat, longitude: nowPos.lng } }, true);
                 }
             }

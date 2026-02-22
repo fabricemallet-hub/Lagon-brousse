@@ -97,7 +97,8 @@ import {
   MousePointer2,
   Undo2,
   PlayCircle,
-  StopCircle
+  StopCircle,
+  Activity
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -222,21 +223,15 @@ export default function VesselTrackerPage() {
 
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // ÉCOUTEUR RÉCEPTEUR CENTRAL
   useEffect(() => { 
     if (followedVessels) recepteur.processVesselAlerts(followedVessels); 
   }, [followedVessels, recepteur.processVesselAlerts]);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
-  
-  // PROTOCOLE HARD CLEAR v83.0
   const activeCirclesRef = useRef<google.maps.Circle[]>([]);
   const prevStatusRef = useRef<string>('');
   const hasCenteredInitially = useRef(false);
 
-  /**
-   * PURGE TOTALE v83.0 : Supprime physiquement tous les cercles du tableau global.
-   */
   const hardClearCircles = useCallback(() => {
     const count = activeCirclesRef.current.length;
     activeCirclesRef.current.forEach(circle => {
@@ -252,10 +247,12 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     if (prevStatusRef.current !== emetteur.vesselStatus) {
-        // Nettoyage impératif lors de la sortie du mouillage ou dérive (v83.0 : Hard Clear)
         if (emetteur.vesselStatus === 'moving' || emetteur.vesselStatus === 'returning' || emetteur.vesselStatus === 'landed' || emetteur.vesselStatus === 'offline') {
             hardClearCircles();
-            recepteur.stopAllAlarms();
+            // v83.1 : La purge ne coupe l'audio QUE si on est plus en dérive/urgence
+            if (emetteur.vesselStatus !== 'drifting' && emetteur.vesselStatus !== 'emergency') {
+                recepteur.stopAllAlarms();
+            }
         }
         prevStatusRef.current = emetteur.vesselStatus;
     }
@@ -288,7 +285,7 @@ export default function VesselTrackerPage() {
     recepteur.initAudio(); 
     if (simulator.isTeleportMode && e.latLng) {
         recepteur.stopAllAlarms();
-        hardClearCircles(); // Nettoyer avant téléportation
+        hardClearCircles();
         simulator.teleport(e.latLng.lat(), e.latLng.lng());
         toast({ title: "Position Sandbox injectée" });
     }
@@ -296,8 +293,6 @@ export default function VesselTrackerPage() {
 
   const activeAnchorVessel = useMemo(() => {
     if (mapCore.isCirclesHidden) return null;
-    
-    // RÈGLE v82.1 : Priorité absolue aux données locales pour l'émetteur
     if (emetteur.isSharing) {
         if ((emetteur.vesselStatus === 'stationary' || emetteur.vesselStatus === 'drifting') && emetteur.anchorPos) {
             return { 
@@ -311,7 +306,6 @@ export default function VesselTrackerPage() {
         const otherVessels = followedVessels?.filter(v => v.id !== emetteur.sharingId && v.isSharing && v.anchorLocation) || [];
         return otherVessels[0] || null;
     }
-    
     if (!followedVessels) return null;
     return followedVessels.find(v => v.isSharing && v.anchorLocation);
   }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, mapCore.isCirclesHidden]);
@@ -322,13 +316,57 @@ export default function VesselTrackerPage() {
     recepteur.updateLocalPrefs({ alerts: currentAlerts });
   };
 
-  const handleClearEverything = () => {
+  const handleTestAudioSystem = async () => {
     recepteur.initAudio();
-    hardClearCircles();
-    emetteur.clearLogs();
+    toast({ title: "Diagnostic Audio", description: "Lancement de la séquence de test..." });
+    
+    const alerts = Object.keys(recepteur.vesselPrefs.alerts);
+    for (const key of alerts) {
+        const config = recepteur.vesselPrefs.alerts[key as keyof VesselPrefs['alerts']];
+        if (config.enabled && config.sound) {
+            const sound = recepteur.availableSounds.find(s => s.label.toLowerCase() === config.sound.toLowerCase() || s.id === config.sound);
+            if (sound) {
+                const audio = new Audio(sound.url);
+                audio.volume = recepteur.vesselPrefs.volume;
+                audio.play().catch(() => {});
+                await new Promise(r => setTimeout(r, 1200));
+                audio.pause();
+            }
+        }
+    }
+    toast({ title: "Diagnostic Terminé", description: "Si aucun son n'est sorti, vérifiez les réglages de votre smartphone." });
   };
 
-  if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
+  const handleSaveVessel = async () => {
+    if (!user || !firestore) return;
+    const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            savedVesselIds: cleanId ? arrayUnion(cleanId) : savedVesselIds,
+            lastVesselId: cleanId || customSharingId,
+            vesselNickname: vesselNickname
+        });
+        if (vesselIdToFollow) setVesselIdToFollow('');
+        toast({ title: "ID enregistré" });
+    } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: "Erreur sauvegarde" });
+    }
+  };
+
+  const handleRemoveSavedVessel = async (id: string) => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            savedVesselIds: arrayRemove(id)
+        });
+        toast({ title: "Navire retiré" });
+    } catch (e) {
+        console.error(e);
+    }
+  };
+
+  if (loadError) return <div className="p-4 text-destructive">Erreur Google Maps.</div>;
   if (!isLoaded || isProfileLoading) return <Skeleton className="h-96 w-full" />;
 
   return (
@@ -513,7 +551,7 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v82.1 prêt</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v83.1 prêt</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm border-slate-100", (log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') || log.label === 'DÉRIVE' || log.label === 'SANDBOX' || log.label === 'LABO' || log.label === 'PURGE' || log.label === 'RESET' || log.label === 'CHGT STATUT' || log.label === 'CHGT MANUEL') && 'border-red-200 bg-red-50')}>
                                                   <div className="flex justify-between items-start">
@@ -563,7 +601,12 @@ export default function VesselTrackerPage() {
                                   </div>
 
                                   <div className="space-y-4 p-4 border-2 rounded-2xl bg-muted/10">
-                                      <p className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2 mb-2"><Volume2 className="size-3" /> Pilotage Global & Sons</p>
+                                      <div className="flex items-center justify-between mb-4">
+                                          <p className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2"><Volume2 className="size-3" /> Pilotage Global & Sons</p>
+                                          <Button variant="secondary" size="sm" onClick={handleTestAudioSystem} className="h-8 text-[8px] font-black uppercase gap-2 border shadow-sm">
+                                              <Activity className="size-3" /> Test Audio Système
+                                          </Button>
+                                      </div>
                                       <div className="flex items-center justify-between">
                                           <Label className="text-xs font-black uppercase">Alertes Sonores</Label>
                                           <Switch checked={recepteur.vesselPrefs.isNotifyEnabled} onCheckedChange={v => { recepteur.initAudio(); recepteur.updateLocalPrefs({ isNotifyEnabled: v }); }} />
@@ -650,7 +693,7 @@ export default function VesselTrackerPage() {
                                 <TabsContent value="labo" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
                                     <div className="space-y-4 p-4 border-2 border-dashed border-red-200 rounded-3xl bg-red-50/30">
                                         <div className="flex items-center justify-between border-b pb-2">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v83.0</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v83.1</p>
                                             <Switch checked={simulator.isActive} onCheckedChange={(v) => { recepteur.initAudio(); recepteur.stopAllAlarms(); simulator.setIsActive(v); }} />
                                         </div>
                                         
