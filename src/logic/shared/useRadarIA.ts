@@ -5,9 +5,9 @@ import { getDistance } from '@/lib/utils';
 import type { RadarDanger } from '@/lib/types';
 
 /**
- * HOOK RADAR IA v92.0 : SENTINEL V2 (Filtre de Confiance)
+ * HOOK RADAR IA v92.1 : SENTINEL V3 (Filtrage Chirurgical)
  * Scanne l'environnement satellite pour détecter les récifs et la terre.
- * Ajout v92.0 : Analyse de persistance (3 scans) et fonction "Ignore".
+ * Ajout v92.1 : Seuil bathymétrique strict (-1.2m à +0.5m) et veille auto en eaux profondes.
  */
 export function useRadarIA(currentPos: { lat: number, lng: number } | null, speedKnots: number = 0) {
   const [dangers, setDangers] = useState<RadarDanger[]>([]);
@@ -34,13 +34,38 @@ export function useRadarIA(currentPos: { lat: number, lng: number } | null, spee
   }, []);
 
   /**
-   * PerformScan v92.0 : Intègre la persistance et la double validation.
+   * PerformScan v92.1 : Intègre le seuil strict et la validation de zone profonde.
    */
   const performScan = useCallback(async () => {
     if (!currentPos || typeof google === 'undefined') return;
     
     setIsScanning(true);
     const elevator = new google.maps.ElevationService();
+
+    // v92.1 : Étape 1 - Vérification de la zone (Deep Water Check)
+    // On vérifie la profondeur sous le bateau. Si c'est trop profond, on ne scanne pas le reste.
+    try {
+        const boatElevationRes = await new Promise<google.maps.ElevationResult[]>((resolve, reject) => {
+            elevator.getElevationForLocations({ 
+                locations: [new google.maps.LatLng(currentPos.lat, currentPos.lng)] 
+            }, (res, status) => {
+                if (status === 'OK' && res) resolve(res);
+                else reject(status);
+            });
+        });
+
+        const boatDepth = boatElevationRes[0]?.elevation || 0;
+        // Si on est en plein bleu (fond > 10m), on désactive Sentinel pour économiser l'API
+        if (boatDepth < -10) {
+            setDangers([]);
+            setClosestDanger(null);
+            setIsScanning(false);
+            return;
+        }
+    } catch (e) {
+        // En cas d'erreur API, on continue par prudence
+    }
+
     const radarRadius = 200; // 200m
     const step = 45; // 8 directions
     
@@ -57,7 +82,6 @@ export function useRadarIA(currentPos: { lat: number, lng: number } | null, spee
             const lng = currentPos.lng + lngOffset;
             
             pointsToScan.push(new google.maps.LatLng(lat, lng));
-            // Création d'une clé unique basée sur la position (précision 5m)
             currentBatchKeys.push(`${lat.toFixed(4)}_${lng.toFixed(4)}`);
         }
     }
@@ -77,15 +101,17 @@ export function useRadarIA(currentPos: { lat: number, lng: number } | null, spee
             const key = currentBatchKeys[idx];
             const elevation = res.elevation;
 
-            // DOUBLE VALIDATION : Bathymétrie < 1.5m (Bathymétrie négative = eau peu profonde)
-            // Note: En mode satellite, on simule ici que l'élévation renvoyée par Google inclut le fond marin proche.
-            if (elevation > -1.5) {
-                // PERSISTANCE : On incrémente le compteur pour cette coordonnée
+            // v92.1 : SEUIL BATHYMÉTRIQUE STRICT (-1.2m à +0.5m)
+            // On ignore tout ce qui est plus profond que 1.2m (pas de risque immédiat pour la coque)
+            // On ignore tout ce qui est plus haut que 0.5m (terre ferme visible, évite les faux positifs sur les arbres/reliefs côtiers)
+            const isCriticalDepth = elevation >= -1.2 && elevation <= 0.5;
+
+            if (isCriticalDepth) {
                 const prevCount = detectionHistoryRef.current[key] || 0;
                 const newCount = prevCount + 1;
                 newHistory[key] = newCount;
 
-                // On ne valide que si détecté 3 fois de suite
+                // Validation sur 3 scans consécutifs (Persistance temporelle)
                 if (newCount >= 3) {
                     const id = `danger-${key}`;
                     if (!ignoredIds.has(id)) {
@@ -102,7 +128,6 @@ export function useRadarIA(currentPos: { lat: number, lng: number } | null, spee
             }
         });
 
-        // Mise à jour de l'historique (nettoyage des points disparus)
         detectionHistoryRef.current = newHistory;
         setDangers(validatedDangers);
         
