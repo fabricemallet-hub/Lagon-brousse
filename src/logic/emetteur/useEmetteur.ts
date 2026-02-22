@@ -11,8 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v80.3 : "Priorité Rendu Sandbox & Throttling Firestore"
- * Correction v80.3 : Amélioration de la réactivité des seuils de mouvement simulés.
+ * LOGIQUE ÉMETTEUR (A) v82.0 : "Gestion stricte des ancres et reset"
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -175,12 +174,11 @@ export function useEmetteur(
     if (!isSharingRef.current && !force) return;
     if (simulator?.isComCut && !force) return; 
     
-    // Throttling en mode simulation pour préserver les quotas (5s)
-    const now = Date.now();
-    if (simulator?.isActive && !force && now - lastFirestoreSyncRef.current < 5000) {
+    const nowTs = Date.now();
+    if (simulator?.isActive && !force && nowTs - lastFirestoreSyncRef.current < 5000) {
         return;
     }
-    lastFirestoreSyncRef.current = now;
+    lastFirestoreSyncRef.current = nowTs;
 
     const batteryLevel = Math.round(batteryRef.current.level * 100);
     const isCharging = batteryRef.current.charging;
@@ -250,24 +248,24 @@ export function useEmetteur(
     const knotSpeed = speed;
     let nextStatus = vesselStatusRef.current;
 
-    // RÈGLE v80.3 : Détection auto plus sensible pour la simulation
     if (knotSpeed >= 4) {
         if (nextStatus !== 'moving') {
             nextStatus = 'moving';
             setAnchorPos(null);
+            anchorPosRef.current = null;
             addTechLog('CHGT STATUT', 'Navigation détectée (MOUVEMENT)');
         }
     } 
     else if (knotSpeed < 2 && (nextStatus === 'moving' || nextStatus === 'drifting')) {
         nextStatus = 'stationary';
         setAnchorPos({ lat, lng });
+        anchorPosRef.current = { lat, lng };
         addTechLog('CHGT STATUT', 'Mouillage stabilisé (ARRÊT)');
     }
 
     if ((nextStatus === 'stationary' || nextStatus === 'drifting') && anchorPosRef.current) {
         const dist = getDistance(lat, lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
         if (dist > mooringRadiusRef.current) {
-            // En simulation on ignore la précision GPS pour forcer la détection de dérive
             if (acc <= 25 || simulator?.isActive) {
                 if (nextStatus !== 'drifting' && nextStatus !== 'emergency') {
                     nextStatus = 'drifting';
@@ -301,7 +299,6 @@ export function useEmetteur(
     });
   }, [addTechLog, updateVesselInFirestore, simulator?.isActive]);
 
-  // ÉCOUTEUR POSITION SIMULÉE (RENDU PRIORITAIRE)
   useEffect(() => {
     if (simulator?.isActive && simulator?.simPos) {
         handlePositionLogic(
@@ -321,13 +318,13 @@ export function useEmetteur(
             const lastPos = lastHeartbeatPosRef.current;
             const currentStatus = vesselStatusRef.current;
             
-            // On ne déclenche le mouillage auto que si on n'est pas en mode simulation
             if (nowPos && lastPos && currentStatus === 'moving' && !simulator?.isActive) {
                 const dist = getDistance(nowPos.lat, nowPos.lng, lastPos.lat, lastPos.lng);
                 if (dist < mooringRadiusRef.current) {
                     vesselStatusRef.current = 'stationary';
                     setVesselStatus('stationary');
                     setAnchorPos(nowPos);
+                    anchorPosRef.current = nowPos;
                     addTechLog('MOUILLAGE AUTO', 'Détecté par stabilité GPS (30s)');
                     updateVesselInFirestore({ status: 'stationary', anchorLocation: { latitude: nowPos.lat, longitude: nowPos.lng } }, true);
                 }
@@ -350,14 +347,12 @@ export function useEmetteur(
     isSharingRef.current = true;
     addTechLog('LANCEMENT', 'Initialisation en cours...');
 
-    // Si la Sandbox est déjà active, on injecte immédiatement la position simulée
     if (simulator?.isActive && simulator?.simPos) {
         handlePositionLogic(simulator.simPos.lat, simulator.simPos.lng, simulator.simSpeed, simulator.simBearing, simulator.simAccuracy);
     }
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        // RÈGLE v80.3 : Ignorer le GPS réel si la Sandbox est active
         if (simulator?.isActive) return;
         handlePositionLogic(pos.coords.latitude, pos.coords.longitude, (pos.coords.speed || 0) * 1.94384, pos.coords.heading || 0, pos.coords.accuracy);
       },
@@ -395,6 +390,7 @@ export function useEmetteur(
     
     setCurrentPos(null);
     setAnchorPos(null);
+    anchorPosRef.current = null;
     setTechLogs([]);
     setTacticalLogs([]);
     lastSentStatusRef.current = null;
@@ -422,8 +418,13 @@ export function useEmetteur(
   const changeManualStatus = useCallback((st: VesselStatus['status'], label?: string) => {
     vesselStatusRef.current = st;
     setVesselStatus(st);
-    if (st === 'moving') setAnchorPos(null);
-    else if (currentPosRef.current) setAnchorPos(currentPosRef.current);
+    if (st === 'moving') {
+        setAnchorPos(null);
+        anchorPosRef.current = null;
+    } else if (currentPosRef.current) {
+        setAnchorPos(currentPosRef.current);
+        anchorPosRef.current = currentPosRef.current;
+    }
 
     updateVesselInFirestore({ 
         status: st, 
@@ -456,12 +457,15 @@ export function useEmetteur(
 
   const resetTrajectory = useCallback(() => {
     handleStopCleanupRef.current?.();
-    addTechLog('RESET', 'Purge tracé bleu');
+    setAnchorPos(null);
+    anchorPosRef.current = null;
+    updateVesselInFirestore({ anchorLocation: null, status: 'moving' }, true);
+    addTechLog('RESET', 'Purge tracé bleu et cercle');
     if (currentPosRef.current) {
-        handlePositionUpdateRef.current?.(currentPosRef.current.lat, currentPosRef.current.lng, vesselStatusRef.current);
+        handlePositionUpdateRef.current?.(currentPosRef.current.lat, currentPosRef.current.lng, 'moving');
     }
     toast({ title: "Trajectoire réinitialisée" });
-  }, [addTechLog, toast]);
+  }, [addTechLog, toast, updateVesselInFirestore]);
 
   const forceTimeOffset = useCallback((minutes: number) => {
     if (!simulator) return;
