@@ -101,7 +101,8 @@ import {
   Undo2,
   PlayCircle,
   StopCircle,
-  Activity
+  Activity,
+  Signal
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -303,7 +304,8 @@ export default function VesselTrackerPage() {
                 status: emetteur.vesselStatus, 
                 anchorLocation: { latitude: emetteur.anchorPos.lat, longitude: emetteur.anchorPos.lng }, 
                 location: emetteur.currentPos ? { latitude: emetteur.currentPos.lat, longitude: emetteur.currentPos.lng } : null, 
-                mooringRadius: emetteur.mooringRadius 
+                mooringRadius: emetteur.mooringRadius,
+                accuracy: emetteur.accuracy // Ajout v85.0
             };
         }
         const otherVessels = followedVessels?.filter(v => v.id !== emetteur.sharingId && v.isSharing && v.anchorLocation) || [];
@@ -311,18 +313,10 @@ export default function VesselTrackerPage() {
     }
     if (!followedVessels) return null;
     return followedVessels.find(v => v.isSharing && v.anchorLocation);
-  }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, mapCore.isCirclesHidden]);
+  }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, emetteur.accuracy, mapCore.isCirclesHidden]);
 
-  // v84.1 : Calcul de la distance réelle de dérive pour l'indicateur tactique
-  const currentDriftDist = useMemo(() => {
-    if (!activeAnchorVessel?.anchorLocation || !activeAnchorVessel?.location) return null;
-    return Math.round(getDistance(
-        activeAnchorVessel.anchorLocation.latitude, 
-        activeAnchorVessel.anchorLocation.longitude,
-        activeAnchorVessel.location.latitude,
-        activeAnchorVessel.location.longitude
-    ));
-  }, [activeAnchorVessel]);
+  // v85.0: Utilisation de la distance lissée (smoothedDistance)
+  const currentDriftDist = emetteur.smoothedDistance;
 
   const handleUpdateAlertConfig = (key: keyof VesselPrefs['alerts'], field: 'enabled' | 'sound' | 'loop', value: any) => {
     const currentAlerts = { ...recepteur.vesselPrefs.alerts };
@@ -410,14 +404,16 @@ export default function VesselTrackerPage() {
                 <React.Fragment>
                     {activeAnchorVessel.location && <Polyline path={[{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }, { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }]} options={{ strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6', strokeOpacity: 0.8, strokeWeight: 2, zIndex: 2 }} />}
                     
-                    {/* v84.1 : Indicateur numérique de distance au-dessus du cercle */}
+                    {/* v85.0 : Indicateur numérique de distance avec gestion de la précision */}
                     <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -160%)' }} className="flex flex-col items-center pointer-events-none">
                             <div className={cn(
                                 "px-2 py-1 rounded-lg backdrop-blur-md border-2 text-[9px] font-black uppercase shadow-2xl whitespace-nowrap transition-all",
-                                activeAnchorVessel.status === 'drifting' ? "bg-red-600/90 border-red-400 text-white animate-pulse" : "bg-slate-900/80 border-white/20 text-white"
+                                activeAnchorVessel.status === 'drifting' ? "bg-red-600/90 border-red-400 text-white animate-pulse" : 
+                                (activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15) ? "bg-orange-500/90 border-orange-300 text-white" : "bg-slate-900/80 border-white/20 text-white"
                             )}>
                                 Rayon : {activeAnchorVessel.mooringRadius}m | Distance : {currentDriftDist !== null ? `${currentDriftDist}m` : '...'}
+                                {activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15 && " (Prec +/-" + activeAnchorVessel.accuracy + "m)"}
                             </div>
                             <div className="w-0.5 h-2 bg-white/40 shadow-sm" />
                         </div>
@@ -468,7 +464,12 @@ export default function VesselTrackerPage() {
                                           {emetteur.isGhostMode && <Ghost className="size-3 text-primary animate-pulse" />}
                                           <CardTitle className="text-sm font-black uppercase text-primary leading-none">{emetteur.sharingId}</CardTitle>
                                       </div>
-                                      <p className="text-[9px] font-bold text-muted-foreground uppercase mt-1">Capitaine : {emetteur.vesselNickname}</p>
+                                      <div className="flex items-center gap-2 mt-1">
+                                          <p className="text-[9px] font-bold text-muted-foreground uppercase">Capitaine : {emetteur.vesselNickname}</p>
+                                          <Badge variant="outline" className={cn("h-4 text-[7px] font-black uppercase px-1 border-dashed", emetteur.accuracy > 15 ? "text-orange-600 border-orange-300 bg-orange-50" : "text-green-600 border-green-300 bg-green-50")}>
+                                              Prec: +/-{emetteur.accuracy}m
+                                          </Badge>
+                                      </div>
                                   </div>
                               </div>
                               <div className="flex items-center gap-3">
@@ -589,12 +590,12 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v83.1 prêt</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v85.0 prêt</div>
                                           {emetteur.techLogs.map((log, i) => (
-                                              <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm border-slate-100", (log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') || log.label === 'DÉRIVE' || log.label === 'SANDBOX' || log.label === 'LABO' || log.label === 'PURGE' || log.label === 'RESET' || log.label === 'CHGT STATUT' || log.label === 'CHGT MANUEL') && 'border-red-200 bg-red-50')}>
+                                              <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm border-slate-100", (log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') || log.label === 'DÉRIVE' || log.label === 'SIGNAL' || log.label === 'SANDBOX' || log.label === 'LABO' || log.label === 'PURGE' || log.label === 'RESET' || log.label === 'CHGT STATUT' || log.label === 'CHGT MANUEL') && 'border-red-200 bg-red-50')}>
                                                   <div className="flex justify-between items-start">
                                                       <div className="flex flex-col gap-0.5">
-                                                          <span className={cn("font-black uppercase text-[10px]", (log.label.includes('ÉNERGIE') || log.label.includes('URGENCE') || log.label === 'DÉRIVE' || log.label === 'SANDBOX' || log.label === 'LABO' || log.label === 'PURGE') ? 'text-red-600' : 'text-slate-800')}>
+                                                          <span className={cn("font-black uppercase text-[10px]", (log.label.includes('ÉNERGIE') || log.label.includes('URGENCE') || log.label === 'DÉRIVE' || log.label === 'SIGNAL' || log.label === 'SANDBOX' || log.label === 'LABO' || log.label === 'PURGE') ? 'text-red-600' : 'text-slate-800')}>
                                                               {log.label} {log.durationMinutes > 0 ? `(${log.durationMinutes} min)` : ''}
                                                               <span className={cn("ml-1", 
                                                                   log.status === 'moving' ? "text-blue-600" :
@@ -614,7 +615,7 @@ export default function VesselTrackerPage() {
                                                   </div>
                                                   <div className="flex items-center justify-between border-t border-dashed pt-1.5">
                                                       <span className="text-[8px] font-bold text-muted-foreground uppercase truncate flex-1">{log.details}</span>
-                                                      {log.accuracy !== undefined && <Badge variant="outline" className="text-[7px] h-3.5 font-black uppercase bg-white">Prec: +/-{log.accuracy}m</Badge>}
+                                                      {log.accuracy !== undefined && <Badge variant="outline" className={cn("text-[7px] h-3.5 font-black uppercase bg-white", log.accuracy > 15 ? "text-orange-600 border-orange-200" : "")}>Prec: +/-{log.accuracy}m</Badge>}
                                                   </div>
                                               </div>
                                           ))}
@@ -731,7 +732,7 @@ export default function VesselTrackerPage() {
                                 <TabsContent value="labo" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
                                     <div className="space-y-4 p-4 border-2 border-dashed border-red-200 rounded-3xl bg-red-50/30">
                                         <div className="flex items-center justify-between border-b pb-2">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v84.1</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v85.0</p>
                                             <Switch checked={simulator.isActive} onCheckedChange={(v) => { recepteur.initAudio(); recepteur.stopAllAlarms(); simulator.setIsActive(v); }} />
                                         </div>
                                         
@@ -773,6 +774,16 @@ export default function VesselTrackerPage() {
                                                 <Slider value={[simulator.simBearing]} min={0} max={360} step={5} onValueChange={v => { recepteur.initAudio(); simulator.setSimBearing(v[0]); }} />
                                             </div>
 
+                                            {/* v85.0 : Slider Bruit GPS */}
+                                            <div className="space-y-2 border-t pt-2">
+                                                <div className="flex justify-between text-[9px] font-black uppercase">
+                                                    <span className="flex items-center gap-1"><Signal className="size-3" /> Bruit GPS (Instabilité)</span>
+                                                    <span className="text-red-600">{simulator.simGpsNoise} m</span>
+                                                </div>
+                                                <Slider value={[simulator.simGpsNoise]} min={0} max={50} step={1} onValueChange={v => { simulator.setSimGpsNoise(v[0]); }} />
+                                                <p className="text-[7px] font-bold text-muted-foreground uppercase">Simule un signal qui saute pour tester le lissage</p>
+                                            </div>
+
                                             <div className="space-y-2">
                                                 <div className="flex justify-between text-[9px] font-black uppercase">
                                                     <span>Batterie Simulée</span>
@@ -792,7 +803,6 @@ export default function VesselTrackerPage() {
                                                     <Input type="number" value={testMinutes} onChange={e => setTestMinutes(e.target.value)} className="h-10 border-2 font-black text-center" />
                                                     <Button className="h-10 font-black uppercase text-[10px] gap-2 flex-1" onClick={() => { recepteur.initAudio(); emetteur.forceTimeOffset(parseInt(testMinutes)); }}>Injecter Temps</Button>
                                                 </div>
-                                                <p className="text-[8px] font-bold text-red-600 italic leading-tight mt-1">L'injection met à jour statusChangedAt pour tester la Veille Stratégique.</p>
                                             </div>
                                         </div>
 
