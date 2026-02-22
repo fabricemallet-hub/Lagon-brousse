@@ -11,7 +11,7 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 
 /**
- * LOGIQUE ÉMETTEUR (A) v87.0 : Gestion de l'historique des flottes et auto-saisie.
+ * LOGIQUE ÉMETTEUR (A) v87.1 : Gestion de l'historique des flottes et pont Sandbox.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -66,8 +66,6 @@ export function useEmetteur(
   const lastFirestoreSyncRef = useRef<number>(0);
 
   const driftCheckLockedUntilRef = useRef<number>(0);
-  const unstableSignalTimerRef = useRef<number | null>(null);
-  const hasLoggedUnstableRef = useRef(false);
   const prevSimPosRef = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => { vesselStatusRef.current = vesselStatus; }, [vesselStatus]);
@@ -107,7 +105,6 @@ export function useEmetteur(
   const watchIdRef = useRef<number | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
-  const isBatteryAlertSentRef = useRef<boolean>(false);
   const lastHeartbeatPosRef = useRef<{ lat: number, lng: number } | null>(null);
   
   const handlePositionUpdateRef = useRef(handlePositionUpdate);
@@ -289,6 +286,19 @@ export function useEmetteur(
     });
   }, [addTechLog, updateVesselInFirestore, simulator?.isActive]);
 
+  // v87.1 : Bridge Sandbox - Écouteur de position simulée
+  useEffect(() => {
+    if (simulator?.isActive && simulator?.simPos) {
+      handlePositionLogic(
+        simulator.simPos.lat,
+        simulator.simPos.lng,
+        simulator.simSpeed,
+        simulator.simBearing,
+        simulator.simAccuracy || 5
+      );
+    }
+  }, [simulator?.isActive, simulator?.simPos, simulator?.simSpeed, simulator?.simBearing, simulator?.simAccuracy, handlePositionLogic]);
+
   const startSharing = useCallback(() => {
     if (!navigator.geolocation || !user || !firestore) return;
     setIsSharing(true);
@@ -312,7 +322,6 @@ export function useEmetteur(
             if (!existing) {
                 updates.savedFleets = arrayUnion({ id: fleetIdClean, comment: fleetComment.trim() || 'Nouveau Groupe' });
             } else if (fleetComment.trim() && existing.comment !== fleetComment.trim()) {
-                // Mise à jour du commentaire si nécessaire
                 const updatedFleets = currentFleets.map(f => f.id === fleetIdClean ? { ...f, comment: fleetComment.trim() } : f);
                 updates.savedFleets = updatedFleets;
             }
