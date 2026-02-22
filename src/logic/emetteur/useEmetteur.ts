@@ -9,12 +9,12 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-// v99.0 : CONSTANTES DE VITESSE
+// CONSTANTES DE VITESSE
 const THRESHOLD_DRIFT = 0.2; // ND
 const THRESHOLD_MOVEMENT = 2.0; // ND
 
 /**
- * LOGIQUE ÉMETTEUR (A) v99.0 : Stabilisation et Anti-Loop.
+ * LOGIQUE ÉMETTEUR (A) v100.0 : Stabilisation et Rendu Temps Réel.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -39,7 +39,6 @@ export function useEmetteur(
   const distanceHistoryRef = useRef<number[]>([]);
   const speedConsecutiveHitsRef = useRef<number>(0);
   
-  // v99.0 : VERROUS DE STABILISATION
   const lastStatusChangeTimeRef = useRef<number>(0);
   const isLaboAlreadyRunningRef = useRef<boolean>(false);
   
@@ -60,7 +59,6 @@ export function useEmetteur(
   const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
 
   const [techLogs, setTechLogs] = useState<TechLogEntry[]>([]);
-  const [tacticalLogs, setTacticalLogs] = useState<any[]>([]);
   
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
   const currentPosRef = useRef(currentPos);
@@ -80,7 +78,7 @@ export function useEmetteur(
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  // Synchronisation de la ref pour éviter les closures périmées dans watchPosition
+  // Synchronisation de la ref v100.0 : INSTANTANÉE pour les calculs GPS
   useEffect(() => {
     mooringRadiusRef.current = mooringRadius;
   }, [mooringRadius]);
@@ -103,7 +101,6 @@ export function useEmetteur(
     };
 
     setTechLogs(prev => [logEntry, ...prev].slice(0, 50));
-    addDoc(collection(firestore, 'vessels', sharingId, 'tech_logs'), { ...logEntry, time: Timestamp.fromDate(now) }).catch(() => {});
   }, [firestore, sharingId, accuracy, simulator?.timeOffset]);
 
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
@@ -142,29 +139,22 @@ export function useEmetteur(
     return setDoc(doc(firestore, 'vessels', sharingId), payload, { merge: true }).then(() => setLastSyncTime(Date.now()));
   }, [user, firestore, sharingId, vesselNickname, customFleetId, simulator?.isComCut, simulator?.isActive, simulator?.timeOffset, accuracy]);
 
-  // v99.0 : Reset Labo avec protection Anti-Loop
   useEffect(() => {
     if (simulator?.isActive) {
         if (isLaboAlreadyRunningRef.current) return;
         isLaboAlreadyRunningRef.current = true;
-        
         setAnchorPos(null);
         anchorPosRef.current = null;
         lastSentStatusRef.current = null;
-        distanceHistoryRef.current = [];
-        speedConsecutiveHitsRef.current = 0;
         setVesselStatus('stationary');
         vesselStatusRef.current = 'stationary';
         addTechLog('LABO', 'SANDBOX ACTIVÉE');
     } else {
         if (!isLaboAlreadyRunningRef.current) return;
         isLaboAlreadyRunningRef.current = false;
-        
         setAnchorPos(null);
         anchorPosRef.current = null;
         lastSentStatusRef.current = null;
-        distanceHistoryRef.current = [];
-        speedConsecutiveHitsRef.current = 0;
         setVesselStatus('moving');
         vesselStatusRef.current = 'moving';
         addTechLog('LABO', 'RETOUR MODE RÉEL');
@@ -176,7 +166,6 @@ export function useEmetteur(
     const isSimActive = !!simulator?.isActive;
     const now = Date.now();
 
-    // 1. Détection de statut basée sur la vitesse
     if (speed < THRESHOLD_DRIFT) {
         speedConsecutiveHitsRef.current = 0;
         if (nextStatus !== 'stationary') {
@@ -216,7 +205,6 @@ export function useEmetteur(
         }
     }
 
-    // v99.0 : STATUS DEBOUNCING (500ms) - Empêche les changements trop rapides
     if (nextStatus !== vesselStatusRef.current) {
         if (now - lastStatusChangeTimeRef.current < 500) {
             nextStatus = vesselStatusRef.current;
@@ -303,12 +291,7 @@ export function useEmetteur(
     anchorPos, mooringRadius, setMooringRadius, accuracy, battery, smoothedDistance,
     vesselNickname, setVesselNickname, customSharingId, setCustomSharingId, customFleetId, setCustomFleetId, 
     fleetComment, setFleetComment, sharingId,
-    lastSyncTime, techLogs, tacticalLogs, 
-    addTacticalLog: async (type: string, photoUrl?: string) => {
-        if (!firestore || !sharingId || !currentPosRef.current) return;
-        const logEntry = { type: type.toUpperCase(), time: new Date(), pos: currentPosRef.current, vesselName: vesselNickname || sharingId, photoUrl: photoUrl || null };
-        addDoc(collection(firestore, 'vessels', sharingId, 'tactical_logs'), { ...logEntry, time: serverTimestamp() }).catch(() => {});
-    },
+    lastSyncTime, techLogs, 
     emergencyContact, setEmergencyContact, vesselSmsMessage, setVesselSmsMessage, isEmergencyEnabled, setIsEmergencyEnabled,
     isCustomMessageEnabled, setIsCustomMessageEnabled, clearLogs: () => setTechLogs([]),
     isGhostMode, toggleGhostMode: () => setIsGhostMode(!isGhostMode), 
@@ -335,7 +318,7 @@ export function useEmetteur(
     isSharing, startSharing, stopSharing, currentPos, currentHeading, currentSpeed, vesselStatus,
     anchorPos, mooringRadius, setMooringRadius, accuracy, battery, smoothedDistance,
     vesselNickname, customSharingId, customFleetId, fleetComment, sharingId,
-    lastSyncTime, techLogs, tacticalLogs, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
+    lastSyncTime, techLogs, emergencyContact, vesselSmsMessage, isEmergencyEnabled,
     isCustomMessageEnabled, toast, user, firestore, isGhostMode, isTrajectoryHidden, updateVesselInFirestore,
     userProfile?.savedFleets, addTechLog
   ]);

@@ -5,10 +5,15 @@ import { getDistance } from '@/lib/utils';
 import type { RadarDanger } from '@/lib/types';
 
 /**
- * HOOK RADAR IA v99.0 : SENTINEL V3 (Filtrage Chirurgical & Stabilisation)
- * Ajout v99.0 : Mise en veille si le statut n'est pas STATIONNAIRE ou DÉRIVE.
+ * HOOK RADAR IA v100.0 : SENTINEL V3.1 (Optimisation Flux & Pause)
+ * Ajout v100.0 : Paramètre isPaused pour libérer le thread lors des interactions UX lourdes.
  */
-export function useRadarIA(currentPos: { lat: number, lng: number } | null, speedKnots: number = 0, vesselStatus?: string) {
+export function useRadarIA(
+    currentPos: { lat: number, lng: number } | null, 
+    speedKnots: number = 0, 
+    vesselStatus?: string,
+    isPaused: boolean = false
+) {
   const [dangers, setDangers] = useState<RadarDanger[]>([]);
   const [closestDanger, setClosestDanger] = useState<RadarDanger | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -16,7 +21,6 @@ export function useRadarIA(currentPos: { lat: number, lng: number } | null, spee
   const lastScanPosRef = useRef<{ lat: number, lng: number } | null>(null);
   const scanTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // HISTORIQUE DE PERSISTANCE
   const detectionHistoryRef = useRef<Record<string, number>>({});
   const [ignoredIds, setIgnoredIds] = useState<Set<string>>(new Set());
 
@@ -29,7 +33,9 @@ export function useRadarIA(currentPos: { lat: number, lng: number } | null, spee
   }, []);
 
   const performScan = useCallback(async () => {
-    // v99.0 : RADAR OPTIMIZATION - On ne scanne que si le statut est stable et critique
+    // v100.0 : Protection UX - On ne scanne pas si en pause ou en mouvement rapide
+    if (isPaused) return;
+
     const isStatusStable = vesselStatus === 'stationary' || vesselStatus === 'drifting' || vesselStatus === 'emergency';
     if (!currentPos || typeof google === 'undefined' || !isStatusStable) {
         if (dangers.length > 0) setDangers([]);
@@ -40,42 +46,23 @@ export function useRadarIA(currentPos: { lat: number, lng: number } | null, spee
     const elevator = new google.maps.ElevationService();
 
     try {
-        const boatElevationRes = await new Promise<google.maps.ElevationResult[]>((resolve, reject) => {
-            elevator.getElevationForLocations({ 
-                locations: [new google.maps.LatLng(currentPos.lat, currentPos.lng)] 
-            }, (res, status) => {
-                if (status === 'OK' && res) resolve(res);
-                else reject(status);
-            });
-        });
+        const radarRadius = 200;
+        const step = 45;
+        const pointsToScan: google.maps.LatLng[] = [];
+        const currentBatchKeys: string[] = [];
 
-        const boatDepth = boatElevationRes[0]?.elevation || 0;
-        if (boatDepth < -10) {
-            setDangers([]);
-            setClosestDanger(null);
-            setIsScanning(false);
-            return;
+        for (let angle = 0; angle < 360; angle += step) {
+            for (let dist = 50; dist <= radarRadius; dist += 50) {
+                const rad = (angle * Math.PI) / 180;
+                const latOffset = (dist / 111320) * Math.cos(rad);
+                const lngOffset = (dist / (111320 * Math.cos(currentPos.lat * Math.PI / 180))) * Math.sin(rad);
+                const lat = currentPos.lat + latOffset;
+                const lng = currentPos.lng + lngOffset;
+                pointsToScan.push(new google.maps.LatLng(lat, lng));
+                currentBatchKeys.push(`${lat.toFixed(4)}_${lng.toFixed(4)}`);
+            }
         }
-    } catch (e) {}
 
-    const radarRadius = 200;
-    const step = 45;
-    const pointsToScan: google.maps.LatLng[] = [];
-    const currentBatchKeys: string[] = [];
-
-    for (let angle = 0; angle < 360; angle += step) {
-        for (let dist = 50; dist <= radarRadius; dist += 50) {
-            const rad = (angle * Math.PI) / 180;
-            const latOffset = (dist / 111320) * Math.cos(rad);
-            const lngOffset = (dist / (111320 * Math.cos(currentPos.lat * Math.PI / 180))) * Math.sin(rad);
-            const lat = currentPos.lat + latOffset;
-            const lng = currentPos.lng + lngOffset;
-            pointsToScan.push(new google.maps.LatLng(lat, lng));
-            currentBatchKeys.push(`${lat.toFixed(4)}_${lng.toFixed(4)}`);
-        }
-    }
-
-    try {
         const results = await new Promise<google.maps.ElevationResult[]>((resolve, reject) => {
             elevator.getElevationForLocations({ locations: pointsToScan }, (res, status) => {
                 if (status === 'OK' && res) resolve(res);
@@ -89,6 +76,7 @@ export function useRadarIA(currentPos: { lat: number, lng: number } | null, spee
         results.forEach((res, idx) => {
             const key = currentBatchKeys[idx];
             const elevation = res.elevation;
+            // Seuil bathymétrique strict v92.1
             const isCriticalDepth = elevation >= -1.2 && elevation <= 0.5;
 
             if (isCriticalDepth) {
@@ -126,9 +114,10 @@ export function useRadarIA(currentPos: { lat: number, lng: number } | null, spee
         setIsScanning(false);
         lastScanPosRef.current = currentPos;
     }
-  }, [currentPos, ignoredIds, vesselStatus, dangers.length]);
+  }, [currentPos, ignoredIds, vesselStatus, dangers.length, isPaused]);
 
   useEffect(() => {
+    if (isPaused) return;
     if (speedKnots > 10) {
         if (dangers.length > 0) setDangers([]);
         if (closestDanger) setClosestDanger(null);
@@ -156,7 +145,7 @@ export function useRadarIA(currentPos: { lat: number, lng: number } | null, spee
             scanTimerRef.current = null;
         }
     };
-  }, [currentPos, speedKnots, performScan, dangers.length, closestDanger, isScanning]);
+  }, [currentPos, speedKnots, performScan, dangers.length, closestDanger, isScanning, isPaused]);
 
   return { dangers, closestDanger, isScanning, ignoreDanger };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react';
 import { useMapCore } from '@/logic/shared/useMapCore';
 import { useSimulator } from '@/logic/shared/useSimulator';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
@@ -18,7 +18,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Slider } from '@/components/ui/slider';
-import { Textarea } from '@/components/ui/textarea';
 import { 
   useUser, 
   useFirestore, 
@@ -32,8 +31,6 @@ import {
   where, 
   doc, 
   orderBy, 
-  addDoc, 
-  serverTimestamp,
   updateDoc,
   arrayUnion,
   arrayRemove
@@ -57,7 +54,6 @@ import {
   BatteryFull, 
   BatteryCharging,
   WifiOff,
-  History as HistoryIcon, 
   MapPin, 
   X, 
   Play, 
@@ -65,55 +61,25 @@ import {
   Home, 
   Settings, 
   Smartphone, 
-  Bird, 
-  Target, 
-  Fish, 
-  Camera, 
   Ghost, 
-  Users, 
-  Phone, 
-  Waves, 
-  Save, 
-  Battery,
-  CheckCircle2,
-  Trash2,
-  ChevronDown,
   Volume2,
-  Timer,
   Bell,
-  Eye,
-  EyeOff,
-  ClipboardList,
   Lock,
   Unlock,
-  TestTube2,
-  CloudRain,
-  Wind,
-  Thermometer,
-  CloudLightning,
-  Sun,
-  Move,
-  Copy,
   BatteryLow,
   BatteryMedium,
   History,
-  MousePointer2,
-  Undo2,
-  PlayCircle,
-  StopCircle,
-  Activity,
-  Signal,
-  ArrowUp,
-  Compass,
-  Ruler
+  Move,
+  Copy,
+  ChevronDown,
+  ClipboardList
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { cn, getDistance, getBearing, calculateProjectedPosition } from '@/lib/utils';
+import { cn, calculateProjectedPosition } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import type { UserAccount, VesselStatus, SoundLibraryEntry, TechLogEntry, VesselPrefs } from '@/lib/types';
+import type { UserAccount, VesselStatus, SoundLibraryEntry, TechLogEntry } from '@/lib/types';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -181,6 +147,7 @@ export default function VesselTrackerPage() {
   const [appMode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   const [isMounted, setIsMounted] = useState(false);
+  const [isAdjustingRadius, setIsAdjustingRadius] = useState(false);
   
   const mapCore = useMapCore();
   const simulator = useSimulator();
@@ -203,7 +170,8 @@ export default function VesselTrackerPage() {
   const recepteur = useRecepteur(emetteur.sharingId);
   const flotte = useFlotte(emetteur.sharingId, emetteur.vesselNickname);
   
-  const radar = useRadarIA(emetteur.currentPos, emetteur.currentSpeed, emetteur.vesselStatus);
+  // v100.0 : RADAR IA avec Pause UX lors des réglages de rayon
+  const radar = useRadarIA(emetteur.currentPos, emetteur.currentSpeed, emetteur.vesselStatus, isAdjustingRadius);
   
   const isAdmin = useMemo(() => {
     if (!user) return false;
@@ -215,9 +183,7 @@ export default function VesselTrackerPage() {
   const [isImpactProbable, setIsImpactProbable] = useState(false);
 
   useEffect(() => {
-    const handleGlobalMessage = (e: MessageEvent) => {
-        // Logique Windy ou autre API tierce
-    };
+    const handleGlobalMessage = (e: MessageEvent) => {};
     window.addEventListener('message', handleGlobalMessage);
     return () => window.removeEventListener('message', handleGlobalMessage);
   }, []);
@@ -314,14 +280,7 @@ export default function VesselTrackerPage() {
     return null;
   }, [simulator, emetteur, mapCore.isCirclesHidden]);
 
-  const tensionVectorStyle = useMemo(() => {
-    if (!activeAnchorVessel || !activeAnchorVessel.location) return null;
-    let color = '#ffffff', opacity = 0.6;
-    if (activeAnchorVessel.status === 'drifting' || activeAnchorVessel.status === 'emergency') { color = '#ef4444'; opacity = 1.0; }
-    else if (emetteur.smoothedDistance !== null && emetteur.smoothedDistance >= activeAnchorVessel.mooringRadius * 0.8) { color = '#f97316'; opacity = mapCore.isFlashOn ? 1.0 : 0.2; }
-    return { color, opacity };
-  }, [activeAnchorVessel, emetteur.smoothedDistance, mapCore.isFlashOn]);
-
+  // v100.0 : Mémoïsation des options de cercles pour éviter le Forced Reflow
   const mooringCircleOptions = useMemo(() => {
     if (!activeAnchorVessel) return null;
     const isDrifting = activeAnchorVessel.status === 'drifting';
@@ -370,12 +329,15 @@ export default function VesselTrackerPage() {
             
             {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                 <React.Fragment>
+                    {/* CERCLE DE PRÉCISION (EXTERNE) v95.0 : Uniquement si > 20m */}
                     {activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 20 && (
-                        <Circle center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} radius={activeAnchorVessel.accuracy} options={{ strokeColor: '#ffffff', strokeOpacity: 0.3, strokeWeight: 1, fillColor: '#ffffff', fillOpacity: 0.05, clickable: false, zIndex: 0 }} />
+                        <Circle 
+                            center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
+                            radius={activeAnchorVessel.accuracy} 
+                            options={{ strokeColor: '#ffffff', strokeOpacity: 0.3, strokeWeight: 1, fillColor: '#ffffff', fillOpacity: 0.05, clickable: false, zIndex: 0 }} 
+                        />
                     )}
-                    {tensionVectorStyle && activeAnchorVessel.location && (
-                        <Polyline path={[{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }, { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }]} options={{ strokeColor: tensionVectorStyle.color, strokeOpacity: tensionVectorStyle.opacity, strokeWeight: 1, icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 2 }, offset: '0', repeat: '10px' }], zIndex: 2 }} />
-                    )}
+                    
                     <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -320%)', zIndex: 9999 }} className="flex flex-col items-center pointer-events-none mb-3">
                             <div className={cn("px-[10px] py-[4px] rounded-lg backdrop-blur-md border text-[11px] font-black uppercase shadow-2xl whitespace-nowrap bg-slate-900/80 text-white border-white", activeAnchorVessel.status === 'drifting' && "bg-red-600/90 animate-pulse")}>
@@ -386,7 +348,11 @@ export default function VesselTrackerPage() {
                             <div className="w-0.5 h-3 bg-white/40 shadow-sm" />
                         </div>
                     </OverlayView>
-                    <Circle center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} radius={activeAnchorVessel.mooringRadius || 100} options={mooringCircleOptions || {}} />
+                    <Circle 
+                        center={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} 
+                        radius={activeAnchorVessel.mooringRadius || 100} 
+                        options={mooringCircleOptions || {}} 
+                    />
                 </React.Fragment>
             )}
             
@@ -442,7 +408,13 @@ export default function VesselTrackerPage() {
                                       <p className="text-[10px] font-black uppercase text-orange-800">Rayon Dérive</p>
                                       <p className="text-lg font-black text-orange-950 leading-none">{emetteur.mooringRadius}M</p>
                                   </div>
-                                  <Slider value={[emetteur.mooringRadius]} min={10} max={100} step={10} onValueChange={(v) => emetteur.setMooringRadius(v[0])} />
+                                  <Slider 
+                                    value={[emetteur.mooringRadius]} 
+                                    min={10} max={100} step={10} 
+                                    onPointerDown={() => setIsAdjustingRadius(true)}
+                                    onPointerUp={() => setIsAdjustingRadius(false)}
+                                    onValueChange={(v) => emetteur.setMooringRadius(v[0])} 
+                                  />
                                   <Button variant="outline" size="sm" className="w-full h-10 font-black uppercase text-[9px] border-2 bg-white text-orange-600" onClick={emetteur.saveMooringRadius}><Save className="size-3 mr-2" /> Fixer comme rayon par défaut</Button>
                               </div>
                               <Button variant="destructive" className="w-full h-16 font-black uppercase text-xs tracking-widest shadow-xl rounded-2xl" onClick={emetteur.stopSharing}>ARRÊTER LE PARTAGE</Button>
