@@ -78,7 +78,9 @@ import {
   Fish,
   Waves,
   Bird,
-  Camera
+  Camera,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -563,12 +565,115 @@ export default function VesselTrackerPage() {
                                 </ScrollArea>
                               </TabsContent>
 
-                              <TabsContent value="settings" className="m-0 p-4 space-y-4 bg-white">
-                                  <div className="flex justify-between items-center">
-                                      <Label className="text-xs font-black uppercase">Volume Global</Label>
-                                      <Slider value={[recepteur.vesselPrefs.volume * 100]} max={100} onValueChange={v => recepteur.updateLocalPrefs({ volume: v[0] / 100 })} className="w-32" />
+                              <TabsContent value="settings" className="m-0 p-4 space-y-6 bg-white animate-in fade-in duration-300">
+                                  <Button 
+                                    className="w-full h-14 font-black uppercase tracking-widest shadow-xl rounded-2xl gap-3 bg-primary hover:bg-primary/90 transition-all active:scale-95" 
+                                    onClick={recepteur.savePrefsToFirestore}
+                                    disabled={recepteur.isSaving}
+                                  >
+                                      {recepteur.isSaving ? <RefreshCw className="size-5 animate-spin" /> : <CheckCircle2 className="size-5" />}
+                                      ENREGISTRER ET VALIDER
+                                  </Button>
+
+                                  <Card className="border-2 border-primary/10 bg-primary/5 rounded-2xl overflow-hidden">
+                                      <CardContent className="p-4 flex items-center justify-between">
+                                          <div className="space-y-0.5">
+                                              <p className="text-[11px] font-black uppercase text-primary tracking-tight">ACTIVER LES SIGNAUX SONORES GLOBAUX</p>
+                                              <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">PILOTAGE GÉNÉRAL DU THREAD AUDIO</p>
+                                          </div>
+                                          <Switch 
+                                            checked={recepteur.vesselPrefs.isNotifyEnabled} 
+                                            onCheckedChange={v => recepteur.updateLocalPrefs({ isNotifyEnabled: v })} 
+                                          />
+                                      </CardContent>
+                                  </Card>
+
+                                  <div className="space-y-3 px-1">
+                                      <div className="flex items-center justify-between">
+                                          <Label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+                                              <Volume2 className="size-4 text-primary" /> VOLUME (INTENSITY {Math.round(recepteur.vesselPrefs.volume * 100)}%)
+                                          </Label>
+                                      </div>
+                                      <Slider 
+                                        value={[recepteur.vesselPrefs.volume * 100]} 
+                                        max={100} 
+                                        step={1}
+                                        onValueChange={v => recepteur.updateLocalPrefs({ volume: v[0] / 100 })} 
+                                        className="py-2"
+                                      />
                                   </div>
-                                  <Button className="w-full font-black uppercase h-12" onClick={recepteur.savePrefsToFirestore}>Enregistrer Réglages</Button>
+
+                                  <Card className="border-2 border-dashed border-primary/20 bg-muted/5 rounded-2xl p-4 space-y-4">
+                                      <div className="flex items-center justify-between border-b border-primary/10 pb-2">
+                                          <div className="flex items-center gap-2">
+                                              <Clock className="size-4 text-primary" />
+                                              <span className="text-[10px] font-black uppercase text-slate-700">VEILLE STRATÉGIQUE</span>
+                                          </div>
+                                          <Switch 
+                                            checked={recepteur.vesselPrefs.isWatchEnabled} 
+                                            onCheckedChange={v => recepteur.updateLocalPrefs({ isWatchEnabled: v })} 
+                                          />
+                                      </div>
+
+                                      <div className={cn("space-y-4 transition-all duration-300", !recepteur.vesselPrefs.isWatchEnabled && "opacity-40 grayscale pointer-events-none")}>
+                                          <div className="space-y-2">
+                                              <div className="flex justify-between items-center px-1">
+                                                  <Label className="text-[9px] font-black uppercase text-slate-500">SEUIL D'IMMOBILITÉ</Label>
+                                                  <span className="text-xs font-black text-primary">
+                                                      {recepteur.vesselPrefs.watchDuration >= 60 ? `${Math.floor(recepteur.vesselPrefs.watchDuration / 60)}H` : `${recepteur.vesselPrefs.watchDuration} MIN`}
+                                                  </span>
+                                              </div>
+                                              <Slider 
+                                                value={[recepteur.vesselPrefs.watchDuration]} 
+                                                min={10} 
+                                                max={1440} 
+                                                step={10}
+                                                onValueChange={v => recepteur.updateLocalPrefs({ watchDuration: v[0] })} 
+                                              />
+                                          </div>
+
+                                          <div className="flex items-center gap-2">
+                                              <div className="flex-1">
+                                                  <Select 
+                                                    value={recepteur.vesselPrefs.watchSound} 
+                                                    onValueChange={v => recepteur.updateLocalPrefs({ watchSound: v })}
+                                                  >
+                                                      <SelectTrigger className="h-11 border-2 font-black uppercase text-[10px] bg-white">
+                                                          <SelectValue placeholder="Choisir un son..." />
+                                                      </SelectTrigger>
+                                                      <SelectContent>
+                                                          {recepteur.availableSounds.map(s => (
+                                                              <SelectItem key={s.id} value={s.label} className="text-[10px] font-black uppercase">{s.label}</SelectItem>
+                                                          ))}
+                                                      </SelectContent>
+                                                  </Select>
+                                              </div>
+                                              <div className="bg-white border-2 rounded-xl flex items-center px-3 h-11 gap-2 shadow-sm">
+                                                  <span className="text-[8px] font-black uppercase text-slate-400">LOOP</span>
+                                                  <Switch 
+                                                    checked={recepteur.vesselPrefs.watchLoop} 
+                                                    onCheckedChange={v => recepteur.updateLocalPrefs({ watchLoop: v })} 
+                                                    className="scale-75"
+                                                  />
+                                              </div>
+                                              <Button 
+                                                variant="outline" 
+                                                size="icon" 
+                                                className="h-11 w-11 border-2 bg-white text-primary active:scale-90 transition-all"
+                                                onClick={() => {
+                                                    const sound = recepteur.availableSounds.find(s => s.label === recepteur.vesselPrefs.watchSound);
+                                                    if (sound) {
+                                                        const audio = new Audio(sound.url);
+                                                        audio.volume = recepteur.vesselPrefs.volume;
+                                                        audio.play();
+                                                    }
+                                                }}
+                                              >
+                                                  <Play className="size-5 fill-primary" />
+                                              </Button>
+                                          </div>
+                                      </div>
+                                  </Card>
                               </TabsContent>
 
                               {isAdmin && (
