@@ -80,7 +80,11 @@ import {
   Bird,
   Camera,
   CheckCircle2,
-  Clock
+  Clock,
+  Battery,
+  Compass,
+  Radio,
+  ZapOff
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -508,7 +512,7 @@ export default function VesselTrackerPage() {
                                   <TabsTrigger value="tactical" className="text-[10px] font-black uppercase">Tactique</TabsTrigger>
                                   <TabsTrigger value="technical" className="text-[10px] font-black uppercase">Technique</TabsTrigger>
                                   <TabsTrigger value="settings" className="text-[10px] font-black uppercase">Réglages Sons</TabsTrigger>
-                                  {isAdmin && <TabsTrigger value="labo" className="text-[10px] font-black uppercase text-primary">Labo</TabsTrigger>}
+                                  {isAdmin && <TabsTrigger value="labo" className="text-[10px] font-black uppercase text-red-600">Labo</TabsTrigger>}
                               </TabsList>
                               
                               <TabsContent value="tactical" className="m-0 p-4 bg-white">
@@ -677,24 +681,112 @@ export default function VesselTrackerPage() {
                               </TabsContent>
 
                               {isAdmin && (
-                                <TabsContent value="labo" className="m-0 p-4 space-y-4 bg-white">
-                                    <div className="p-4 border-2 border-dashed border-red-200 rounded-2xl bg-red-50/30">
-                                        <div className="flex items-center justify-between border-b pb-2 mb-4">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique</p>
+                                <TabsContent value="labo" className="m-0 p-4 space-y-6 bg-white animate-in fade-in duration-300">
+                                    <div className="p-4 border-2 border-dashed border-red-200 rounded-[2rem] bg-red-50/30 space-y-6">
+                                        <div className="flex items-center justify-between border-b border-red-100 pb-3">
+                                            <div className="flex items-center gap-2">
+                                                <Zap className="size-4 text-red-600 fill-red-600" />
+                                                <span className="text-xs font-black uppercase tracking-widest text-red-600">Sandbox Tactique</span>
+                                            </div>
                                             <Switch checked={simulator.isActive} onCheckedChange={(v) => simulator.setIsActive(v)} />
                                         </div>
-                                        <div className={cn("space-y-4", !simulator.isActive && "opacity-40 pointer-events-none")}>
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between text-[9px] font-black uppercase">
-                                                    <span>Vitesse Simulée</span>
-                                                    <span className="text-red-600">{simulator.simSpeed.toFixed(1)} ND</span>
+
+                                        <div className={cn("space-y-6 transition-all", !simulator.isActive && "opacity-40 pointer-events-none grayscale")}>
+                                            {/* Vitesse & Cap */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-[10px] font-black uppercase">
+                                                        <span className="flex items-center gap-1"><Move className="size-3" /> Vitesse</span>
+                                                        <span className="text-red-600">{simulator.simSpeed.toFixed(1)} ND</span>
+                                                    </div>
+                                                    <Slider value={[simulator.simSpeed]} max={10} step={0.1} onValueChange={v => simulator.setSimSpeed(v[0])} />
                                                 </div>
-                                                <Slider value={[simulator.simSpeed]} max={5} step={0.1} onValueChange={v => simulator.setSimSpeed(v[0])} />
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-[10px] font-black uppercase">
+                                                        <span className="flex items-center gap-1"><Compass className="size-3" /> Cap</span>
+                                                        <span className="text-red-600">{simulator.simBearing}°</span>
+                                                    </div>
+                                                    <Slider value={[simulator.simBearing]} max={360} step={5} onValueChange={v => simulator.setSimBearing(v[0])} />
+                                                </div>
                                             </div>
-                                            <Button variant={simulator.isMoving ? "destructive" : "default"} className="w-full h-12 font-black uppercase text-[10px]" onClick={() => simulator.setIsMoving(!simulator.isMoving)}>
-                                                {simulator.isMoving ? 'STOP SIMU' : 'LANCER SIMU'}
-                                            </Button>
-                                            <Button variant="outline" className="w-full h-10 text-[10px] font-black uppercase" onClick={simulator.stopSim}>RÉTABLIR RÉEL</Button>
+
+                                            {/* Précision & Bruit */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-[10px] font-black uppercase">
+                                                        <span className="flex items-center gap-1"><Target className="size-3" /> Précision (Acc)</span>
+                                                        <span className="text-red-600">{simulator.simAccuracy}M</span>
+                                                    </div>
+                                                    <Slider value={[simulator.simAccuracy]} min={2} max={100} step={1} onValueChange={v => simulator.setSimAccuracy(v[0])} />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-[10px] font-black uppercase">
+                                                        <span className="flex items-center gap-1"><AlertTriangle className="size-3" /> Bruit (Saut)</span>
+                                                        <span className="text-red-600">{simulator.simGpsNoise}M</span>
+                                                    </div>
+                                                    <Slider value={[simulator.simGpsNoise]} max={50} step={1} onValueChange={v => simulator.setSimGpsNoise(v[0])} />
+                                                </div>
+                                            </div>
+
+                                            {/* Temps & Batterie */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-[10px] font-black uppercase">
+                                                        <span className="flex items-center gap-1"><Clock className="size-3" /> Time Offset</span>
+                                                        <span className="text-red-600">{simulator.timeOffset} MIN</span>
+                                                    </div>
+                                                    <Slider value={[simulator.timeOffset]} min={0} max={1440} step={10} onValueChange={v => simulator.setTimeOffset(v[0])} />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-[10px] font-black uppercase">
+                                                        <span className="flex items-center gap-1"><Battery className="size-3" /> Batterie</span>
+                                                        <span className="text-red-600">{simulator.simBattery}%</span>
+                                                    </div>
+                                                    <Slider value={[simulator.simBattery]} max={100} step={1} onValueChange={v => simulator.setSimBattery(v[0])} />
+                                                </div>
+                                            </div>
+
+                                            {/* Coupures */}
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2">
+                                                    <span className="text-[10px] font-black uppercase">Coupure GPS</span>
+                                                    <Switch checked={simulator.isGpsCut} onCheckedChange={v => simulator.setIsGpsCut(v)} />
+                                                </div>
+                                                <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2">
+                                                    <span className="text-[10px] font-black uppercase">Coupure Com</span>
+                                                    <Switch checked={simulator.isComCut} onCheckedChange={v => simulator.setIsComCut(v)} />
+                                                </div>
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div className="space-y-2">
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <Button 
+                                                        variant={simulator.isTeleportMode ? "default" : "outline"} 
+                                                        className="h-12 font-black uppercase text-[10px] border-2" 
+                                                        onClick={() => simulator.setIsTeleportMode(!simulator.isTeleportMode)}
+                                                    >
+                                                        {simulator.isTeleportMode ? "CLIQUEZ CARTE..." : "INJECTION CLIC"}
+                                                    </Button>
+                                                    <Button 
+                                                        variant="outline" 
+                                                        className="h-12 font-black uppercase text-[10px] border-2 text-red-600 border-red-100" 
+                                                        onClick={() => simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius)}
+                                                    >
+                                                        LANCER DÉRIVE
+                                                    </Button>
+                                                </div>
+                                                <Button 
+                                                    variant={simulator.isMoving ? "destructive" : "default"} 
+                                                    className="w-full h-14 font-black uppercase text-xs shadow-lg rounded-xl" 
+                                                    onClick={() => simulator.setIsMoving(!simulator.isMoving)}
+                                                >
+                                                    {simulator.isMoving ? 'ARRÊTER SIMULATION' : 'LANCER SIMULATION'}
+                                                </Button>
+                                                <Button variant="ghost" className="w-full h-10 text-[9px] font-black uppercase tracking-widest text-slate-400" onClick={simulator.stopSim}>
+                                                    RÉTABLIR DONNÉES RÉELLES
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 </TabsContent>
