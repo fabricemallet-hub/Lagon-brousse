@@ -88,7 +88,6 @@ import {
   Clock,
   Battery,
   Compass,
-  Radio,
   ZapOff,
   EyeOff,
   Trash2,
@@ -390,7 +389,7 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
-        <div className="absolute top-[15%] right-[10px] z-[9999] pointer-events-none flex flex-col items-end gap-2 max-w-[200px]">
+        <div className="absolute top-[35%] right-[10px] z-[999] pointer-events-none flex flex-col items-end gap-2 max-w-[200px]">
             <div className="flex bg-black/40 backdrop-blur-md rounded-lg p-1 border border-white/10 pointer-events-auto shadow-xl group transition-opacity hover:opacity-100 opacity-40">
                 {['AUTO', 'TACTICAL', 'TECHNICAL'].map(m => (
                     <button 
@@ -412,7 +411,7 @@ export default function VesselTrackerPage() {
                             key={i} 
                             style={{ textShadow: '1px 1px 2px #000' }}
                             className={cn(
-                                "font-black uppercase tracking-tight",
+                                "font-black uppercase tracking-tight text-right animate-in fade-in slide-in-from-right-1 duration-300",
                                 isTactical ? "text-cyan-400" : "text-white/80",
                                 isDrift && "text-red-500 animate-pulse"
                             )}
@@ -424,10 +423,10 @@ export default function VesselTrackerPage() {
             </div>
         </div>
 
-        <div className="absolute top-4 left-4 z-[9999] flex flex-col gap-2">
+        <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl" onClick={() => mapCore.setIsFullscreen(!mapCore.isFullscreen)}>{mapCore.isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
         </div>
-        <div className="absolute top-4 right-4 z-[9999] flex flex-col gap-2">
+        <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
             <Button onClick={() => mapCore.setIsFollowMode(!mapCore.isFollowMode)} className={cn("h-10 w-10 border-2 shadow-xl rounded-xl transition-all", mapCore.isFollowMode ? "bg-primary text-white" : "bg-white text-primary")}>{mapCore.isFollowMode ? <Lock className="size-5" /> : <Unlock className="size-5" />}</Button>
             <Button onClick={handleRecenter} className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl flex items-center justify-center"><LocateFixed className="size-5"/></Button>
         </div>
