@@ -102,7 +102,8 @@ import {
   PlayCircle,
   StopCircle,
   Activity,
-  Signal
+  Signal,
+  ArrowUp
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -218,6 +219,7 @@ export default function VesselTrackerPage() {
   }, [user, userProfile]);
 
   const [testMinutes, setTestMinutes] = useState('60');
+  const [isTensionVectorEnabled, setIsTensionVectorEnabled] = useState(true);
 
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -234,20 +236,20 @@ export default function VesselTrackerPage() {
   }, [followedVessels, recepteur.processVesselAlerts]);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
-  const activeCirclesRef = useRef<google.maps.Circle[]>([]);
+  const activeCirclesRef = useRef<(google.maps.Circle | google.maps.Polyline)[]>([]);
   const prevStatusRef = useRef<string>('');
   const hasCenteredInitially = useRef(false);
 
   const hardClearCircles = useCallback(() => {
     const count = activeCirclesRef.current.length;
-    activeCirclesRef.current.forEach(circle => {
+    activeCirclesRef.current.forEach(obj => {
         try {
-            circle.setMap(null);
+            obj.setMap(null);
         } catch (e) {}
     });
     activeCirclesRef.current = [];
     if (count > 0) {
-        emetteur.addTechLog('LABO', `PURGE TOTALE : ${count} CERCLES SUPPRIMÉS`);
+        emetteur.addTechLog('LABO', `PURGE TOTALE : ${count} OBJETS SUPPRIMÉS`);
     }
   }, [emetteur.addTechLog]);
 
@@ -317,6 +319,24 @@ export default function VesselTrackerPage() {
   }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, emetteur.accuracy, mapCore.isCirclesHidden]);
 
   const currentDriftDist = emetteur.smoothedDistance;
+
+  // Calcul du style du vecteur de tension
+  const tensionVectorStyle = useMemo(() => {
+    if (!activeAnchorVessel || !activeAnchorVessel.location || !isTensionVectorEnabled) return null;
+    
+    let color = '#ffffff'; // Blanc par défaut
+    let opacity = 0.6;
+    
+    if (activeAnchorVessel.status === 'drifting' || activeAnchorVessel.status === 'emergency') {
+        color = '#ef4444'; // Rouge
+        opacity = 1.0;
+    } else if (currentDriftDist !== null && currentDriftDist >= activeAnchorVessel.mooringRadius * 0.8) {
+        color = '#f97316'; // Orange
+        opacity = mapCore.isFlashOn ? 1.0 : 0.2; // Clignotant
+    }
+
+    return { color, opacity };
+  }, [activeAnchorVessel, currentDriftDist, isTensionVectorEnabled, mapCore.isFlashOn]);
 
   const handleUpdateAlertConfig = (key: keyof VesselPrefs['alerts'], field: 'enabled' | 'sound' | 'loop', value: any) => {
     const currentAlerts = { ...recepteur.vesselPrefs.alerts };
@@ -400,9 +420,25 @@ export default function VesselTrackerPage() {
 
         <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={12} onLoad={mapCore.setGoogleMap} onDragStart={() => mapCore.setIsFollowMode(false)} onClick={handleMapClick} options={{ disableDefaultUI: true, mapTypeControl: false, mapTypeId: mapCore.viewMode === 'beta' ? 'hybrid' : 'satellite', gestureHandling: 'greedy' }}>
             {!emetteur.isTrajectoryHidden && mapCore.breadcrumbs.length > 1 && <Polyline path={mapCore.breadcrumbs.map(p => ({ lat: p.lat, lng: p.lng }))} options={{ strokeColor: '#3b82f6', strokeOpacity: 0.6, strokeWeight: 2, zIndex: 1 }} />}
+            
             {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
                 <React.Fragment>
-                    {activeAnchorVessel.location && <Polyline path={[{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }, { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }]} options={{ strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6', strokeOpacity: 0.8, strokeWeight: 2, zIndex: 2 }} />}
+                    {tensionVectorStyle && activeAnchorVessel.location && (
+                        <Polyline 
+                            onLoad={p => activeCirclesRef.current.push(p)}
+                            path={[
+                                { lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }, 
+                                { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }
+                            ]} 
+                            options={{ 
+                                strokeColor: tensionVectorStyle.color, 
+                                strokeOpacity: tensionVectorStyle.opacity, 
+                                strokeWeight: 1, 
+                                icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 2 }, offset: '0', repeat: '10px' }],
+                                zIndex: 2 
+                            }} 
+                        />
+                    )}
                     
                     <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -320%)', zIndex: 9999 }} className="flex flex-col items-center pointer-events-none mb-3">
@@ -566,6 +602,14 @@ export default function VesselTrackerPage() {
                               </TabsList>
                               
                               <TabsContent value="tactical" className="m-0 bg-white p-4 space-y-4">
+                                  <div className="p-3 bg-muted/10 rounded-xl border flex items-center justify-between">
+                                      <div className="space-y-0.5">
+                                          <Label className="text-[10px] font-black uppercase">Vecteur de Tension</Label>
+                                          <p className="text-[8px] font-bold text-muted-foreground uppercase">Lien ancre-navire</p>
+                                      </div>
+                                      <Switch checked={isTensionVectorEnabled} onCheckedChange={setIsTensionVectorEnabled} />
+                                  </div>
+
                                   <div className="grid grid-cols-4 gap-2">
                                       {TACTICAL_SPECIES.map(spec => (
                                           <Button key={spec.label} variant="outline" className="flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 hover:bg-primary/5 active:scale-95" onClick={() => { recepteur.initAudio(); emetteur.addTacticalLog(spec.label); }}>
@@ -590,7 +634,7 @@ export default function VesselTrackerPage() {
                               <TabsContent value="technical" className="m-0 bg-slate-50/50 p-4">
                                   <ScrollArea className="h-48 shadow-inner">
                                       <div className="space-y-2">
-                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v85.0 prêt</div>
+                                          <div className="p-2 border rounded-lg bg-green-50 text-[10px] font-black uppercase text-green-700">Système v86.0 prêt</div>
                                           {emetteur.techLogs.map((log, i) => (
                                               <div key={i} className={cn("p-3 border rounded-xl bg-white flex flex-col gap-2 shadow-sm border-slate-100", (log.label.includes('URGENCE') || log.label.includes('ÉNERGIE') || log.label === 'DÉRIVE' || log.label === 'SIGNAL' || log.label === 'SANDBOX' || log.label === 'LABO' || log.label === 'PURGE' || log.label === 'RESET' || log.label === 'CHGT STATUT' || log.label === 'CHGT MANUEL' || log.label === 'SIGNAL') && 'border-red-200 bg-red-50')}>
                                                   <div className="flex justify-between items-start">
@@ -732,7 +776,7 @@ export default function VesselTrackerPage() {
                                 <TabsContent value="labo" className="m-0 bg-white p-4 space-y-6 overflow-y-auto max-h-[60vh] scrollbar-hide">
                                     <div className="space-y-4 p-4 border-2 border-dashed border-red-200 rounded-3xl bg-red-50/30">
                                         <div className="flex items-center justify-between border-b pb-2">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v85.0</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2"><Zap className="size-3" /> Sandbox Tactique v86.0</p>
                                             <Switch checked={simulator.isActive} onCheckedChange={(v) => { recepteur.initAudio(); recepteur.stopAllAlarms(); simulator.setIsActive(v); }} />
                                         </div>
                                         
