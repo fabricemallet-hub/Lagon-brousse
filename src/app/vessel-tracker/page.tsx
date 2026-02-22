@@ -1,6 +1,3 @@
-
-'use client';
-
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useMapCore } from '@/logic/shared/useMapCore';
 import { useSimulator } from '@/logic/shared/useSimulator';
@@ -120,16 +117,6 @@ import { useToast } from '@/hooks/use-toast';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
-const TACTICAL_SPECIES = [
-    { label: 'MARLIN', icon: Target },
-    { label: 'THON', icon: Fish },
-    { label: 'TAZARD', icon: Fish },
-    { label: 'WAHOO', icon: Fish },
-    { label: 'BONITE', icon: Fish },
-    { label: 'SARDINES', icon: Waves },
-    { label: 'OISEAUX', icon: Bird }
-];
-
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
   const props = { className: cn("size-4", className) };
@@ -213,7 +200,9 @@ export default function VesselTrackerPage() {
   const emetteur = useEmetteur(handlePositionUpdate, handleStopCleanup, simulator, userProfile);
   const recepteur = useRecepteur(emetteur.sharingId);
   const flotte = useFlotte(emetteur.sharingId, emetteur.vesselNickname);
-  const radar = useRadarIA(emetteur.currentPos, emetteur.currentSpeed);
+  
+  // v99.0 : Radar IA prend désormais le statut pour mise en veille
+  const radar = useRadarIA(emetteur.currentPos, emetteur.currentSpeed, emetteur.vesselStatus);
   
   const isAdmin = useMemo(() => {
     if (!user) return false;
@@ -222,9 +211,16 @@ export default function VesselTrackerPage() {
     return masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid) || userProfile?.role === 'admin';
   }, [user, userProfile]);
 
-  const [testMinutes, setTestMinutes] = useState('60');
-  const [isTensionVectorEnabled, setIsTensionVectorEnabled] = useState(true);
   const [isImpactProbable, setIsImpactProbable] = useState(false);
+
+  // v99.0 : Nettoyage des écouteurs globaux
+  useEffect(() => {
+    const handleGlobalMessage = (e: MessageEvent) => {
+        // Logique Windy ou autre API tierce
+    };
+    window.addEventListener('message', handleGlobalMessage);
+    return () => window.removeEventListener('message', handleGlobalMessage);
+  }, []);
 
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -240,7 +236,6 @@ export default function VesselTrackerPage() {
     if (followedVessels) recepteur.processVesselAlerts(followedVessels, isImpactProbable); 
   }, [followedVessels, recepteur, isImpactProbable]);
 
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const activeCirclesRef = useRef<(google.maps.Circle | google.maps.Polyline)[]>([]);
   const prevStatusRef = useRef<string>('');
   const hasCenteredInitially = useRef(false);
@@ -320,29 +315,24 @@ export default function VesselTrackerPage() {
   }, [simulator, emetteur, mapCore.isCirclesHidden]);
 
   const tensionVectorStyle = useMemo(() => {
-    if (!activeAnchorVessel || !activeAnchorVessel.location || !isTensionVectorEnabled) return null;
+    if (!activeAnchorVessel || !activeAnchorVessel.location) return null;
     let color = '#ffffff', opacity = 0.6;
     if (activeAnchorVessel.status === 'drifting' || activeAnchorVessel.status === 'emergency') { color = '#ef4444'; opacity = 1.0; }
     else if (emetteur.smoothedDistance !== null && emetteur.smoothedDistance >= activeAnchorVessel.mooringRadius * 0.8) { color = '#f97316'; opacity = mapCore.isFlashOn ? 1.0 : 0.2; }
     return { color, opacity };
-  }, [activeAnchorVessel, emetteur.smoothedDistance, isTensionVectorEnabled, mapCore.isFlashOn]);
+  }, [activeAnchorVessel, emetteur.smoothedDistance, mapCore.isFlashOn]);
 
   const mooringCircleOptions = useMemo(() => {
     if (!activeAnchorVessel) return null;
+    const isDrifting = activeAnchorVessel.status === 'drifting';
     return { 
-        strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
-        strokeOpacity: (activeAnchorVessel.status === 'drifting' && mapCore.isFlashOn) ? 1.0 : (activeAnchorVessel.isSim ? 0.4 : 0.8), 
+        strokeColor: isDrifting ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
+        strokeOpacity: (isDrifting && mapCore.isFlashOn) ? 1.0 : (activeAnchorVessel.isSim ? 0.4 : 0.8), 
         strokeWeight: activeAnchorVessel.isSim ? 2 : 3, 
-        fillColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
+        fillColor: isDrifting ? '#ef4444' : (activeAnchorVessel.isSim ? '#f97316' : '#3b82f6'), 
         fillOpacity: 0.15, clickable: false, zIndex: 1 
     };
   }, [activeAnchorVessel, mapCore.isFlashOn]);
-
-  const handleUpdateAlertConfig = (key: keyof VesselPrefs['alerts'], field: 'enabled' | 'sound' | 'loop', value: any) => {
-    const currentAlerts = { ...recepteur.vesselPrefs.alerts };
-    currentAlerts[key] = { ...currentAlerts[key], [field]: value };
-    recepteur.updateLocalPrefs({ alerts: currentAlerts });
-  };
 
   const handleSaveVessel = async () => {
     if (!user || !firestore) return;
@@ -495,15 +485,18 @@ export default function VesselTrackerPage() {
                           <div className="flex items-center gap-3"><ClipboardList className="size-5 text-primary" /><span className="text-sm font-black uppercase tracking-tighter">Cockpit Technique</span></div>
                       </AccordionTrigger>
                       <AccordionContent className="p-0">
-                          <Tabs defaultValue="tactical" className="w-full">
-                              <TabsList className={cn("grid h-12 bg-muted/20 border-y rounded-none", isAdmin ? "grid-cols-4" : "grid-cols-3")}>
-                                  <TabsTrigger value="tactical" className="text-[10px] font-black uppercase">Tactique</TabsTrigger>
+                          <Tabs defaultValue="technical" className="w-full">
+                              <TabsList className={cn("grid h-12 bg-muted/20 border-y rounded-none", isAdmin ? "grid-cols-3" : "grid-cols-2")}>
                                   <TabsTrigger value="technical" className="text-[10px] font-black uppercase">Journal</TabsTrigger>
                                   <TabsTrigger value="settings" className="text-[10px] font-black uppercase">Réglages</TabsTrigger>
                                   {isAdmin && <TabsTrigger value="labo" className="text-[10px] font-black uppercase text-primary">Labo</TabsTrigger>}
                               </TabsList>
                               
                               <TabsContent value="technical" className="m-0 p-4 bg-white">
+                                <div className="flex justify-between items-center mb-2 px-1">
+                                    <p className="text-[9px] font-black uppercase text-muted-foreground">Historique session</p>
+                                    <Button variant="ghost" size="sm" onClick={emetteur.clearLogs} className="h-6 text-[8px] font-black uppercase text-destructive border border-destructive/20">Purger l'historique</Button>
+                                </div>
                                 <ScrollArea className="h-48">
                                     <div className="space-y-2">
                                         {emetteur.techLogs.map((log, i) => (

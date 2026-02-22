@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -10,12 +9,12 @@ import { fr } from 'date-fns/locale';
 import { getDistance } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-// v98.0 : CONSTANTES DE VITESSE
+// v99.0 : CONSTANTES DE VITESSE
 const THRESHOLD_DRIFT = 0.2; // ND
 const THRESHOLD_MOVEMENT = 2.0; // ND
 
 /**
- * LOGIQUE ÉMETTEUR (A) v98.0 : Automatisation des seuils et filtrage clapot.
+ * LOGIQUE ÉMETTEUR (A) v99.0 : Stabilisation et Anti-Loop.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -38,7 +37,11 @@ export function useEmetteur(
   
   const [smoothedDistance, setSmoothedDistance] = useState<number | null>(null);
   const distanceHistoryRef = useRef<number[]>([]);
-  const speedConsecutiveHitsRef = useRef<number>(0); // v98.0 : Filtre clapot
+  const speedConsecutiveHitsRef = useRef<number>(0);
+  
+  // v99.0 : VERROUS DE STABILISATION
+  const lastStatusChangeTimeRef = useRef<number>(0);
+  const isLaboAlreadyRunningRef = useRef<boolean>(false);
   
   const [vesselNickname, setVesselNickname] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
@@ -69,41 +72,6 @@ export function useEmetteur(
   const isTrajectoryHiddenRef = useRef(isTrajectoryHidden);
   const lastFirestoreSyncRef = useRef<number>(0);
 
-  const driftCheckLockedUntilRef = useRef<number>(0);
-  const prevSimPosRef = useRef<{ lat: number; lng: number } | null>(null);
-
-  useEffect(() => { vesselStatusRef.current = vesselStatus; }, [vesselStatus]);
-  useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
-  useEffect(() => { anchorPosRef.current = anchorPos; }, [anchorPos]);
-  useEffect(() => { mooringRadiusRef.current = mooringRadius; }, [mooringRadius]);
-  useEffect(() => { batteryRef.current = battery; }, [battery]);
-  useEffect(() => { isSharingRef.current = isSharing; }, [isSharing]);
-  useEffect(() => { isGhostModeRef.current = isGhostMode; }, [isGhostMode]);
-  useEffect(() => { isTrajectoryHiddenRef.current = isTrajectoryHidden; }, [isTrajectoryHidden]);
-
-  const setMooringRadius = useCallback((val: number) => {
-    const capped = Math.min(val, 100);
-    _setMooringRadius(capped);
-    mooringRadiusRef.current = capped;
-  }, []);
-
-  useEffect(() => {
-    if (userProfile && !vesselNickname) {
-      setVesselNickname(userProfile.vesselNickname || userProfile.displayName || '');
-      if (userProfile.lastVesselId) setCustomSharingId(userProfile.lastVesselId);
-      if (userProfile.lastFleetId) setCustomFleetId(userProfile.lastFleetId);
-      const lastFleet = userProfile.savedFleets?.find(f => f.id === userProfile.lastFleetId);
-      if (lastFleet) setFleetComment(lastFleet.comment);
-    }
-  }, [userProfile, vesselNickname]);
-
-  useEffect(() => {
-    if (userProfile?.vesselPrefs?.mooringRadius) {
-      const radius = Math.min(userProfile.vesselPrefs.mooringRadius, 100);
-      setMooringRadius(radius);
-    }
-  }, [userProfile, setMooringRadius]);
-
   const watchIdRef = useRef<number | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
   
@@ -118,43 +86,20 @@ export function useEmetteur(
     const currentStatus = statusOverride || vesselStatusRef.current;
     const batteryLevel = Math.round(batteryRef.current.level * 100);
 
-    setTechLogs(prev => {
-        const logEntry: TechLogEntry = {
-            label: label.toUpperCase(),
-            details: details || '',
-            time: now,
-            pos: currentPosRef.current,
-            status: currentStatus,
-            batteryLevel,
-            accuracy: accuracy,
-            durationMinutes: 0
-        };
-        addDoc(collection(firestore, 'vessels', sharingId, 'tech_logs'), { ...logEntry, time: Timestamp.fromDate(now) }).catch(() => {});
-        return [logEntry, ...prev].slice(0, 50);
-    });
-  }, [firestore, sharingId, accuracy, simulator?.timeOffset]);
+    const logEntry: TechLogEntry = {
+        label: label.toUpperCase(),
+        details: details || '',
+        time: now,
+        pos: currentPosRef.current,
+        status: currentStatus,
+        batteryLevel,
+        accuracy: accuracy,
+        durationMinutes: 0
+    };
 
-  useEffect(() => {
-    if (simulator?.isActive) {
-        setAnchorPos(null);
-        anchorPosRef.current = null;
-        lastSentStatusRef.current = null;
-        distanceHistoryRef.current = [];
-        speedConsecutiveHitsRef.current = 0;
-        setVesselStatus('stationary');
-        vesselStatusRef.current = 'stationary';
-        addTechLog('LABO', 'SANDBOX ACTIVÉE');
-    } else {
-        setAnchorPos(null);
-        anchorPosRef.current = null;
-        lastSentStatusRef.current = null;
-        distanceHistoryRef.current = [];
-        speedConsecutiveHitsRef.current = 0;
-        setVesselStatus('moving');
-        vesselStatusRef.current = 'moving';
-        addTechLog('LABO', 'RETOUR MODE RÉEL');
-    }
-  }, [simulator?.isActive, addTechLog]);
+    setTechLogs(prev => [logEntry, ...prev].slice(0, 50));
+    addDoc(collection(firestore, 'vessels', sharingId, 'tech_logs'), { ...logEntry, time: Timestamp.fromDate(now) }).catch(() => {});
+  }, [firestore, sharingId, accuracy, simulator?.timeOffset]);
 
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>, force = false) => {
     if (!user || !firestore || (!isSharingRef.current && !force) || (simulator?.isComCut && !force)) return;
@@ -192,11 +137,41 @@ export function useEmetteur(
     return setDoc(doc(firestore, 'vessels', sharingId), payload, { merge: true }).then(() => setLastSyncTime(Date.now()));
   }, [user, firestore, sharingId, vesselNickname, customFleetId, simulator?.isComCut, simulator?.isActive, simulator?.timeOffset, accuracy]);
 
+  // v99.0 : Reset Labo avec protection Anti-Loop
+  useEffect(() => {
+    if (simulator?.isActive) {
+        if (isLaboAlreadyRunningRef.current) return;
+        isLaboAlreadyRunningRef.current = true;
+        
+        setAnchorPos(null);
+        anchorPosRef.current = null;
+        lastSentStatusRef.current = null;
+        distanceHistoryRef.current = [];
+        speedConsecutiveHitsRef.current = 0;
+        setVesselStatus('stationary');
+        vesselStatusRef.current = 'stationary';
+        addTechLog('LABO', 'SANDBOX ACTIVÉE');
+    } else {
+        if (!isLaboAlreadyRunningRef.current) return;
+        isLaboAlreadyRunningRef.current = false;
+        
+        setAnchorPos(null);
+        anchorPosRef.current = null;
+        lastSentStatusRef.current = null;
+        distanceHistoryRef.current = [];
+        speedConsecutiveHitsRef.current = 0;
+        setVesselStatus('moving');
+        vesselStatusRef.current = 'moving';
+        addTechLog('LABO', 'RETOUR MODE RÉEL');
+    }
+  }, [simulator?.isActive, addTechLog]);
+
   const handlePositionLogic = useCallback((lat: number, lng: number, speed: number, heading: number, acc: number) => {
     let nextStatus = vesselStatusRef.current;
     const isSimActive = !!simulator?.isActive;
+    const now = Date.now();
 
-    // v98.0 : FILTRE CLAPOT (3 HITS)
+    // 1. Détection de statut basée sur la vitesse
     if (speed < THRESHOLD_DRIFT) {
         speedConsecutiveHitsRef.current = 0;
         if (nextStatus !== 'stationary') {
@@ -207,7 +182,6 @@ export function useEmetteur(
         }
     } else {
         speedConsecutiveHitsRef.current += 1;
-        
         if (speedConsecutiveHitsRef.current >= 3) {
             if (speed >= THRESHOLD_MOVEMENT) {
                 if (nextStatus !== 'moving') {
@@ -217,7 +191,6 @@ export function useEmetteur(
                     addTechLog('CHGT STATUT', 'Navigation (MOUVEMENT)');
                 }
             } else if (speed >= THRESHOLD_DRIFT) {
-                // Zone de dérive (0.2 - 2.0 ND)
                 if (!anchorPosRef.current) {
                     setAnchorPos({ lat, lng });
                     anchorPosRef.current = { lat, lng };
@@ -238,13 +211,20 @@ export function useEmetteur(
         }
     }
 
-    // Gestion de l'ancre forcée en Simu au premier point
+    // v99.0 : STATUS DEBOUNCING (500ms) - Empêche les changements trop rapides
+    if (nextStatus !== vesselStatusRef.current) {
+        if (now - lastStatusChangeTimeRef.current < 500) {
+            nextStatus = vesselStatusRef.current;
+        } else {
+            lastStatusChangeTimeRef.current = now;
+        }
+    }
+
     if (isSimActive && !anchorPosRef.current) {
         setAnchorPos({ lat, lng });
         anchorPosRef.current = { lat, lng };
     }
 
-    // Calcul de distance lissée pour l'affichage
     if (anchorPosRef.current) {
         const rawDist = getDistance(lat, lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
         distanceHistoryRef.current = [...distanceHistoryRef.current, rawDist].slice(-3);
