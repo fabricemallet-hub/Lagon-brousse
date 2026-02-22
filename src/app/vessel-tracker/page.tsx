@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -168,6 +169,7 @@ export default function VesselTrackerPage() {
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   const [isMounted, setIsMounted] = useState(false);
   const [isAdjustingRadius, setIsAdjustingRadius] = useState(false);
+  const [hudMode, setHudMode] = useState<'AUTO' | 'TACTICAL' | 'TECHNICAL'>('AUTO');
   
   const mapCore = useMapCore();
   const simulator = useSimulator();
@@ -359,6 +361,17 @@ export default function VesselTrackerPage() {
     }
   };
 
+  const hudLogs = useMemo(() => {
+    const logs = [...emetteur.techLogs];
+    const tacticalLabels = ['CHGT STATUT', 'DÉRIVE', 'URGENCE', 'CHGT MANUEL', 'MOUILLAGE', 'POSITION'];
+    
+    return logs.filter(log => {
+        if (hudMode === 'TACTICAL') return tacticalLabels.includes(log.label);
+        if (hudMode === 'TECHNICAL') return !tacticalLabels.includes(log.label);
+        return true;
+    }).slice(0, 8);
+  }, [emetteur.techLogs, hudMode]);
+
   const smsPreview = useMemo(() => {
     const nicknamePrefix = emetteur.vesselNickname ? `[${emetteur.vesselNickname.toUpperCase()}] ` : "";
     const customText = (emetteur.isCustomMessageEnabled && emetteur.vesselSmsMessage) ? emetteur.vesselSmsMessage : "Requiert assistance immédiate.";
@@ -382,6 +395,41 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden bg-slate-100 transition-all", mapCore.isFullscreen ? "fixed inset-0 z-[150] h-screen" : "h-[500px]")}>
+        {/* HUD TRANSPARENT v109.0 */}
+        <div className="absolute top-[15%] right-[10px] z-[9999] pointer-events-none flex flex-col items-end gap-2 max-w-[200px]">
+            <div className="flex bg-black/40 backdrop-blur-md rounded-lg p-1 border border-white/10 pointer-events-auto shadow-xl group transition-opacity hover:opacity-100 opacity-40">
+                {['AUTO', 'TACTICAL', 'TECHNICAL'].map(m => (
+                    <button 
+                        key={m} 
+                        onClick={() => setHudMode(m as any)}
+                        className={cn("px-2 py-1 text-[7px] font-black uppercase rounded transition-all", hudMode === m ? "bg-primary text-white" : "text-white/60 hover:bg-white/10")}
+                    >
+                        {m === 'TACTICAL' ? 'TACT' : m === 'TECHNICAL' ? 'TECH' : m}
+                    </button>
+                ))}
+            </div>
+            
+            <div className="flex flex-col items-end gap-1 font-mono text-[9px] whitespace-pre transition-all">
+                {hudLogs.map((log, i) => {
+                    const isTactical = ['CHGT STATUT', 'DÉRIVE', 'URGENCE', 'CHGT MANUEL', 'MOUILLAGE', 'POSITION'].includes(log.label);
+                    const isDrift = log.label === 'DÉRIVE' || log.label === 'URGENCE';
+                    return (
+                        <div 
+                            key={i} 
+                            style={{ textShadow: '1px 1px 2px #000' }}
+                            className={cn(
+                                "font-black uppercase tracking-tight",
+                                isTactical ? "text-cyan-400" : "text-white/80",
+                                isDrift && "text-red-500 animate-pulse"
+                            )}
+                        >
+                            [{format(log.time, 'HH:mm')}] {log.label}: {log.status}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[9999] flex bg-slate-900/90 backdrop-blur-md p-1 rounded-2xl border-2 border-white/20 shadow-2xl">
             <Button variant={mapCore.viewMode === 'alpha' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl" onClick={() => mapCore.setViewMode('alpha')}>Maps</Button>
             <Button variant={mapCore.viewMode === 'beta' ? 'default' : 'ghost'} size="sm" className="h-9 px-4 font-black uppercase text-[10px] rounded-xl" onClick={() => mapCore.setViewMode('beta')}>Météo</Button>
@@ -457,6 +505,24 @@ export default function VesselTrackerPage() {
             <Button onClick={() => mapCore.setIsFollowMode(!mapCore.isFollowMode)} className={cn("h-10 w-10 border-2 shadow-xl rounded-xl transition-all", mapCore.isFollowMode ? "bg-primary text-white" : "bg-white text-primary")}>{mapCore.isFollowMode ? <Lock className="size-5" /> : <Unlock className="size-5" />}</Button>
             <Button onClick={handleRecenter} className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl flex items-center justify-center"><LocateFixed className="size-5"/></Button>
         </div>
+      </div>
+
+      {/* BOUTONS URGENCE RESTAURÉS v109.0 */}
+      <div className="grid grid-cols-2 gap-2 mb-4">
+          <Button 
+            variant="destructive" 
+            className="h-14 font-black uppercase rounded-2xl shadow-xl gap-3 text-xs border-2 border-white/20 animate-pulse" 
+            onClick={() => emetteur.triggerEmergency('MAYDAY')}
+          >
+              <ShieldAlert className="size-5" /> MAYDAY (SOS)
+          </Button>
+          <Button 
+            variant="secondary" 
+            className="h-14 font-black uppercase rounded-2xl shadow-lg gap-3 text-xs border-2 border-primary/20" 
+            onClick={() => emetteur.triggerEmergency('PAN PAN')}
+          >
+              <AlertTriangle className="size-5 text-primary" /> PAN PAN
+          </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
