@@ -14,7 +14,7 @@ const THRESHOLD_DRIFT = 0.2; // ND
 const THRESHOLD_MOVEMENT = 2.0; // ND
 
 /**
- * LOGIQUE ÉMETTEUR (A) v100.0 : Stabilisation et Rendu Temps Réel.
+ * LOGIQUE ÉMETTEUR (A) v105.0 : Stabilisation, Rendu Temps Réel et Confidentialité.
  */
 export function useEmetteur(
     handlePositionUpdate?: (lat: number, lng: number, status: string) => void, 
@@ -59,6 +59,7 @@ export function useEmetteur(
   const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
 
   const [techLogs, setTechLogs] = useState<TechLogEntry[]>([]);
+  const [breadcrumbs, setBreadcrumbs] = useState<{ lat: number, lng: number, timestamp: number }[]>([]);
   
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
   const currentPosRef = useRef(currentPos);
@@ -78,10 +79,10 @@ export function useEmetteur(
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  // Synchronisation de la ref v100.0 : INSTANTANÉE pour les calculs GPS
-  useEffect(() => {
-    mooringRadiusRef.current = mooringRadius;
-  }, [mooringRadius]);
+  // Synchronisation des refs
+  useEffect(() => { mooringRadiusRef.current = mooringRadius; }, [mooringRadius]);
+  useEffect(() => { isGhostModeRef.current = isGhostMode; }, [isGhostMode]);
+  useEffect(() => { isTrajectoryHiddenRef.current = isTrajectoryHidden; }, [isTrajectoryHidden]);
 
   const addTechLog = useCallback(async (label: string, details?: string, statusOverride?: string) => {
     if (!firestore || !sharingId) return;
@@ -138,28 +139,6 @@ export function useEmetteur(
 
     return setDoc(doc(firestore, 'vessels', sharingId), payload, { merge: true }).then(() => setLastSyncTime(Date.now()));
   }, [user, firestore, sharingId, vesselNickname, customFleetId, simulator?.isComCut, simulator?.isActive, simulator?.timeOffset, accuracy]);
-
-  useEffect(() => {
-    if (simulator?.isActive) {
-        if (isLaboAlreadyRunningRef.current) return;
-        isLaboAlreadyRunningRef.current = true;
-        setAnchorPos(null);
-        anchorPosRef.current = null;
-        lastSentStatusRef.current = null;
-        setVesselStatus('stationary');
-        vesselStatusRef.current = 'stationary';
-        addTechLog('LABO', 'SANDBOX ACTIVÉE');
-    } else {
-        if (!isLaboAlreadyRunningRef.current) return;
-        isLaboAlreadyRunningRef.current = false;
-        setAnchorPos(null);
-        anchorPosRef.current = null;
-        lastSentStatusRef.current = null;
-        setVesselStatus('moving');
-        vesselStatusRef.current = 'moving';
-        addTechLog('LABO', 'RETOUR MODE RÉEL');
-    }
-  }, [simulator?.isActive, addTechLog]);
 
   const handlePositionLogic = useCallback((lat: number, lng: number, speed: number, heading: number, acc: number) => {
     let nextStatus = vesselStatusRef.current;
@@ -247,12 +226,6 @@ export function useEmetteur(
     });
   }, [addTechLog, updateVesselInFirestore, simulator?.isActive]);
 
-  useEffect(() => {
-    if (simulator?.isActive && simulator?.simPos) {
-      handlePositionLogic(simulator.simPos.lat, simulator.simPos.lng, simulator.simSpeed, simulator.simBearing, simulator.simAccuracy || 5);
-    }
-  }, [simulator?.isActive, simulator?.simPos, simulator?.simSpeed, simulator?.simBearing, simulator?.simAccuracy, handlePositionLogic]);
-
   const startSharing = useCallback(() => {
     if (!navigator.geolocation || !user || !firestore) return;
     setIsSharing(true);
@@ -294,9 +267,26 @@ export function useEmetteur(
     lastSyncTime, techLogs, 
     emergencyContact, setEmergencyContact, vesselSmsMessage, setVesselSmsMessage, isEmergencyEnabled, setIsEmergencyEnabled,
     isCustomMessageEnabled, setIsCustomMessageEnabled, clearLogs: () => setTechLogs([]),
-    isGhostMode, toggleGhostMode: () => setIsGhostMode(!isGhostMode), 
-    isTrajectoryHidden, toggleTrajectoryHidden: () => setIsTrajectoryHidden(!isTrajectoryHidden),
-    resetTrajectory: () => { setAnchorPos(null); updateVesselInFirestore({ anchorLocation: null }, true); },
+    isGhostMode, 
+    toggleGhostMode: () => {
+        const next = !isGhostMode;
+        setIsGhostMode(next);
+        isGhostModeRef.current = next;
+        updateVesselInFirestore({ isGhostMode: next });
+    },
+    isTrajectoryHidden, 
+    toggleTrajectoryHidden: () => {
+        const next = !isTrajectoryHidden;
+        setIsTrajectoryHidden(next);
+        isTrajectoryHiddenRef.current = next;
+        updateVesselInFirestore({ isTrajectoryHidden: next });
+    },
+    resetTrajectory: () => { 
+        setAnchorPos(null); 
+        anchorPosRef.current = null;
+        updateVesselInFirestore({ anchorLocation: null }, true); 
+        setBreadcrumbs([]);
+    },
     addTechLog,
     savedFleets: userProfile?.savedFleets || [],
     changeManualStatus: (st: VesselStatus['status']) => {

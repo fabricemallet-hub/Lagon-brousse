@@ -84,7 +84,8 @@ import {
   Battery,
   Compass,
   Radio,
-  ZapOff
+  ZapOff,
+  EyeOff
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -515,7 +516,7 @@ export default function VesselTrackerPage() {
                                   {isAdmin && <TabsTrigger value="labo" className="text-[10px] font-black uppercase text-red-600">Labo</TabsTrigger>}
                               </TabsList>
                               
-                              <TabsContent value="tactical" className="m-0 p-4 bg-white">
+                              <TabsContent value="tactical" className="m-0 p-4 bg-white space-y-6">
                                   <div className="grid grid-cols-4 gap-2">
                                       <Button variant="outline" className="flex flex-col items-center justify-center h-20 rounded-xl border-2 gap-1 touch-manipulation transition-all active:scale-95" onClick={() => handleTactical('MARLIN')}>
                                           <Target className="size-5 text-primary" />
@@ -548,6 +549,52 @@ export default function VesselTrackerPage() {
                                       <Button variant="outline" className="flex flex-col items-center justify-center h-20 rounded-xl border-2 gap-1 touch-manipulation transition-all active:scale-95 bg-slate-50" onClick={() => handleTactical('PRISE')}>
                                           <Camera className="size-5 text-primary" />
                                           <span className="text-[9px] font-black uppercase">Prise</span>
+                                      </Button>
+                                  </div>
+
+                                  {/* BLOC CONFIDENTIALITÉ TACTIQUE v105.0 */}
+                                  <div className="mt-6 p-5 bg-slate-900 text-white rounded-3xl space-y-6 shadow-2xl border border-white/10">
+                                      <div className="flex items-center gap-2 mb-2">
+                                          <Ghost className="size-4 text-primary" />
+                                          <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">Confidentialité Tactique</h4>
+                                      </div>
+
+                                      <div className="space-y-4">
+                                          <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                                              <div className="space-y-0.5">
+                                                  <p className="text-xs font-black uppercase">Mode Fantôme</p>
+                                                  <p className="text-[9px] font-bold text-slate-400 uppercase">Invisible pour la Flotte C</p>
+                                              </div>
+                                              <Switch 
+                                                  checked={emetteur.isGhostMode} 
+                                                  onCheckedChange={emetteur.toggleGhostMode}
+                                                  className="data-[state=checked]:bg-primary"
+                                              />
+                                          </div>
+
+                                          <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                                              <div className="space-y-0.5">
+                                                  <p className="text-xs font-black uppercase">Masquer Tracé</p>
+                                                  <p className="text-[9px] font-bold text-slate-400 uppercase">Cache la ligne bleue</p>
+                                              </div>
+                                              <Switch 
+                                                  checked={emetteur.isTrajectoryHidden} 
+                                                  onCheckedChange={emetteur.toggleTrajectoryHidden}
+                                                  className="data-[state=checked]:bg-primary"
+                                              />
+                                          </div>
+                                      </div>
+
+                                      <Button 
+                                          variant="outline" 
+                                          className="w-full h-12 bg-white text-slate-900 font-black uppercase text-[10px] tracking-widest gap-2 rounded-xl border-none hover:bg-slate-100 transition-all active:scale-[0.98]"
+                                          onClick={() => {
+                                              emetteur.resetTrajectory();
+                                              mapCore.clearBreadcrumbs();
+                                              toast({ title: "Trajectoire réinitialisée" });
+                                          }}
+                                      >
+                                          <History className="size-4" /> Reset Trajectoire
                                       </Button>
                                   </div>
                               </TabsContent>
