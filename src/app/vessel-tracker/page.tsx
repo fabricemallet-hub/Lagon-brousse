@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useMapCore } from '@/logic/shared/useMapCore';
 import { useSimulator } from '@/logic/shared/useSimulator';
 import { useEmetteur } from '@/logic/emetteur/useEmetteur';
@@ -594,7 +593,7 @@ export default function VesselTrackerPage() {
                                                 fillOpacity: isImpactProbable ? (mapCore.isFlashOn ? 0.6 : 0.2) : 0.4, 
                                                 clickable: false, 
                                                 zIndex: 10 
-                                            }} 
+                            }} 
                                         />
                                         <OverlayView position={proj} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                             <div style={{ transform: 'translate(-50%, -320%)', zIndex: 10000 }} className="flex flex-col items-center pointer-events-none mb-3">
@@ -732,7 +731,7 @@ export default function VesselTrackerPage() {
                           <CardContent className="p-4 space-y-4">
                               <div className="grid grid-cols-2 gap-2">
                                   <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", emetteur.vesselStatus === 'returning' ? "bg-indigo-600 text-white border-indigo-700" : "bg-indigo-50 border-indigo-100 text-indigo-700")} onClick={() => { recepteur.initAudio(); emetteur.changeManualStatus('returning'); }}>Retour Maison</Button>
-                                  <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", emetteur.vesselStatus === 'landed' ? "bg-green-600 text-white border-green-700" : "bg-green-50 border-indigo-100 text-green-700")} onClick={() => { recepteur.initAudio(); emetteur.changeManualStatus('landed'); }}>À terre</Button>
+                                  <Button variant="outline" className={cn("h-14 font-black uppercase text-[10px] border-2 gap-2", emetteur.vesselStatus === 'landed' ? "bg-green-600 text-white border-green-700" : "bg-indigo-50 border-indigo-100 text-green-700")} onClick={() => { recepteur.initAudio(); emetteur.changeManualStatus('landed'); }}>À terre</Button>
                               </div>
                               <div className="p-4 bg-orange-50/30 border-2 border-orange-100 rounded-2xl space-y-4">
                                   <div className="flex items-center justify-between">
