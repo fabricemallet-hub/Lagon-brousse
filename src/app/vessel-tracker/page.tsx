@@ -9,7 +9,7 @@ import { useRecepteur } from '@/logic/recepteur/useRecepteur';
 import { useFlotte } from '@/logic/flotteC/useFlotte';
 import { useRadarIA } from '@/logic/shared/useRadarIA';
 import { GoogleMap, OverlayView, Circle, Polyline } from '@react-google-maps/api';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -145,7 +145,8 @@ const VesselMarker = ({ vessel }: { vessel: VesselStatus }) => {
                     <div className="flex items-center gap-1 mt-0.5 border-t border-white/10 pt-0.5 w-full justify-center">
                         <span className={cn("text-[7px] font-black uppercase tracking-tighter", 
                             statusLabel === 'MOUVEMENT' ? "text-green-400" : 
-                            statusLabel === 'MOUILLAGE' ? "text-blue-400" : "text-red-400"
+                            statusLabel === 'MOUILLAGE' ? "text-blue-400" : 
+                            statusLabel === 'RETOUR' ? "text-indigo-400" : "text-red-400"
                         )}>
                             {statusLabel} | {vessel.speed !== undefined && `${vessel.speed.toFixed(1)}ND`}
                         </span>
@@ -251,11 +252,14 @@ export default function VesselTrackerPage() {
   }, [emetteur.vesselStatus, hardClearCircles, recepteur]);
 
   useEffect(() => {
-    if (emetteur.currentPos && !hasCenteredInitially.current && mapCore.googleMap) {
-        mapCore.handleRecenter(emetteur.currentPos);
-        hasCenteredInitially.current = true;
+    if ((emetteur.currentPos || simulator.simPos) && !hasCenteredInitially.current && mapCore.googleMap) {
+        const pos = emetteur.currentPos || simulator.simPos;
+        if (pos) {
+            mapCore.handleRecenter(pos);
+            hasCenteredInitially.current = true;
+        }
     }
-  }, [emetteur.currentPos, mapCore]);
+  }, [emetteur.currentPos, simulator.simPos, mapCore]);
 
   useEffect(() => {
     if (emetteur.vesselStatus === 'drifting' && emetteur.currentPos && mapCore.googleMap) {
@@ -394,6 +398,13 @@ export default function VesselTrackerPage() {
     window.location.href = `sms:${contact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
+  const handleMapClick = (e: google.maps.MapMouseEvent) => {
+    if (simulator.isActive && simulator.isTeleportMode && e.latLng) {
+        simulator.teleport(e.latLng.lat(), e.latLng.lng());
+        toast({ title: "Téléportation LABO effectuée" });
+    }
+  };
+
   return (
     <div className="w-full space-y-4 pb-32 px-1 relative">
       {recepteur.isAlarmActive && (
@@ -451,7 +462,15 @@ export default function VesselTrackerPage() {
             <Button onClick={handleRecenter} className="bg-white/90 border-2 h-10 w-10 text-primary shadow-xl rounded-xl flex items-center justify-center"><LocateFixed className="size-5"/></Button>
         </div>
 
-        <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={12} onLoad={mapCore.setGoogleMap} onDragStart={() => mapCore.setIsFollowMode(false)} options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
+        <GoogleMap 
+            mapContainerClassName="w-full h-full" 
+            defaultCenter={INITIAL_CENTER} 
+            defaultZoom={12} 
+            onLoad={mapCore.setGoogleMap} 
+            onDragStart={() => mapCore.setIsFollowMode(false)} 
+            onClick={handleMapClick}
+            options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
+        >
             {!emetteur.isTrajectoryHidden && mapCore.breadcrumbs.length > 1 && <Polyline path={mapCore.breadcrumbs.map(p => ({ lat: p.lat, lng: p.lng }))} options={{ strokeColor: '#3b82f6', strokeOpacity: 0.6, strokeWeight: 2, zIndex: 1 }} />}
             
             {activeAnchorVessel && activeAnchorVessel.anchorLocation && (
@@ -470,8 +489,8 @@ export default function VesselTrackerPage() {
                 </OverlayView>
             ))}
 
-            {emetteur.isSharing && emetteur.currentPos && (
-                <OverlayView position={emetteur.currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+            {(emetteur.isSharing || simulator.isActive) && (emetteur.currentPos || simulator.simPos) && (
+                <OverlayView position={emetteur.currentPos || simulator.simPos!} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                     <VesselMarker vessel={{ id: emetteur.sharingId, displayName: emetteur.vesselNickname || 'Moi', status: emetteur.vesselStatus, speed: emetteur.currentSpeed, batteryLevel: Math.round(emetteur.battery.level * 100), isCharging: emetteur.battery.charging, isSharing: true, isGhostMode: emetteur.isGhostMode, lastActive: new Date() } as any} />
                 </OverlayView>
             )}
@@ -624,7 +643,7 @@ export default function VesselTrackerPage() {
                                             <span className="font-black text-sm text-primary uppercase">{fleet.id}</span>
                                             {fleet.comment && <span className="text-[10px] font-bold text-muted-foreground uppercase">{fleet.comment}</span>}
                                         </div>
-                                        <Button variant="ghost" size="icon" className="size-10 text-destructive/20 hover:text-destructive hover:bg-red-50" onClick={(e) => { e.stopPropagation(); emetteur.removeFleet(fleet); }}>
+                                        <Button variant="ghost" size="icon" className="size-10 text-destructive/40 hover:text-destructive hover:bg-red-50" onClick={(e) => { e.stopPropagation(); emetteur.removeFleet(fleet); }}>
                                             <Trash2 className="size-5" />
                                         </Button>
                                     </div>
@@ -836,7 +855,7 @@ export default function VesselTrackerPage() {
                                             </div>
 
                                             <div className="space-y-1.5">
-                                                <Label className="text-[9px] font-black uppercase text-slate-500 tracking-widest ml-1">NUMÉRO POUR ASSISTANCE</Label>
+                                                <Label className="text-[9px] font-black uppercase text-slate-500 tracking-widest ml-1">NUMÉRO DU CONTACT À TERRE</Label>
                                                 <div className="relative">
                                                     <Input 
                                                         value={emetteur.assistanceContact} 
@@ -881,43 +900,125 @@ export default function VesselTrackerPage() {
 
                       {isAdmin && (
                         <TabsContent value="labo" className="m-0 p-4 space-y-6 bg-white">
-                            <div className="p-4 border-2 border-dashed border-red-200 rounded-[2rem] bg-red-50/30 space-y-6">
-                                <div className="flex items-center justify-between border-b border-red-100 pb-3">
+                            <div className="p-6 border-2 border-dashed border-red-200 rounded-[2.5rem] bg-red-50/20 space-y-8">
+                                <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <Zap className="size-4 text-red-600 fill-red-600" />
-                                        <span className="text-xs font-black uppercase tracking-widest text-red-600">Sandbox Labo</span>
+                                        <Zap className="size-5 text-red-600 fill-red-600" />
+                                        <span className="text-sm font-black uppercase tracking-tighter text-red-600">Sandbox Tactique</span>
                                     </div>
                                     <Switch checked={simulator.isActive} onCheckedChange={(v) => simulator.setIsActive(v)} />
                                 </div>
 
-                                <div className={cn("space-y-6", !simulator.isActive && "opacity-40 pointer-events-none")}>
+                                <div className={cn("space-y-8", !simulator.isActive && "opacity-40 pointer-events-none")}>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center px-1">
+                                                <Label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+                                                    <Move className="size-3" /> Vitesse
+                                                </Label>
+                                                <span className="text-xs font-black text-red-600">{simulator.simSpeed.toFixed(1)} ND</span>
+                                            </div>
+                                            <Slider value={[simulator.simSpeed]} max={40} step={0.1} onValueChange={v => simulator.setSimSpeed(v[0])} />
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center px-1">
+                                                <Label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+                                                    <Compass className="size-3" /> Cap
+                                                </Label>
+                                                <span className="text-xs font-black text-red-600">{simulator.simBearing}°</span>
+                                            </div>
+                                            <Slider value={[simulator.simBearing]} max={360} step={1} onValueChange={v => simulator.setSimBearing(v[0])} />
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center px-1">
+                                                <Label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+                                                    <LocateFixed className="size-3" /> Précision (ACC)
+                                                </Label>
+                                                <span className="text-xs font-black text-red-600">{simulator.simAccuracy}M</span>
+                                            </div>
+                                            <Slider value={[simulator.simAccuracy]} min={1} max={100} step={1} onValueChange={v => simulator.setSimAccuracy(v[0])} />
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center px-1">
+                                                <Label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+                                                    <AlertTriangle className="size-3" /> Bruit (Saut)
+                                                </Label>
+                                                <span className="text-xs font-black text-red-600">{simulator.simGpsNoise}M</span>
+                                            </div>
+                                            <Slider value={[simulator.simGpsNoise]} max={50} step={1} onValueChange={v => simulator.setSimGpsNoise(v[0])} />
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center px-1">
+                                                <Label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+                                                    <Clock className="size-3" /> Time Offset
+                                                </Label>
+                                                <span className="text-xs font-black text-red-600">{simulator.timeOffset} MIN</span>
+                                            </div>
+                                            <Slider value={[simulator.timeOffset]} min={-1440} max={1440} step={1} onValueChange={v => simulator.setTimeOffset(v[0])} />
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center px-1">
+                                                <Label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+                                                    <Battery className="size-3" /> Batterie
+                                                </Label>
+                                                <span className="text-xs font-black text-red-600">{simulator.simBattery}%</span>
+                                            </div>
+                                            <Slider value={[simulator.simBattery]} max={100} step={1} onValueChange={v => simulator.setSimBattery(v[0])} />
+                                        </div>
+                                    </div>
+
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-[10px] font-black uppercase">
-                                                <span>Vitesse</span>
-                                                <span className="text-red-600">{simulator.simSpeed.toFixed(1)} ND</span>
-                                            </div>
-                                            <Slider value={[simulator.simSpeed]} max={10} step={0.1} onValueChange={v => simulator.setSimSpeed(v[0])} />
+                                        <div className="flex items-center justify-between p-4 bg-white border-2 rounded-2xl shadow-sm">
+                                            <Label className="text-[10px] font-black uppercase text-slate-800">Coupure GPS</Label>
+                                            <Switch checked={simulator.isGpsCut} onCheckedChange={(v) => simulator.setIsGpsCut(v)} />
                                         </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-[10px] font-black uppercase">
-                                                <span>Cap</span>
-                                                <span className="text-red-600">{simulator.simBearing}°</span>
-                                            </div>
-                                            <Slider value={[simulator.simBearing]} max={360} step={5} onValueChange={v => simulator.setSimBearing(v[0])} />
+                                        <div className="flex items-center justify-between p-4 bg-white border-2 rounded-2xl shadow-sm">
+                                            <Label className="text-[10px] font-black uppercase text-slate-800">Coupure COM</Label>
+                                            <Switch checked={simulator.isComCut} onCheckedChange={(v) => simulator.setIsComCut(v)} />
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-[10px] font-black uppercase">
-                                            <span className="flex items-center gap-1"><Battery className="size-3" /> Batterie</span>
-                                            <span className="text-red-600">{simulator.simBattery}%</span>
-                                        </div>
-                                        <Slider value={[simulator.simBattery]} max={100} step={1} onValueChange={v => simulator.setSimBattery(v[0])} />
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <Button 
+                                            variant={simulator.isTeleportMode ? "default" : "outline"} 
+                                            className={cn("h-14 font-black uppercase text-xs border-2 rounded-2xl transition-all shadow-sm", simulator.isTeleportMode && "bg-slate-900 text-white")}
+                                            onClick={() => simulator.setIsTeleportMode(!simulator.isTeleportMode)}
+                                        >
+                                            Injection Clic
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            className="h-14 font-black uppercase text-xs border-2 rounded-2xl text-red-600 border-red-100 bg-white hover:bg-red-50 shadow-sm"
+                                            onClick={() => simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius)}
+                                        >
+                                            Lancer Dérive
+                                        </Button>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <Button variant={simulator.isTeleportMode ? "default" : "outline"} className="h-12 font-black uppercase text-[10px] border-2" onClick={() => simulator.setIsTeleportMode(!simulator.isTeleportMode)}>INJECTION CLIC</Button>
-                                        <Button variant="outline" className="h-12 font-black uppercase text-[10px] border-2 text-red-600 border-red-100" onClick={() => simulator.forceDrift(emetteur.anchorPos, emetteur.mooringRadius)}>LANCER DÉRIVE</Button>
-                                    </div>
+
+                                    <Button 
+                                        className={cn(
+                                            "w-full h-20 text-lg font-black uppercase tracking-widest shadow-2xl rounded-3xl transition-all border-4 border-white/20",
+                                            simulator.isMoving ? "bg-red-600 hover:bg-red-700" : "bg-primary hover:bg-primary/90"
+                                        )}
+                                        onClick={() => simulator.setIsMoving(!simulator.isMoving)}
+                                    >
+                                        {simulator.isMoving ? "Arrêter Simulation" : "Lancer Simulation"}
+                                    </Button>
+
+                                    <button 
+                                        onClick={() => {
+                                            simulator.stopSim();
+                                            toast({ title: "Données réelles rétablies" });
+                                        }}
+                                        className="w-full text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-primary transition-colors py-2"
+                                    >
+                                        Rétablir données réelles
+                                    </button>
                                 </div>
                             </div>
                         </TabsContent>
