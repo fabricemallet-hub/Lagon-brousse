@@ -213,7 +213,8 @@ export default function VesselTrackerPage() {
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com', 'kledostyle@hotmail.com', 'kledostyle@outlook.com'];
-    return masterEmails.includes(user.email?.toLowerCase() || '') || userProfile?.role === 'admin';
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2', 'koKj5ObSGXYeO1PLKU5bgo8Yaky1'];
+    return masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid) || userProfile?.role === 'admin';
   }, [user, userProfile]);
 
   const [testMinutes, setTestMinutes] = useState('60');
@@ -305,7 +306,7 @@ export default function VesselTrackerPage() {
                 anchorLocation: { latitude: emetteur.anchorPos.lat, longitude: emetteur.anchorPos.lng }, 
                 location: emetteur.currentPos ? { latitude: emetteur.currentPos.lat, longitude: emetteur.currentPos.lng } : null, 
                 mooringRadius: emetteur.mooringRadius,
-                accuracy: emetteur.accuracy // Ajout v85.0
+                accuracy: emetteur.accuracy
             };
         }
         const otherVessels = followedVessels?.filter(v => v.id !== emetteur.sharingId && v.isSharing && v.anchorLocation) || [];
@@ -315,7 +316,6 @@ export default function VesselTrackerPage() {
     return followedVessels.find(v => v.isSharing && v.anchorLocation);
   }, [followedVessels, emetteur.isSharing, emetteur.vesselStatus, emetteur.anchorPos, emetteur.currentPos, emetteur.sharingId, emetteur.mooringRadius, emetteur.accuracy, mapCore.isCirclesHidden]);
 
-  // v85.0: Utilisation de la distance lissée (smoothedDistance)
   const currentDriftDist = emetteur.smoothedDistance;
 
   const handleUpdateAlertConfig = (key: keyof VesselPrefs['alerts'], field: 'enabled' | 'sound' | 'loop', value: any) => {
@@ -404,18 +404,17 @@ export default function VesselTrackerPage() {
                 <React.Fragment>
                     {activeAnchorVessel.location && <Polyline path={[{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }, { lat: activeAnchorVessel.location.latitude, lng: activeAnchorVessel.location.longitude }]} options={{ strokeColor: activeAnchorVessel.status === 'drifting' ? '#ef4444' : '#3b82f6', strokeOpacity: 0.8, strokeWeight: 2, zIndex: 2 }} />}
                     
-                    {/* v85.0 : Indicateur numérique de distance avec gestion de la précision */}
                     <OverlayView position={{ lat: activeAnchorVessel.anchorLocation.latitude, lng: activeAnchorVessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                        <div style={{ transform: 'translate(-50%, -160%)' }} className="flex flex-col items-center pointer-events-none">
+                        <div style={{ transform: 'translate(-50%, -240%)', zIndex: 9999 }} className="flex flex-col items-center pointer-events-none">
                             <div className={cn(
-                                "px-2 py-1 rounded-lg backdrop-blur-md border-2 text-[9px] font-black uppercase shadow-2xl whitespace-nowrap transition-all",
+                                "px-[10px] py-[4px] rounded-lg backdrop-blur-md border-2 text-[10px] font-black uppercase shadow-2xl whitespace-nowrap transition-all",
                                 activeAnchorVessel.status === 'drifting' ? "bg-red-600/90 border-red-400 text-white animate-pulse" : 
                                 (activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15) ? "bg-orange-500/90 border-orange-300 text-white" : "bg-slate-900/80 border-white/20 text-white"
                             )}>
                                 Rayon : {activeAnchorVessel.mooringRadius}m | Distance : {currentDriftDist !== null ? `${currentDriftDist}m` : '...'}
                                 {activeAnchorVessel.accuracy && activeAnchorVessel.accuracy > 15 && " (Prec +/-" + activeAnchorVessel.accuracy + "m)"}
                             </div>
-                            <div className="w-0.5 h-2 bg-white/40 shadow-sm" />
+                            <div className="w-0.5 h-3 bg-white/40 shadow-sm" />
                         </div>
                     </OverlayView>
 
@@ -774,7 +773,6 @@ export default function VesselTrackerPage() {
                                                 <Slider value={[simulator.simBearing]} min={0} max={360} step={5} onValueChange={v => { recepteur.initAudio(); simulator.setSimBearing(v[0]); }} />
                                             </div>
 
-                                            {/* v85.0 : Slider Bruit GPS */}
                                             <div className="space-y-2 border-t pt-2">
                                                 <div className="flex justify-between text-[9px] font-black uppercase">
                                                     <span className="flex items-center gap-1"><Signal className="size-3" /> Bruit GPS (Instabilité)</span>
